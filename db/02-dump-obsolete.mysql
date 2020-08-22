@@ -1,0 +1,7 @@
+-- Delete tasks in deleted state
+DELETE from tasks WHERE state = -1;
+
+-- Delete the whole event log
+DROP TABLE IF EXISTS tasks_event_log;
+
+UPDATE schema_version SET version = 2 LIMIT 1;
