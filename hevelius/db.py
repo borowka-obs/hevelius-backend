@@ -8,13 +8,13 @@ def connect():
     return cnx
 
 def run_query(cnx, query):
-    cursor = cnx.cursor(buffered=True) # cursor(dictionary=True) or cursor(named_tuple=True)
+    cursor = cnx.cursor() # cursor(dictionary=True) or cursor(named_tuple=True)
     cursor.execute(query)
-    print("#### rowcount = %d" % cursor.rowcount)
     try:
         result = cursor.fetchall()
     except:
-        result = None    
+        result = None # If this is an update or delete query.
+        cnx.commit()
     cursor.close()
     return result
 
@@ -97,7 +97,7 @@ def task_update(cnx, id, fwhm = None, eccentricity = None):
 
     q = "UPDATE tasks SET %s WHERE task_id=%d" % (upd, id)
 
-    print("#### query=[%s]" % q)
+    print("Updating task %d: query=[%s]" % (id, q))
 
     run_query(cnx, q)
         
