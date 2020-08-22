@@ -4,8 +4,6 @@
 import sys
 sys.path.append("e:\\devel\\hevelius-proc")
 
-import pprint
-
 from hevelius import db
 
 print("Hevelius db-migrate 0.1")
