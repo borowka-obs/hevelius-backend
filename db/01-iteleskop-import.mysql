@@ -1,0 +1,368 @@
+-- MySQL dump 10.17  Distrib 10.3.22-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: localhost    Database: hevelius
+-- ------------------------------------------------------
+-- Server version	10.3.22-MariaDB-0+deb10u1
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `filters`
+--
+
+DROP TABLE IF EXISTS `filters`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `filters` (
+  `scope_id` int(11) DEFAULT NULL,
+  `filter_id` varchar(16) DEFAULT NULL,
+  `descr` varchar(128) DEFAULT NULL,
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `filters`
+--
+
+LOCK TABLES `filters` WRITE;
+/*!40000 ALTER TABLE `filters` DISABLE KEYS */;
+/*!40000 ALTER TABLE `filters` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `mymfavorites`
+--
+
+DROP TABLE IF EXISTS `mymfavorites`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `mymfavorites` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `fav_name` text DEFAULT NULL,
+  `fav_source` text DEFAULT NULL,
+  `fav_path` text DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin2 COMMENT='Please do not modify this table!';
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `mymfavorites`
+--
+
+LOCK TABLES `mymfavorites` WRITE;
+/*!40000 ALTER TABLE `mymfavorites` DISABLE KEYS */;
+/*!40000 ALTER TABLE `mymfavorites` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `objects`
+--
+
+DROP TABLE IF EXISTS `objects`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `objects` (
+  `object_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(68) NOT NULL,
+  `ra` float DEFAULT NULL,
+  `decl` float DEFAULT NULL,
+  `descr` varchar(1024) DEFAULT NULL,
+  `comment` text DEFAULT NULL,
+  `type` varchar(3) DEFAULT NULL,
+  `epoch` varchar(7) DEFAULT NULL,
+  `const` varchar(3) DEFAULT NULL,
+  `magn` float DEFAULT NULL,
+  `x` float DEFAULT NULL,
+  `y` float DEFAULT NULL,
+  PRIMARY KEY (`object_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=17342 DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `objects`
+--
+
+LOCK TABLES `objects` WRITE;
+/*!40000 ALTER TABLE `objects` DISABLE KEYS */;
+/*!40000 ALTER TABLE `objects` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `schema_version`
+--
+
+DROP TABLE IF EXISTS `schema_version`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `schema_version` (
+  `version` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `schema_version`
+--
+
+LOCK TABLES `schema_version` WRITE;
+/*!40000 ALTER TABLE `schema_version` DISABLE KEYS */;
+INSERT INTO `schema_version` VALUES (1);
+/*!40000 ALTER TABLE `schema_version` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `settings`
+--
+
+DROP TABLE IF EXISTS `settings`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `settings` (
+  `settings_id` int(11) NOT NULL AUTO_INCREMENT,
+  `name` varchar(50) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `value` varchar(1024) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `comment` varchar(100) COLLATE utf8_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`settings_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=15 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci PACK_KEYS=0;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `settings`
+--
+
+LOCK TABLES `settings` WRITE;
+/*!40000 ALTER TABLE `settings` DISABLE KEYS */;
+/*!40000 ALTER TABLE `settings` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `task_states`
+--
+
+DROP TABLE IF EXISTS `task_states`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `task_states` (
+  `state` int(11) NOT NULL,
+  `name` varchar(20) DEFAULT NULL,
+  `descr` text DEFAULT NULL,
+  PRIMARY KEY (`state`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `task_states`
+--
+
+LOCK TABLES `task_states` WRITE;
+/*!40000 ALTER TABLE `task_states` DISABLE KEYS */;
+/*!40000 ALTER TABLE `task_states` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tasks`
+--
+
+DROP TABLE IF EXISTS `tasks`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `tasks` (
+  `task_id` int(10) unsigned NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `scope_id` int(11) NOT NULL,
+  `object` varchar(64) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `ra` float DEFAULT NULL,
+  `decl` float DEFAULT NULL,
+  `exposure` float DEFAULT NULL,
+  `descr` varchar(1024) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `filter` varchar(16) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `binning` tinyint(4) DEFAULT NULL,
+  `guiding` tinyint(4) DEFAULT 1,
+  `dither` tinyint(4) DEFAULT 0,
+  `defocus` tinyint(4) DEFAULT NULL,
+  `calibrate` tinyint(4) DEFAULT NULL,
+  `solve` tinyint(4) DEFAULT NULL,
+  `vphot` tinyint(4) DEFAULT NULL,
+  `other_cmd` varchar(512) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `min_alt` float DEFAULT NULL,
+  `moon_distance` float DEFAULT NULL,
+  `skip_before` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `skip_after` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `min_interval` int(11) DEFAULT NULL,
+  `comment` mediumtext COLLATE utf8_unicode_ci DEFAULT NULL,
+  `state` int(11) DEFAULT NULL,
+  `imagename` varchar(256) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `created` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',
+  `activated` timestamp NULL DEFAULT NULL,
+  `performed` timestamp NULL DEFAULT NULL,
+  `max_moon_phase` int(11) DEFAULT NULL,
+  `max_sun_alt` int(11) DEFAULT NULL,
+  `auto_center` tinyint(4) DEFAULT 0,
+  `calibrated` tinyint(4) DEFAULT 0,
+  `solved` tinyint(4) DEFAULT 0,
+  `sent` tinyint(4) DEFAULT 0,
+  PRIMARY KEY (`task_id`),
+  KEY `user_id` (`user_id`),
+  KEY `tasks_idx_state` (`state`),
+  KEY `tasks_idx_created` (`created`),
+  KEY `tasks_idx_activated` (`activated`),
+  KEY `ix_created` (`created`),
+  KEY `ix_activated` (`activated`),
+  KEY `ix_competed` (`performed`),
+  KEY `IX_object` (`object`),
+  CONSTRAINT `tasks_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE
+) ENGINE=InnoDB AUTO_INCREMENT=134927 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `tasks`
+--
+
+LOCK TABLES `tasks` WRITE;
+/*!40000 ALTER TABLE `tasks` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tasks` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `tasks_event_log`
+--
+
+DROP TABLE IF EXISTS `tasks_event_log`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `tasks_event_log` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `task_id` int(11) DEFAULT NULL,
+  `time_stamp` timestamp NULL DEFAULT current_timestamp(),
+  `descr` varchar(1000) COLLATE utf8_unicode_ci DEFAULT '-',
+  PRIMARY KEY (`id`),
+  KEY `tasks_event_log_task_id_idx` (`task_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=2304904 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci PACK_KEYS=0;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `tasks_event_log`
+--
+
+LOCK TABLES `tasks_event_log` WRITE;
+/*!40000 ALTER TABLE `tasks_event_log` DISABLE KEYS */;
+/*!40000 ALTER TABLE `tasks_event_log` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `telescopes`
+--
+
+DROP TABLE IF EXISTS `telescopes`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `telescopes` (
+  `scope_id` int(11) NOT NULL,
+  `name` varchar(64) DEFAULT NULL,
+  `descr` varchar(1024) DEFAULT NULL,
+  `min_dec` float DEFAULT NULL,
+  `max_dec` float DEFAULT NULL,
+  PRIMARY KEY (`scope_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `telescopes`
+--
+
+LOCK TABLES `telescopes` WRITE;
+/*!40000 ALTER TABLE `telescopes` DISABLE KEYS */;
+/*!40000 ALTER TABLE `telescopes` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `user_preferences`
+--
+
+DROP TABLE IF EXISTS `user_preferences`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `user_preferences` (
+  `pref_id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) DEFAULT NULL,
+  `exposure` int(11) DEFAULT 75,
+  `filter` varchar(20) DEFAULT 'CV',
+  `binning` int(11) DEFAULT 2,
+  `guiding` tinyint(4) DEFAULT 1,
+  `dither` tinyint(4) DEFAULT NULL,
+  `defocus` tinyint(4) DEFAULT 0,
+  `calibrate` tinyint(4) DEFAULT 1,
+  `solve` int(11) DEFAULT 1,
+  `vphot` tinyint(4) DEFAULT 0,
+  `min_alt` int(11) DEFAULT 35,
+  `moon_distance` int(11) DEFAULT 0,
+  `max_sun_alt` int(11) NOT NULL DEFAULT -12,
+  `max_moon_phase` int(11) DEFAULT NULL,
+  PRIMARY KEY (`pref_id`),
+  UNIQUE KEY `user_id` (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=10 DEFAULT CHARSET=latin2 PACK_KEYS=0;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `user_preferences`
+--
+
+LOCK TABLES `user_preferences` WRITE;
+/*!40000 ALTER TABLE `user_preferences` DISABLE KEYS */;
+/*!40000 ALTER TABLE `user_preferences` ENABLE KEYS */;
+UNLOCK TABLES;
+
+--
+-- Table structure for table `users`
+--
+
+DROP TABLE IF EXISTS `users`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8 */;
+CREATE TABLE `users` (
+  `user_id` int(11) NOT NULL AUTO_INCREMENT,
+  `login` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `pass` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `firstname` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `lastname` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `share` float DEFAULT NULL,
+  `phone` varchar(11) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `email` varchar(64) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `permissions` int(11) NOT NULL DEFAULT 0,
+  `aavso_id` varchar(5) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `ftp_login` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `ftp_pass` varchar(32) COLLATE utf8_unicode_ci DEFAULT NULL,
+  `pass_d` varchar(50) COLLATE utf8_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`user_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=17 DEFAULT CHARSET=utf8 COLLATE=utf8_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Dumping data for table `users`
+--
+
+LOCK TABLES `users` WRITE;
+/*!40000 ALTER TABLE `users` DISABLE KEYS */;
+/*!40000 ALTER TABLE `users` ENABLE KEYS */;
+UNLOCK TABLES;
+/*!40103 SET TIME_ZONE=@OLD_TIME_ZONE */;
+
+/*!40101 SET SQL_MODE=@OLD_SQL_MODE */;
+/*!40014 SET FOREIGN_KEY_CHECKS=@OLD_FOREIGN_KEY_CHECKS */;
+/*!40014 SET UNIQUE_CHECKS=@OLD_UNIQUE_CHECKS */;
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+/*!40111 SET SQL_NOTES=@OLD_SQL_NOTES */;
+
+-- Dump completed on 2020-08-22 18:08:44

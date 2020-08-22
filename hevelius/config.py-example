@@ -1,0 +1,4 @@
+USER = 'mylogin'
+DBNAME = 'hevelius'
+HOST = 'localhost'
+PASSWORD = 'secret1'
