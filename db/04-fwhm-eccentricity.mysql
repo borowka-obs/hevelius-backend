@@ -1,0 +1,3 @@
+ALTER TABLE tasks ADD COLUMN fwhm float, ADD COLUMN eccentricity float;
+
+UPDATE schema_version SET version = 4 LIMIT 1;
