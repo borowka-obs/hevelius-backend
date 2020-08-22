@@ -1,0 +1,20 @@
+
+-- Create table with states descriptions.
+CREATE TABLE IF NOT EXISTS states (id int unique not null, name varchar(16), descr varchar(128));
+
+-- Insert currently used states.
+INSERT INTO states (id, name, descr) VALUES
+    (-2, "DELETED TEMPLATE", "A template that has been deleted"),
+    (-1, "DELETED", "Tasks that were deleted"),
+    (0, "TEMPLATE", "A task template"),
+    (1, "NEW", "A task that has been recently added and not yet processed in any way"),
+    (2, "ACTIVATED", "A task that has been processed by Tadek's scheduler."),
+    (3, "IN QUEUE", "A task that's in Nerpio queue"),
+    (4, "EXECUTED", "A task been completed by the telescope, but the results hasn't been processed yet"),
+    (6, "DONE", "Task artifacts has been calibrated and Nerpio processing is complete");
+
+-- Forbid non-defined states.
+ALTER TABLE tasks MODIFY state int NOT NULL;
+ALTER TABLE tasks ADD CONSTRAINT fk_state FOREIGN KEY (state) REFERENCES states(id);
+
+UPDATE schema_version SET version = 3 LIMIT 1;
