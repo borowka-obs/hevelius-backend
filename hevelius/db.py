@@ -35,15 +35,18 @@ def stats_get(cnx):
     tasks_cnt = run_query(cnx, 'SELECT count(*) from tasks')
     files_cnt = run_query(cnx, 'SELECT count(*) from tasks where imagename is not null')
 
-    return tasks_cnt[0][0], files_cnt[0][0]
+    fwhm_cnt = run_query(cnx, 'select count(*) from tasks WHERE fwhm is not null')
+    eccentricity_cnt = run_query(cnx, 'select count(*) from tasks WHERE eccentricity is not null')
+
+    return tasks_cnt[0][0], files_cnt[0][0], fwhm_cnt[0][0], eccentricity_cnt[0][0]
 
 def stats_by_state(cnx):
     # Get tasks list by status
-    hist = run_query(cnx, 'SELECT state, count(*) from tasks group by state')
+    hist = run_query(cnx, 'SELECT state, name, count(*) from tasks, states where tasks.state = states.id group by state')
     res = []
 
     for row in hist:
-        res.append( (row[0], row[1]))
+        res.append( (row[0], row[1], row[2]))
 
     return res
 

@@ -54,14 +54,7 @@ def read_csv(fname):
     return tasks
 
 
-if __name__ == '__main__':
-
-    parser = argparse.ArgumentParser("Hevelius Processor 0.1.0")
-    parser.add_argument("-s", "--subframe-selector", help="SubframeSelector output CSV file.", type=str, required=True)
-    parser.add_argument("-d", "--dry-run", help="Pretends to do updates.", action='store_true', default=False, required=False)
-
-    args = parser.parse_args()
-
+def cmd_subframe_selector(args):
     print("Loading file %s" % args.subframe_selector)
 
     tasks = read_csv(args.subframe_selector)
@@ -80,3 +73,14 @@ if __name__ == '__main__':
             print("Pretending to update task %d with fwhm=%f, eccentricity=%f" % (t["id"], t["fwhm"], t["eccentricity"]))
 
     cnx.close()
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser("Hevelius Processor 0.1.0")
+    parser.add_argument("-s", "--subframe-selector", help="SubframeSelector output CSV file.", type=str, required=True)
+    parser.add_argument("-d", "--dry-run", help="Pretends to do updates.", action='store_true', default=False, required=False)
+
+    args = parser.parse_args()
+
+    cmd_subframe_selector(args)
