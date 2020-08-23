@@ -4,6 +4,8 @@
 import sys
 sys.path.append("e:\\devel\\hevelius-proc")
 
+import argparse
+
 from hevelius import db
 
 def parse_task(l):
@@ -51,13 +53,30 @@ def read_csv(fname):
 
     return tasks
 
-tasks = read_csv("SubframeSelector_table.csv")
 
-print("Found %d task(s)" % len(tasks))
+if __name__ == '__main__':
 
-cnx = db.connect()
+    parser = argparse.ArgumentParser("Hevelius Processor 0.1.0")
+    parser.add_argument("-s", "--subframe-selector", help="SubframeSelector output CSV file.", type=str, required=True)
+    parser.add_argument("-d", "--dry-run", help="Pretends to do updates.", action='store_true', default=False, required=False)
 
-for t in tasks:
-    db.task_update(cnx, t["id"], t["fwhm"], t["eccentricity"])
+    args = parser.parse_args()
 
-cnx.close()
+    print("Loading file %s" % args.subframe_selector)
+
+    tasks = read_csv(args.subframe_selector)
+
+    print("Found %d task(s)" % len(tasks))
+
+    cnx = db.connect()
+
+    cnt = 0
+    for t in tasks:
+        print("Task %d of %d: " % (cnt, len(tasks)), end="")
+        cnt += 1
+        if (not args.dry_run):
+            db.task_update(cnx, t["id"], t["fwhm"], t["eccentricity"])
+        else:
+            print("Pretending to update task %d with fwhm=%f, eccentricity=%f" % (t["id"], t["fwhm"], t["eccentricity"]))
+
+    cnx.close()
