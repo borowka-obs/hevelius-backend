@@ -5,34 +5,32 @@ import sys
 sys.path.append("e:\\devel\\hevelius-proc")
 
 from hevelius import db
+import argparse
 
-print("Hevelius db-migrate 0.1")
+def stats(args):
+    cnx = db.connect()
 
-cnx = db.connect()
+    v = db.version_get(cnx)
 
-v = db.version_get(cnx)
+    print("Schema version is %d" % v)
 
-print("Schema version is %d" % v)
+    stats = db.stats_get(cnx)
+    print("There are %d tasks, %d files, %d have FWHM, %d have eccentricity." % stats)
+    print("Missing: %d files miss FWHM, %d files miss eccentricity." % (stats[1] - stats[2], stats[1] - stats[3]))
 
-stats = db.stats_get(cnx)
-print("There are %d tasks, %d files." % stats)
+    print("Stats by state:")
+    by_state = db.stats_by_state(cnx)
+    for id,name,cnt in by_state:
+        print("%18s(%2d): %d" % (name, id, cnt))
 
-print("Stats by state:")
-by_state = db.stats_by_state(cnx)
-print(by_state)
+    cnx.close()
 
-print("Status of task 133989: BEFORE")
-t1 = db.task_get(cnx, 133989)
-print(t1)
+if __name__ == '__main__':
+    print("Hevelius db-migrate 0.1")
 
-db.task_update(cnx, 133989, fwhm = 12.34, eccentricity=54.321)
+    parser = argparse.ArgumentParser("Hevelius DB Migrator 0.1.0")
 
-print("Status of task 133989: AFTER")
-t1 = db.task_get(cnx, 133989)
-print(t1)
+    args = parser.parse_args()
 
+    stats(args)
 
-#t2 = db.task_get(cnx, 133910)
-#print(t2)
-
-cnx.close()
