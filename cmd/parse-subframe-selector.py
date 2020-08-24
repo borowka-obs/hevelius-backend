@@ -2,11 +2,15 @@
 
 # This is an ugly hack. It should be removed.
 import sys
-sys.path.append("e:\\devel\\hevelius-proc")
+sys.path.append(".")
 
 import argparse
 
-from hevelius import db
+try:
+    from hevelius import db
+except ImportError:
+    print("Make sure you have config.py filled in. Please copy config.py-example to config.py and fill it in.")
+    sys.exit(-1)
 
 def parse_task(l):
     """ Parses a string like this: Subframe,1,1,"E:/astro/nerpio/MTOA/2020Q2/SFDB_2020-05-12_00-39-28_J131878_MTOA_CV_1x1_0300s_NGC2403.fit",8.744279e-01,2.505002e+00,7.740531e-01,8.744279e-01,2.760000e+02,1.622958e+01,1.735582e+01,400,3.436380e-02,9.298809e-01,2.496715e+00,9.148272e-02,2.159095e-02,"2020-05-11 22:39:28" """
@@ -27,15 +31,20 @@ def parse_task(l):
     # Now try to get the job id from the filename. First, ignore the path...
     tmp = fname[fname.rfind("/") + 1:]
 
-    # then, get the 26th to 32nd chars, which should be the digits in J131878 string.
-    tmp2 = tmp[26:32]
-    t["id"] = int(tmp2)
+    # then, get the J012345 substring, which designates the task id.
+    try:
+        offset = tmp.find("J") + 1
+        tmp2 = tmp[offset:offset+6]
+        t["id"] = int(tmp2)
+    except ValueError:
+        print("ERROR: Unable to parse task id from [%s], tmp=[%s] tmp2=[%s]" % (l, tmp, tmp2), file = sys.stderr)
+        t["id"] = -1
     return t
 
 def read_csv(fname):
     with open(fname) as f:
         content = f.readlines()
-    
+
     tasks = []
     found = False
     i = 0
@@ -48,7 +57,7 @@ def read_csv(fname):
             found = True
             print("Data header found in line %d" % i)
             continue
-        
+
         tasks.append(parse_task(l))
 
     return tasks
@@ -68,7 +77,10 @@ def cmd_subframe_selector(args):
         print("Task %d of %d: " % (cnt, len(tasks)), end="")
         cnt += 1
         if (not args.dry_run):
-            db.task_update(cnx, t["id"], t["fwhm"], t["eccentricity"])
+            if t["id"] > 0:
+                db.task_update(cnx, t["id"], t["fwhm"], t["eccentricity"])
+            else:
+                print("WARNING: skipping line %d, because task id is %d" % (cnt, t["id"]))
         else:
             print("Pretending to update task %d with fwhm=%f, eccentricity=%f" % (t["id"], t["fwhm"], t["eccentricity"]))
 
