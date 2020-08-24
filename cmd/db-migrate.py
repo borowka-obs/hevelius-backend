@@ -2,7 +2,7 @@
 
 # This is an ugly hack. It should be removed.
 import sys
-sys.path.append("e:\\devel\\hevelius-proc")
+sys.path.append(".")
 
 from hevelius import db
 import argparse
