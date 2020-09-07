@@ -4,7 +4,11 @@ import mysql.connector
 from hevelius import config
 
 def connect():
-    cnx = mysql.connector.connect(user=config.USER, password=config.PASSWORD, database=config.DBNAME, host=config.HOST, port=config.PORT)
+    try:
+        cnx = mysql.connector.connect(user=config.USER, password=config.PASSWORD, database=config.DBNAME, host=config.HOST, port=config.PORT)
+    except BaseException as e:
+        print("ERROR: Failed to connect to DB: user=%s, database=%s, host=%s, port=%d: %s" % (config.USER, config.DBNAME, config.HOST, config.PORT, e))
+        raise
     return cnx
 
 def run_query(cnx, query):
@@ -21,7 +25,12 @@ def run_query(cnx, query):
 def version_get(cnx):
     query = 'SELECT * from schema_version'
     cursor = cnx.cursor()
-    cursor.execute(query)
+
+    try:
+        cursor.execute(query)
+    except mysql.connector.errors.ProgrammingError:
+        # Table doesn't exist, return 0
+        return 0
 
     for i in cursor:
         ver = i[0]
@@ -94,7 +103,7 @@ def task_update(cnx, id, fwhm = None, eccentricity = None):
         if len(upd):
             upd += ", "
         upd += "eccentricity = %f" % eccentricity
-    
+
     if not len(upd):
         print("Nothing to update in task %d, aborting" % id)
 
@@ -103,4 +112,3 @@ def task_update(cnx, id, fwhm = None, eccentricity = None):
     print("Updating task %d: query=[%s]" % (id, q))
 
     run_query(cnx, q)
-        
