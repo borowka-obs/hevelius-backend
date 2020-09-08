@@ -13,5 +13,5 @@ GRANT ALL on hevelius.* to 'hevelius'@'192.0.2.1';
 Then run the following command to import iteleskop schema with Hevelius changes:
 
 ```python
-python cmd/db-migrate.py
+python cmd/db-admin.py migrate
 ```
