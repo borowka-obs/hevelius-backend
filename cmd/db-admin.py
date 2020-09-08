@@ -74,9 +74,16 @@ if __name__ == '__main__':
     print("Hevelius db-migrate 0.1")
 
     parser = argparse.ArgumentParser("Hevelius DB Migrator 0.1.0")
+    subparsers = parser.add_subparsers(help="commands", dest="command")
+
+    stats_parser = subparsers.add_parser('stats', help="Show database statistics")
+    migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
 
     args = parser.parse_args()
 
-    #stats(args)
-    migrate(args)
-
+    if args.command == "stats":
+        stats(args)
+    elif args.command == "migrate":
+        migrate(args)
+    else:
+        parser.print_help()
