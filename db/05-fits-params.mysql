@@ -18,8 +18,8 @@ ALTER TABLE tasks ADD COLUMN he_objectdec float;
 ALTER TABLE tasks ADD COLUMN he_objectalt float;
 ALTER TABLE tasks ADD COLUMN he_objectaz float;
 ALTER TABLE tasks ADD COLUMN he_objectha float;
-ALTER TABLE tasks ADD COLUMN he_site_lattitude float;
-ALTER TABLE tasks ADD COLUMN he_site_longitute float;
+ALTER TABLE tasks ADD COLUMN he_site_lat float;
+ALTER TABLE tasks ADD COLUMN he_site_lon float;
 ALTER TABLE tasks ADD COLUMN he_pierside varchar(4);
 
 ALTER TABLE tasks ADD COLUMN he_jd float; -- Julian Date at start of exposure
@@ -37,8 +37,19 @@ ALTER TABLE tasks ADD COLUMN he_moon_alt float;
 ALTER TABLE tasks ADD COLUMN he_moon_angle float;
 ALTER TABLE tasks ADD COLUMN he_moon_phase float;
 ALTER TABLE tasks ADD COLUMN he_sun_alt float;
-ALTER TABLE tasks ADD COLUMN he_solve_ra float;
-ALTER TABLE tasks ADD COLUMN he_solve_dec float;
-ALTER TABLE tasks ADD COLUMN he_fits_fwhm float;
+ALTER TABLE tasks ADD COLUMN he_solved bool;
+ALTER TABLE tasks ADD COLUMN he_solved_ra float;
+ALTER TABLE tasks ADD COLUMN he_solved_dec float;
+ALTER TABLE tasks ADD COLUMN he_solved_refx int;
+ALTER TABLE tasks ADD COLUMN he_solved_refy int;
+ALTER TABLE tasks ADD COLUMN he_pixscalex float;
+ALTER TABLE tasks ADD COLUMN he_pixscaley float;
+ALTER TABLE tasks ADD COLUMN he_solved_ra_change_x float;
+ALTER TABLE tasks ADD COLUMN he_solved_ra_change_y float;
+ALTER TABLE tasks ADD COLUMN he_solved_dec_change_x float;
+ALTER TABLE tasks ADD COLUMN he_solved_dec_change_y float;
+
+ALTER TABLE tasks ADD COLUMN he_fwhm float;
+ALTER TABLE tasks ADD COLUMN he_stars float;
 
 UPDATE schema_version SET version = 5 LIMIT 1;
