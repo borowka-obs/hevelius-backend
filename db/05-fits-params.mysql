@@ -1,0 +1,44 @@
+ALTER TABLE tasks ADD COLUMN he_resx int; -- fits header: NAXIS1
+ALTER TABLE tasks ADD COLUMN he_resy int; -- fits header: NAXIS2
+ALTER TABLE tasks ADD COLUMN he_obsstart timestamp; -- fits header: DATE-OBS
+ALTER TABLE tasks ADD COLUMN he_exposure float; -- fits header: EXPTIME (in seconds)
+ALTER TABLE tasks ADD COLUMN he_settemp float; -- fits header: SET-TEMP
+ALTER TABLE tasks ADD COLUMN he_ccdtemp float; -- fits header: CCD-TEMP
+
+ALTER TABLE tasks ADD COLUMN he_pixwidth float; -- fits header: Pixel width in microns (after binning)
+ALTER TABLE tasks ADD COLUMN he_pixheight float; -- fits header: Pixel height in microns (after binning)
+
+ALTER TABLE tasks ADD COLUMN he_xbinning int;
+ALTER TABLE tasks ADD COLUMN he_ybinning int;
+
+ALTER TABLE tasks ADD COLUMN he_filter varchar(20); -- TODO: This should be an enum
+
+ALTER TABLE tasks ADD COLUMN he_objectra float;
+ALTER TABLE tasks ADD COLUMN he_objectdec float;
+ALTER TABLE tasks ADD COLUMN he_objectalt float;
+ALTER TABLE tasks ADD COLUMN he_objectaz float;
+ALTER TABLE tasks ADD COLUMN he_objectha float;
+ALTER TABLE tasks ADD COLUMN he_site_lattitude float;
+ALTER TABLE tasks ADD COLUMN he_site_longitute float;
+ALTER TABLE tasks ADD COLUMN he_pierside varchar(4);
+
+ALTER TABLE tasks ADD COLUMN he_jd float; -- Julian Date at start of exposure
+ALTER TABLE tasks ADD COLUMN he_jd_helio float; -- Heliocentric Julian Date at exposure midpoint
+
+ALTER TABLE tasks ADD COLUMN he_tracktime float;
+ALTER TABLE tasks ADD COLUMN he_focal float;
+ALTER TABLE tasks ADD COLUMN he_aperture_diam float;
+ALTER TABLE tasks ADD COLUMN he_aperture_area float;
+ALTER TABLE tasks ADD COLUMN he_scope varchar(32);
+
+ALTER TABLE tasks ADD COLUMN he_camera varchar(32);
+
+ALTER TABLE tasks ADD COLUMN he_moon_alt float;
+ALTER TABLE tasks ADD COLUMN he_moon_angle float;
+ALTER TABLE tasks ADD COLUMN he_moon_phase float;
+ALTER TABLE tasks ADD COLUMN he_sun_alt float;
+ALTER TABLE tasks ADD COLUMN he_solve_ra float;
+ALTER TABLE tasks ADD COLUMN he_solve_dec float;
+ALTER TABLE tasks ADD COLUMN he_fits_fwhm float;
+
+UPDATE schema_version SET version = 5 LIMIT 1;
