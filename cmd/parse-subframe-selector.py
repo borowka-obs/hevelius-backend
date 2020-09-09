@@ -4,6 +4,7 @@
 import sys
 sys.path.append(".")
 
+from hevelius import iteleskop
 import argparse
 
 try:
@@ -29,17 +30,10 @@ def parse_task(l):
     t["stars"] = float(f[11])
 
     # Now try to get the job id from the filename. First, ignore the path...
-    tmp = fname[fname.rfind("/") + 1:]
+    t["id"] = iteleskop.filename_to_task_id(fname)
 
-    # then, get the J012345 substring, which designates the task id.
-    try:
-        offset = tmp.find("J") + 1
-        tmp2 = tmp[offset:offset+6]
-        t["id"] = int(tmp2)
-    except ValueError:
-        print("ERROR: Unable to parse task id from [%s], tmp=[%s] tmp2=[%s]" % (l, tmp, tmp2), file = sys.stderr)
-        t["id"] = -1
     return t
+
 
 def read_csv(fname):
     with open(fname) as f:
