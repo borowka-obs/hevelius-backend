@@ -34,6 +34,14 @@ def stats(args):
 
     cnx.close()
 
+def version(args):
+    cnx = db.connect()
+
+    v = db.version_get(cnx)
+
+    print("Schema version is %d" % v)
+    cnx.close()
+
 def migrate(args):
 
     DIR = "db"
@@ -78,6 +86,7 @@ if __name__ == '__main__':
 
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
+    version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
 
     args = parser.parse_args()
 
@@ -85,5 +94,8 @@ if __name__ == '__main__':
         stats(args)
     elif args.command == "migrate":
         migrate(args)
+    elif args.command == "version":
+        version(args)
+
     else:
         parser.print_help()
