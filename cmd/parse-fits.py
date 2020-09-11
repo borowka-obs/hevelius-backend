@@ -29,8 +29,10 @@ def process_fits_file(fname, verb = False):
 
     q = "UPDATE tasks SET "
 
-    q += "he_resx=%d, " % geti(h, "NAXIS1")
-    q += "he_resy=%d, " % geti(h, "NAXIS2")
+    q += get_int_header(h, "he_resx", "NAXIS1")
+    q += get_int_header(h, "he_resy", "NAXIS2")
+
+
     q += "he_obsstart='%s', " % gets(h, "DATE-OBS")
     q += "he_exposure=%f, " % getf(h, "EXPTIME")
     q += "he_settemp=%f, " % getf(h, "SET-TEMP")
@@ -53,7 +55,8 @@ def process_fits_file(fname, verb = False):
 
     q += "he_jd=%f, " % getf(h,"JD")
     q += "he_jd_helio=%f, " % getf(h,"JD-HELIO")
-    q += "he_tracktime=%f, " % getf(h,"TRAKTIME")
+
+    q += get_float_header(h, "he_tracktime", "TRAKTIME")
 
     q += "he_focal=%f, " % getf(h,"FOCALLEN")
     q += "he_aperture_diam=%f, " % getf(h,"APTDIA")
@@ -69,6 +72,8 @@ def process_fits_file(fname, verb = False):
 
     q += parse_quality(h) # gets FWHM, number of stars recognized
 
+    q += " task_id=task_id" # meaningless, but it's hard to tell if q ends with a , or not at this point.
+
     q += " WHERE task_id=%d" % task_id
 
     print(q)
@@ -77,6 +82,17 @@ def process_fits_file(fname, verb = False):
 
     v = db.run_query(cnx, q)
     cnx.close()
+
+def get_int_header(header, sql, header_name):
+    if not header_name in header or not len(str(header[header_name])):
+        return ""
+    return "%s=%i, " % (sql, geti(header, header_name))
+
+def get_float_header(header, sql, header_name):
+    if not header_name in header or not len(str(header[header_name])):
+        return ""
+    return "%s=%f, " % (sql, getf(header, header_name))
+
 
 def parse_ra(s):
     """ Converts '18 18 49.00'' into 18.123456 """
@@ -115,6 +131,9 @@ def parse_solved(h):
     # CD1_2   =  -1.59801261123E-004 / Change in RA---TAN along Y-Axis
     # CD2_1   =   1.59806120891E-004 / Change in DEC--TAN along X-Axis
     # CD2_2   =  -7.76679979895E-005 / Change in DEC--TAN along Y-Axis
+
+    if not "PLTSOLVD" in h:
+        return "he_solved=0, "
 
     solved = h["PLTSOLVD"]
     if solved != True:
@@ -156,14 +175,19 @@ def parse_solved(h):
     dec_change_x = float(h["CD2_1"])
     dec_change_y = float(h["CD2_2"])
 
-    q += "he_solved_ra_change_x=%f, he_solved_ra_change_y=%f, he_solved_dec_change_x=%f, he_solved_dec_change_y=%f" \
+    q += "he_solved_ra_change_x=%f, he_solved_ra_change_y=%f, he_solved_dec_change_x=%f, he_solved_dec_change_y=%f, " \
         % (ra_change_x, ra_change_y, dec_change_x, dec_change_y)
 
     return q
 
 def parse_quality(header):
 
-    q = ", he_fwhm=%f" % getf(header,"FWHM")
+    q = ""
+    if "FWHM" in header:
+        q = "he_fwhm=%f, " % getf(header,"FWHM")
+
+    if not "HISTORY" in header:
+        return q
 
     for h in header["HISTORY"]:
         # There may be many HISTORY entries. We're looking for the one looking like this:
@@ -175,7 +199,7 @@ def parse_quality(header):
         x = h.split(" ")
         print(x)
         stars = int(x[1])
-        q += ", he_stars=%d" % stars
+        q += "he_stars=%d, " % stars
         break
 
     return q
