@@ -1,0 +1,5 @@
+
+-- Some older tasks have very long camera name: QSI 583ws S/N 00504709 HW 06.00.00 FW 05.02.09 PI 6.4.962.4
+ALTER TABLE tasks MODIFY COLUMN he_camera varchar(64);
+
+UPDATE schema_version SET version = 6 LIMIT 1;
