@@ -2,6 +2,7 @@
 
 from os import listdir
 from os.path import isfile, join
+from pathlib import Path
 from astropy.io import fits
 import sys
 import subprocess
@@ -13,8 +14,11 @@ from hevelius import db
 from hevelius import config
 from hevelius import iteleskop
 
-def process_fits_file(fname):
+def process_fits_file(fname, verb = False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
+
+    if verb:
+        print("Processing %s file..." % fname)
 
     h = read_fits(fname)
 
@@ -186,8 +190,40 @@ def geti(header, param):
     return int(header[param])
 
 def process_fits_list(fname):
-    """ Processes a file that contains a list of FITS files. """
-    raise NotImplementedError("not implemented")
+    with open(fname) as f:
+        lines = f.readlines()
+
+    cnt = len(lines)
+    i = 1
+
+    print("Found %d filename(s) in file %s" % (cnt, fname))
+
+    for l in lines:
+        l = l.strip()
+        print("Processing file %d of %d: %s" % (i, cnt, l))
+        #try:
+        process_fits_file(l)
+        #except Exception as e:
+        #    print("ERROR(%s): %s" % (l,e))
+        i += 1
+
+def process_fits_dir(dir):
+    files = []
+    for f in Path(dir).rglob('*.fit'):
+        files.append(f)
+
+    print("Found %d files(s) in directory %s" % (len(files), dir))
+
+    cnt = len(files)
+    i = 1
+
+    for f in files:
+        print("Processing file %d of %d: %s" % (i, cnt, f))
+        #try:
+        process_fits_file(str(f))
+        #except Exception as e:
+        #    print("ERROR(%s): %s" % (f,e))
+        i += 1
 
 def read_fits(filename):
     """ Reads FITS file, returns its header content """
@@ -204,10 +240,17 @@ if __name__ == '__main__':
 
     file_parser = parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
     list_parser = parser.add_argument("-l", "--list", help="Reads a list of FITS files (one filename per line)", type=str)
+    dir_parser = parser.add_argument("-d", "--dir",   help="Reads all FITS files recursively", type=str)
 
     args = parser.parse_args()
+
+    if not (args.dir or args.file or args.list):
+        print("ERROR: At least one of --file, --list, or --dir is required.")
+        sys.exit(-1)
 
     if args.file:
         process_fits_file(args.file)
     if args.list:
         process_fits_list(args.list)
+    if args.dir:
+        process_fits_dir(args.dir)
