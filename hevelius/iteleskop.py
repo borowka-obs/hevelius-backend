@@ -1,3 +1,5 @@
+import sys
+
 def filename_to_task_id(fname):
     # Get rid of the paths first.
     tmp = fname[fname.rfind("/") + 1:]
