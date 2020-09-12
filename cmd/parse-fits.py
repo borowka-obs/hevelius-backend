@@ -23,14 +23,21 @@ def process_fits_list(fname, show_hdr : bool, dry_run : bool):
 
     print("Found %d filename(s) in file %s" % (cnt, fname))
 
+    cnx = None
+    if not dry_run:
+        cnx = db.connect()
+
     for l in lines:
         l = l.strip()
         print("Processing file %d of %d: %s" % (i, cnt, l))
         #try:
-        process_fits_file(l)
+        process_fits_file(cnx, l, show_hdr=show_hdr, dry_run=dry_run)
         #except Exception as e:
         #    print("ERROR(%s): %s" % (l,e))
         i += 1
+
+    if not dry_run:
+        cnx.close()
 
 def process_fits_dir(dir, show_hdr : bool, dry_run : bool):
     files = []
@@ -42,15 +49,22 @@ def process_fits_dir(dir, show_hdr : bool, dry_run : bool):
     cnt = len(files)
     i = 1
 
+    cnx = None
+    if not dry_run:
+        cnx = db.connect()
+
     for f in files:
         print("Processing file %d of %d: %s" % (i, cnt, f))
         #try:
-        process_fits_file(str(f), show_hdr, dry_run)
+        process_fits_file(cnx, str(f), show_hdr, dry_run)
         #except Exception as e:
         #    print("ERROR(%s): %s" % (f,e))
         i += 1
 
-def process_fits_file(fname, verb = False, show_hdr = False, dry_run = False):
+    if not dry_run:
+        cnx.close()
+
+def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
 
     if verb:
@@ -74,24 +88,28 @@ def process_fits_file(fname, verb = False, show_hdr = False, dry_run = False):
 
     q += get_float_header(h, "he_settemp", "SET-TEMP")
     q += get_float_header(h, "he_ccdtemp", "CCD-TEMP")
+
     q += "he_pixwidth=%f, " % getf(h, "XPIXSZ")
     q += "he_pixheight=%f, " % getf(h, "YPIXSZ")
     q += "he_xbinning=%d, " % geti(h, "XBINNING")
     q += "he_ybinning=%d, " % geti(h, "YBINNING")
     q += "he_filter='%s', " % gets(h, "FILTER")
 
-    q += "he_objectra=%f, " % parse_ra(gets(h, "OBJCTRA"))
-    q += "he_objectdec=%f, " % parse_dec(gets(h, "OBJCTDEC"))
-    q += "he_objectalt=%f, " % getf(h,"OBJCTALT")
-    q += "he_objectaz=%f, " % getf(h,"OBJCTAZ")
-    q += "he_objectha=%f, " % getf(h,"OBJCTHA")
-    q += "he_pierside='%s', " % gets(h,"PIERSIDE")
+    if "OBJCTRA" in h:
+        q += "he_objectra=%f, " % parse_ra(gets(h, "OBJCTRA"))
+        q += "he_objectdec=%f, " % parse_dec(gets(h, "OBJCTDEC"))
+
+    q += get_float_header(h, "he_objectalt", "OBJCTALT")
+    q += get_float_header(h, "he_objectaz", "OBJCTAZ")
+    q += get_float_header(h, "he_objectha", "OBJCTHA")
+    q += get_string_header(h, "he_pierside", "PIERSIDE")
 
     q += "he_site_lat=%f, " % parse_degms(gets(h,"SITELAT"))
     q += "he_site_lon=%f, " % parse_degms(gets(h,"SITELONG"))
 
     q += "he_jd=%f, " % getf(h,"JD")
-    q += "he_jd_helio=%f, " % getf(h,"JD-HELIO")
+
+    q += get_float_header(h, "he_jd_helio", "JD-HELIO")
 
     q += get_float_header(h, "he_tracktime", "TRAKTIME")
 
@@ -101,25 +119,23 @@ def process_fits_file(fname, verb = False, show_hdr = False, dry_run = False):
     q += "he_scope='%s', " % gets(h,"TELESCOP")
     q += "he_camera='%s', " % gets(h,"INSTRUME")
 
-    q += "he_moon_alt=%f, " % getf(h,"MOONWYS")
-    q += "he_moon_angle=%f, " % getf(h,"MOONKAT")
-    q += "he_moon_phase=%f, " % getf(h,"MOONFAZA")
-    q += "he_sun_alt=%f, " % getf(h,"SUN")
+    q += get_float_header(h, "he_moon_alt", "MOONWYS")
+    q += get_float_header(h, "he_moon_angle", "MOONKAT")
+    q += get_float_header(h, "he_moon_phase", "MOONFAZA")
+    q += get_float_header(h, "he_sun_alt", "SUN")
     q += parse_solved(h) # sets he_solved, he_solved_ra, he_solved_dec, he_solved_x, he_solved_y
 
     q += parse_quality(h) # gets FWHM, number of stars recognized
 
     q += " task_id=task_id" # meaningless, but it's hard to tell if q ends with a , or not at this point.
 
-    q += " WHERE task_id=%d" % task_id
+    q += " WHERE task_id=%d;" % task_id
 
     print(q, file=sys.stderr)
 
     if not dry_run:
-        cnx = db.connect()
-
         v = db.run_query(cnx, q)
-        cnx.close()
+
     else:
         print("DB update skipped.")
 
@@ -132,6 +148,11 @@ def get_float_header(header, sql, header_name):
     if not header_name in header or not len(str(header[header_name])):
         return ""
     return "%s=%f, " % (sql, getf(header, header_name))
+
+def get_string_header(header, sql, header_name):
+    if not header_name in header or not len(str(header[header_name])):
+        return ""
+    return "%s='%s', " % (sql, gets(header, header_name))
 
 
 def parse_ra(s):
@@ -276,6 +297,8 @@ if __name__ == '__main__':
     if not (args.dir or args.file or args.list):
         print("ERROR: At least one of --file, --list, --dir is required.")
         sys.exit(-1)
+
+    print(args.dry_run)
 
     if args.file:
         process_fits_file(args.file, show_hdr = args.show_header, dry_run = args.dry_run)
