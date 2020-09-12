@@ -14,7 +14,43 @@ from hevelius import db
 from hevelius import config
 from hevelius import iteleskop
 
-def process_fits_file(fname, verb = False):
+def process_fits_list(fname, show_hdr : bool, dry_run : bool):
+    with open(fname) as f:
+        lines = f.readlines()
+
+    cnt = len(lines)
+    i = 1
+
+    print("Found %d filename(s) in file %s" % (cnt, fname))
+
+    for l in lines:
+        l = l.strip()
+        print("Processing file %d of %d: %s" % (i, cnt, l))
+        #try:
+        process_fits_file(l)
+        #except Exception as e:
+        #    print("ERROR(%s): %s" % (l,e))
+        i += 1
+
+def process_fits_dir(dir, show_hdr : bool, dry_run : bool):
+    files = []
+    for f in Path(dir).rglob('*.fit'):
+        files.append(f)
+
+    print("Found %d files(s) in directory %s" % (len(files), dir))
+
+    cnt = len(files)
+    i = 1
+
+    for f in files:
+        print("Processing file %d of %d: %s" % (i, cnt, f))
+        #try:
+        process_fits_file(str(f), show_hdr, dry_run)
+        #except Exception as e:
+        #    print("ERROR(%s): %s" % (f,e))
+        i += 1
+
+def process_fits_file(fname, verb = False, show_hdr = False, dry_run = False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
 
     if verb:
@@ -22,8 +58,8 @@ def process_fits_file(fname, verb = False):
 
     h = read_fits(fname)
 
-    # Uncomment for nice FITS header print
-    #print(repr(h))
+    if show_hdr:
+        print(repr(h))
 
     task_id = iteleskop.filename_to_task_id(fname)
 
@@ -76,12 +112,15 @@ def process_fits_file(fname, verb = False):
 
     q += " WHERE task_id=%d" % task_id
 
-    print(q)
+    print(q, file=sys.stderr)
 
-    cnx = db.connect()
+    if not dry_run:
+        cnx = db.connect()
 
-    v = db.run_query(cnx, q)
-    cnx.close()
+        v = db.run_query(cnx, q)
+        cnx.close()
+    else:
+        print("DB update skipped.")
 
 def get_int_header(header, sql, header_name):
     if not header_name in header or not len(str(header[header_name])):
@@ -197,7 +236,6 @@ def parse_quality(header):
 
         h = h.strip()
         x = h.split(" ")
-        print(x)
         stars = int(x[1])
         q += "he_stars=%d, " % stars
         break
@@ -213,42 +251,6 @@ def getf(header, param):
 def geti(header, param):
     return int(header[param])
 
-def process_fits_list(fname):
-    with open(fname) as f:
-        lines = f.readlines()
-
-    cnt = len(lines)
-    i = 1
-
-    print("Found %d filename(s) in file %s" % (cnt, fname))
-
-    for l in lines:
-        l = l.strip()
-        print("Processing file %d of %d: %s" % (i, cnt, l))
-        #try:
-        process_fits_file(l)
-        #except Exception as e:
-        #    print("ERROR(%s): %s" % (l,e))
-        i += 1
-
-def process_fits_dir(dir):
-    files = []
-    for f in Path(dir).rglob('*.fit'):
-        files.append(f)
-
-    print("Found %d files(s) in directory %s" % (len(files), dir))
-
-    cnt = len(files)
-    i = 1
-
-    for f in files:
-        print("Processing file %d of %d: %s" % (i, cnt, f))
-        #try:
-        process_fits_file(str(f))
-        #except Exception as e:
-        #    print("ERROR(%s): %s" % (f,e))
-        i += 1
-
 def read_fits(filename):
     """ Reads FITS file, returns its header content """
 
@@ -262,19 +264,21 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser("Hevelius FITS parser 0.1.0")
 
-    file_parser = parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
-    list_parser = parser.add_argument("-l", "--list", help="Reads a list of FITS files (one filename per line)", type=str)
-    dir_parser = parser.add_argument("-d", "--dir",   help="Reads all FITS files recursively", type=str)
+    parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
+    parser.add_argument("-l", "--list", help="Reads a list of FITS files (one filename per line)", type=str)
+    parser.add_argument("-d", "--dir",   help="Reads all FITS files recursively", type=str)
+    parser.add_argument("-s", "--show-header", help="Displays all entries in FITS header", action='store_true')
+    parser.add_argument("-x", "--dry-run", help="Don't do the actual DB update", action='store_true')
 
     args = parser.parse_args()
 
     if not (args.dir or args.file or args.list):
-        print("ERROR: At least one of --file, --list, or --dir is required.")
+        print("ERROR: At least one of --file, --list, --dir is required.")
         sys.exit(-1)
 
     if args.file:
-        process_fits_file(args.file)
+        process_fits_file(args.file, show_hdr = args.show_header, dry_run = args.dry_run)
     if args.list:
-        process_fits_list(args.list)
+        process_fits_list(args.list, show_hdr = args.show_header, dry_run = args.dry_run)
     if args.dir:
-        process_fits_dir(args.dir)
+        process_fits_dir(args.dir, show_hdr = args.show_header, dry_run = args.dry_run)
