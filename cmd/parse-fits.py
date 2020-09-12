@@ -71,8 +71,9 @@ def process_fits_file(fname, verb = False, show_hdr = False, dry_run = False):
 
     q += "he_obsstart='%s', " % gets(h, "DATE-OBS")
     q += "he_exposure=%f, " % getf(h, "EXPTIME")
-    q += "he_settemp=%f, " % getf(h, "SET-TEMP")
-    q += "he_ccdtemp=%f, " % getf(h, "CCD-TEMP")
+
+    q += get_float_header(h, "he_settemp", "SET-TEMP")
+    q += get_float_header(h, "he_ccdtemp", "CCD-TEMP")
     q += "he_pixwidth=%f, " % getf(h, "XPIXSZ")
     q += "he_pixheight=%f, " % getf(h, "YPIXSZ")
     q += "he_xbinning=%d, " % geti(h, "XBINNING")
