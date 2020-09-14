@@ -2,10 +2,11 @@
 
 # This is an ugly hack. It should be removed.
 import sys
+import argparse
+
 sys.path.append(".")
 
 from hevelius import iteleskop
-import argparse
 
 try:
     from hevelius import db

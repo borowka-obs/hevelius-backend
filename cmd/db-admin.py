@@ -8,7 +8,12 @@ import argparse
 
 # This is an ugly hack. It should be removed.
 sys.path.append(".")
-from hevelius import db
+
+try:
+    from hevelius import db
+except ImportError:
+    print("Make sure you have config.py filled in. Please copy config.py-example to config.py and fill it in.")
+    sys.exit(-1)
 from hevelius import config
 
 def stats(args):
