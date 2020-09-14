@@ -38,16 +38,39 @@ def version_get(cnx):
     cursor.close()
     return ver
 
-def stats_get(cnx):
+def stats_print(cnx):
+
+    stats = [
+        ("true", "all tasks"),
+        ("imagename is not null", "with images"),
+        ("he_solved = 1",            "solved"),
+        ("he_solved is null",        "not solved (not attempted)"),
+        ("he_solved = 0",            "not solved (attempted, but failed)"),
+        ("fwhm is not null", "with quality measured (FWHM != null)"),
+        ("eccentricity is not null", "with quality measured (eccen != null)"),
+
+    ]
+
+
+    for cond, descr in stats:
+        q = "SELECT count(*) FROM tasks WHERE %s" % cond
+
+        result = run_query(cnx, q)[0][0]
+
+        print("Tasks %40s: %d" % (descr, result))
 
     # Get overall tasks counters
-    tasks_cnt = run_query(cnx, 'SELECT count(*) from tasks')
-    files_cnt = run_query(cnx, 'SELECT count(*) from tasks where imagename is not null')
+    # tasks_cnt = run_query(cnx, 'SELECT count(*) from tasks')[0][0]
+    # files_cnt = run_query(cnx, 'SELECT count(*) from tasks where imagename is not null')[0][0]
 
-    fwhm_cnt = run_query(cnx, 'select count(*) from tasks WHERE fwhm is not null')
-    eccentricity_cnt = run_query(cnx, 'select count(*) from tasks WHERE eccentricity is not null')
+    # fwhm_cnt = run_query(cnx, 'select count(*) from tasks WHERE fwhm is not null')
+    # eccentricity_cnt = run_query(cnx, 'select count(*) from tasks WHERE eccentricity is not null')
 
-    return tasks_cnt[0][0], files_cnt[0][0], fwhm_cnt[0][0], eccentricity_cnt[0][0]
+    # print("There are %d tasks, %d files, %d have FWHM, %d have eccentricity." % stats)
+    # print("Missing: %d files miss FWHM, %d files miss eccentricity." % (stats[1] - stats[2], stats[1] - stats[3]))
+
+
+    # return tasks_cnt[0][0], files_cnt[0][0], fwhm_cnt[0][0], eccentricity_cnt[0][0]
 
 def stats_by_state(cnx):
     # Get tasks list by status
@@ -63,13 +86,16 @@ def stats_by_user(cnx, state = 6):
     if state is None:
         cond = ""
     else:
-        cond = "WHERE state == %d" % state
+        cond = "AND state = %d" % state
 
-    q = "SELECT login, tasks.user_id, count(*) from tasks, users where tasks.user_id = users.user_id %s group by tasks.user_id" % cond
+    q = "SELECT login, tasks.user_id, count(*) from tasks, users where tasks.user_id = users.user_id %s group by tasks.user_id order by login" % cond
 
     tasks_per_user = run_query(cnx, q)
 
-    return tasks_per_user
+    res = []
+    for row in tasks_per_user:
+        res.append( (row[0], row[1], row[2]) )
+    return res
 
 def task_get(cnx, id):
     q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity FROM tasks WHERE task_id = %d" % id
