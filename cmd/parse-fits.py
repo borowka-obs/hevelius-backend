@@ -301,7 +301,12 @@ if __name__ == '__main__':
     print(args.dry_run)
 
     if args.file:
-        process_fits_file(args.file, show_hdr = args.show_header, dry_run = args.dry_run)
+        cnx = None
+        if not args.dry_run:
+            cnx = db.connect()
+        process_fits_file(cnx, args.file, show_hdr = args.show_header, dry_run = args.dry_run)
+        if cnx:
+            cnx.close()
     if args.list:
         process_fits_list(args.list, show_hdr = args.show_header, dry_run = args.dry_run)
     if args.dir:
