@@ -23,13 +23,16 @@ def stats(args):
         print("Schema version is 0, can't show any stats")
         return
 
-    stats = db.stats_get(cnx)
-    print("There are %d tasks, %d files, %d have FWHM, %d have eccentricity." % stats)
-    print("Missing: %d files miss FWHM, %d files miss eccentricity." % (stats[1] - stats[2], stats[1] - stats[3]))
+    stats = db.stats_print(cnx)
 
-    print("Stats by state:")
+    print("\nStats by state:")
     by_state = db.stats_by_state(cnx)
     for id,name,cnt in by_state:
+        print("%18s(%2d): %d" % (name, id, cnt))
+
+    print("\nStats by user:")
+    by_user = db.stats_by_user(cnx)
+    for name, id, cnt in by_user:
         print("%18s(%2d): %d" % (name, id, cnt))
 
     cnx.close()
