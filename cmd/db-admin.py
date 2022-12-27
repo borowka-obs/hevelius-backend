@@ -50,6 +50,15 @@ def version(args):
     print("Schema version is %d" % v)
     cnx.close()
 
+def config_show(args):
+    """Shows current database configuration."""
+    print("DB credentials:")
+    print(f"User:     {config.USER}")
+    print(f"Password: {config.PASSWORD}")
+    print(f"Database: {config.DBNAME}")
+    print(f"Host:     {config.HOST}")
+    print(f"Port:     {config.PORT}")
+
 def migrate(args):
 
     DIR = "db"
@@ -95,6 +104,7 @@ if __name__ == '__main__':
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
     version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
+    config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
 
     args = parser.parse_args()
 
@@ -104,6 +114,8 @@ if __name__ == '__main__':
         migrate(args)
     elif args.command == "version":
         version(args)
+    elif args.command == "config":
+        config_show(args)
 
     else:
         parser.print_help()
