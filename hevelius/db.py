@@ -16,9 +16,12 @@ def run_query(cnx, query):
     cursor.execute(query)
     try:
         result = cursor.fetchall()
-    except:
-        result = None # If this is an update or delete query.
-        cnx.commit()
+    except mysql.connector.Error as err:
+        print("#### Something went wrong: {}".format(err))
+#    except:
+#        #result = None # If this is an update or delete query.
+#        cnx.commit()
+    cnx.commit()
     cursor.close()
     return result
 
@@ -46,7 +49,7 @@ def stats_print(cnx):
         ("he_solved = 1",            "solved"),
         ("he_solved is null",        "not solved (not attempted)"),
         ("he_solved = 0",            "not solved (attempted, but failed)"),
-        ("fwhm is not null", "with quality measured (FWHM != null)"),
+        ("he_fwhm is not null", "with quality measured (FWHM != null)"),
         ("eccentricity is not null", "with quality measured (eccen != null)"),
 
     ]
@@ -120,6 +123,15 @@ def task_get(cnx, id):
     x["eccentricity"] = t[14]
 
     return x
+
+def tasks_get_filter(cnx, criteria):
+    q = f"SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity FROM tasks WHERE {criteria}"
+
+    tasks = run_query(cnx, q)
+
+    print(f"Selected {len(tasks)} task(s)")
+
+    return tasks
 
 def task_update(cnx, id, fwhm = None, eccentricity = None):
     upd = ""
