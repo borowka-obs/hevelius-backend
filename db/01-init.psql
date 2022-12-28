@@ -1,0 +1,222 @@
+-- MariaDB dump 10.19  Distrib 10.6.11-MariaDB, for debian-linux-gnu (x86_64)
+--
+-- Host: localhost    Database: hevelius
+-- ------------------------------------------------------
+-- Server version	10.6.11-MariaDB-0ubuntu0.22.04.1-log
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table filters
+--
+
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS filters CASCADE;
+DROP TABLE IF EXISTS states CASCADE;
+DROP TABLE IF EXISTS mymfavorites;
+DROP TABLE IF EXISTS objects;
+DROP TABLE IF EXISTS schema_version;
+DROP TABLE IF EXISTS user_preferences;
+DROP TABLE IF EXISTS settings;
+DROP TABLE IF EXISTS task_states;
+DROP TABLE IF EXISTS tasks;
+DROP TABLE IF EXISTS telescopes;
+
+CREATE TABLE users (
+  user_id SERIAL,
+  login varchar(32) DEFAULT NULL,
+  pass varchar(32) DEFAULT NULL,
+  firstname varchar(32) DEFAULT NULL,
+  lastname varchar(32) DEFAULT NULL,
+  share float DEFAULT NULL,
+  phone varchar(11) DEFAULT NULL,
+  email varchar(64) DEFAULT NULL,
+  permissions int NOT NULL DEFAULT 0,
+  aavso_id varchar(5) DEFAULT NULL,
+  ftp_login varchar(32) DEFAULT NULL,
+  ftp_pass varchar(32) DEFAULT NULL,
+  pass_d varchar(50) DEFAULT NULL,
+  PRIMARY KEY (user_id)
+);
+
+CREATE TABLE filters (
+  scope_id int DEFAULT NULL,
+  filter_id varchar(16) DEFAULT NULL,
+  descr varchar(128) DEFAULT NULL,
+  id SERIAL,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE mymfavorites (
+  id SERIAL,
+  fav_name text DEFAULT NULL,
+  fav_source text DEFAULT NULL,
+  fav_path text DEFAULT NULL,
+  PRIMARY KEY (id)
+);
+
+CREATE TABLE objects (
+  object_id SERIAL,
+  name varchar(68) NOT NULL,
+  ra float DEFAULT NULL,
+  decl float DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  comment text DEFAULT NULL,
+  type varchar(3) DEFAULT NULL,
+  epoch varchar(7) DEFAULT NULL,
+  const varchar(3) DEFAULT NULL,
+  magn float DEFAULT NULL,
+  x float DEFAULT NULL,
+  y float DEFAULT NULL,
+  PRIMARY KEY (object_id)
+) ;
+
+CREATE TABLE schema_version (
+  version int DEFAULT NULL
+);
+
+CREATE TABLE settings (
+  settings_id SERIAL,
+  name varchar(50) DEFAULT NULL,
+  value varchar(1024) DEFAULT NULL,
+  comment varchar(100) DEFAULT NULL,
+  PRIMARY KEY (settings_id)
+);
+
+CREATE TABLE states (
+  id int NOT NULL UNIQUE,
+  name varchar(16) DEFAULT NULL,
+  descr varchar(128) DEFAULT NULL
+);
+
+CREATE TABLE task_states (
+  state int NOT NULL,
+  name varchar(20) DEFAULT NULL,
+  descr text DEFAULT NULL,
+  PRIMARY KEY (state)
+);
+
+CREATE TABLE tasks (
+  task_id SERIAL,
+  user_id int NOT NULL,
+  scope_id int NOT NULL,
+  object varchar(64) DEFAULT NULL,
+  ra float DEFAULT NULL,
+  decl float DEFAULT NULL,
+  exposure float DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  filter varchar(16) DEFAULT NULL,
+  binning smallint DEFAULT NULL,
+  guiding smallint DEFAULT 1,
+  dither smallint DEFAULT 0,
+  defocus smallint DEFAULT NULL,
+  calibrate smallint DEFAULT NULL,
+  solve smallint DEFAULT NULL,
+  vphot smallint DEFAULT NULL,
+  other_cmd varchar(512) DEFAULT NULL,
+  min_alt float DEFAULT NULL,
+  moon_distance float DEFAULT NULL,
+  skip_before timestamp NOT NULL DEFAULT '2000-01-01 00:00:00',
+  skip_after timestamp NOT NULL DEFAULT '3000-01-01 00:00:00',
+  min_interval int DEFAULT NULL,
+  comment text DEFAULT NULL,
+  state int NOT NULL,
+  imagename varchar(256) DEFAULT NULL,
+  created timestamp NOT NULL DEFAULT now(),
+  activated timestamp NULL DEFAULT NULL,
+  performed timestamp NULL DEFAULT NULL,
+  max_moon_phase int DEFAULT NULL,
+  max_sun_alt int DEFAULT NULL,
+  auto_center smallint DEFAULT 0,
+  calibrated smallint DEFAULT 0,
+  solved smallint DEFAULT 0,
+  sent smallint DEFAULT 0,
+  he_resx int DEFAULT NULL,
+  he_resy int DEFAULT NULL,
+  he_obsstart timestamp DEFAULT NULL,
+  he_exposure float DEFAULT NULL,
+  he_settemp float DEFAULT NULL,
+  he_ccdtemp float DEFAULT NULL,
+  he_pixwidth float DEFAULT NULL,
+  he_pixheight float DEFAULT NULL,
+  he_xbinning int DEFAULT NULL,
+  he_ybinning int DEFAULT NULL,
+  he_filter varchar(20) DEFAULT NULL,
+  he_objectra float DEFAULT NULL,
+  he_objectdec float DEFAULT NULL,
+  he_objectalt float DEFAULT NULL,
+  he_objectaz float DEFAULT NULL,
+  he_objectha float DEFAULT NULL,
+  he_site_lat float DEFAULT NULL,
+  he_site_lon float DEFAULT NULL,
+  he_pierside varchar(4) DEFAULT NULL,
+  he_jd float DEFAULT NULL,
+  he_jd_helio float DEFAULT NULL,
+  he_tracktime float DEFAULT NULL,
+  he_focal float DEFAULT NULL,
+  he_aperture_diam float DEFAULT NULL,
+  he_aperture_area float DEFAULT NULL,
+  he_scope varchar(32) DEFAULT NULL,
+  he_camera varchar(64) DEFAULT NULL,
+  he_moon_alt float DEFAULT NULL,
+  he_moon_angle float DEFAULT NULL,
+  he_moon_phase float DEFAULT NULL,
+  he_sun_alt float DEFAULT NULL,
+  he_solved boolean DEFAULT NULL,
+  he_solved_ra float DEFAULT NULL,
+  he_solved_dec float DEFAULT NULL,
+  he_solved_refx int DEFAULT NULL,
+  he_solved_refy int DEFAULT NULL,
+  he_pixscalex float DEFAULT NULL,
+  he_pixscaley float DEFAULT NULL,
+  he_solved_ra_change_x float DEFAULT NULL,
+  he_solved_ra_change_y float DEFAULT NULL,
+  he_solved_dec_change_x float DEFAULT NULL,
+  he_solved_dec_change_y float DEFAULT NULL,
+  he_fwhm float DEFAULT NULL,
+  he_stars float DEFAULT NULL,
+  fwhm float DEFAULT NULL,
+  eccentricity float DEFAULT NULL,
+  PRIMARY KEY (task_id),
+  CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES users(user_id),
+  CONSTRAINT fk_state FOREIGN KEY (state) REFERENCES states (id),
+  CONSTRAINT tasks_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE telescopes (
+  scope_id int NOT NULL,
+  name varchar(64) DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  min_dec float DEFAULT NULL,
+  max_dec float DEFAULT NULL,
+  PRIMARY KEY (scope_id)
+);
+
+CREATE TABLE user_preferences (
+  pref_id SERIAL,
+  user_id int DEFAULT NULL,
+  exposure int DEFAULT 75,
+  filter varchar(20) DEFAULT 'CV',
+  binning int DEFAULT 2,
+  guiding smallint DEFAULT 1,
+  dither smallint DEFAULT NULL,
+  defocus smallint DEFAULT 0,
+  calibrate smallint DEFAULT 1,
+  solve int DEFAULT 1,
+  vphot smallint DEFAULT 0,
+  min_alt int DEFAULT 35,
+  moon_distance int DEFAULT 0,
+  max_sun_alt int NOT NULL DEFAULT -12,
+  max_moon_phase int DEFAULT NULL,
+  PRIMARY KEY (pref_id),
+  CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
