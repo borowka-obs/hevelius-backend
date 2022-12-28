@@ -10,7 +10,7 @@ import argparse
 sys.path.append(".")
 
 try:
-    from hevelius import db
+    from hevelius import db_mysql as db
 except ImportError:
     print("Make sure you have config.py filled in. Please copy config.py-example to config.py and fill it in.")
     sys.exit(-1)
