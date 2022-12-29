@@ -56,6 +56,15 @@ CREATE TABLE filters (
   PRIMARY KEY (id)
 );
 
+CREATE TABLE telescopes (
+  scope_id int NOT NULL,
+  name varchar(64) DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  min_dec float DEFAULT NULL,
+  max_dec float DEFAULT NULL,
+  PRIMARY KEY (scope_id)
+);
+
 CREATE TABLE mymfavorites (
   id SERIAL,
   fav_name text DEFAULT NULL,
@@ -171,7 +180,7 @@ CREATE TABLE tasks (
   he_moon_angle float DEFAULT NULL,
   he_moon_phase float DEFAULT NULL,
   he_sun_alt float DEFAULT NULL,
-  he_solved boolean DEFAULT NULL,
+  he_solved smallint DEFAULT NULL,
   he_solved_ra float DEFAULT NULL,
   he_solved_dec float DEFAULT NULL,
   he_solved_refx int DEFAULT NULL,
@@ -189,17 +198,10 @@ CREATE TABLE tasks (
   PRIMARY KEY (task_id),
   CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES users(user_id),
   CONSTRAINT fk_state FOREIGN KEY (state) REFERENCES states (id),
+  CONSTRAINT fk_scope FOREIGN KEY (scope_id) REFERENCES telescopes (scope_id),
   CONSTRAINT tasks_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
-CREATE TABLE telescopes (
-  scope_id int NOT NULL,
-  name varchar(64) DEFAULT NULL,
-  descr varchar(1024) DEFAULT NULL,
-  min_dec float DEFAULT NULL,
-  max_dec float DEFAULT NULL,
-  PRIMARY KEY (scope_id)
-);
 
 CREATE TABLE user_preferences (
   pref_id SERIAL,
@@ -220,3 +222,5 @@ CREATE TABLE user_preferences (
   PRIMARY KEY (pref_id),
   CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
+
+INSERT INTO schema_version VALUES(7);

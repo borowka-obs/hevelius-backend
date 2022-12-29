@@ -42,7 +42,16 @@ def stats(args):
 
     cnx.close()
 
-def select_tasks(args):
+def deg2rah(ra: float) -> str:
+    """Converts Right Ascension specified in degrees (0..359) to hour
+    (0..23.59)"""
+
+    h = int(ra/15)
+    m = int(ra - h*15) * 4
+
+    return f"{h}h{m:02d}m ({ra}deg)"
+
+def histogram(args):
     cnx = db.connect()
 
     tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
@@ -54,11 +63,21 @@ def select_tasks(args):
     for t in tasks:
         ra = int(t[4])
         decl = int(t[5])
-        histo[decl,ra] += 1
+        histo[90-decl,ra] += 1
 
+
+    y_labels = list(range(90,-90,-1))
+    y_labels = list(map(lambda a: str(a), y_labels))
+
+    x_labels = list(map(lambda a: deg2rah(a), range(0,360,1)))
+
+    labels=dict(x="Right Ascension (h:m/deg)", y="Declination (deg)", color="# of frames")
 
     pandas = pd.DataFrame(histo)
-    fig = px.imshow(pandas)
+    fig = px.imshow(pandas, labels=labels, y=y_labels, x=x_labels)
+
+    fig['layout']['yaxis']['autorange'] = "reversed"
+
     fig.show()
 
 
@@ -69,14 +88,14 @@ if __name__ == '__main__':
     subparsers = parser.add_subparsers(help="commands", dest="command")
 
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
-    select_parser = subparsers.add_parser('select', help="Selects some tasks")
+    select_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
 
     args = parser.parse_args()
 
     if args.command == "stats":
         stats(args)
-    elif args.command == "select":
-        select_tasks(args)
+    elif args.command == "distrib":
+        histogram(args)
 
     else:
         parser.print_help()
