@@ -51,11 +51,10 @@ def deg2rah(ra: float) -> str:
 
     return f"{h}h{m:02d}m ({ra}deg)"
 
+
 def histogram(args):
     cnx = db.connect()
-
     tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
-
     cnx.close()
 
     # This gets a list of coords (0-359, -90..90)
@@ -65,6 +64,30 @@ def histogram(args):
         decl = int(t[5])
         histo[90-decl,ra] += 1
 
+    return histo
+
+def groups(args):
+    histo = histogram(args)
+
+    min_frames = 200
+    print(f"Showing groups with more than {min_frames} frame(s)")
+    cnt = 0
+    poi = []
+    for decl in range(0,360):
+        for ra in range(0,180):
+            if histo[ra][decl] > min_frames:
+                poi.append({ "cnt": int(histo[ra][decl]), "ra": ra, "decl": decl})
+                cnt += 1
+
+    poi = sorted(poi, key=lambda p: p['cnt'], reverse=True)
+
+    for p in poi:
+        print(f"POI {p['cnt']}, ra={p['ra']}, decl={p['decl']}")
+
+
+def histogram_show(args):
+
+    histo = histogram(args)
 
     y_labels = list(range(90,-90,-1))
     y_labels = list(map(lambda a: str(a), y_labels))
@@ -89,13 +112,16 @@ if __name__ == '__main__':
 
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
     select_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
+    select_parser = subparsers.add_parser('groups', help="Shows frames' groups")
 
     args = parser.parse_args()
 
     if args.command == "stats":
         stats(args)
     elif args.command == "distrib":
-        histogram(args)
+        histogram_show(args)
+    elif args.command == "groups":
+        groups(args)
 
     else:
         parser.print_help()
