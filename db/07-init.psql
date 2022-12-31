@@ -223,4 +223,5 @@ CREATE TABLE user_preferences (
   CONSTRAINT fk_user_id FOREIGN KEY(user_id) REFERENCES users(user_id)
 );
 
-INSERT INTO schema_version VALUES(7);
+DELETE FROM schema_version;
+INSERT INTO schema_version VALUES (7);
