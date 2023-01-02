@@ -29,25 +29,37 @@ def histogram():
    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
    return render_template('histogram.html', graphJSON=graphJSON)
 
-@app.route('/api/tasks')
+@app.route('/api/tasks', methods = ['POST', 'GET'])
 def tasks():
 
-    cnx = db.connect()
-    tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6 LIMIT 10")
-    cnx.close()
+    user_id = get_param(request, 'user_id')
+    limit = get_param(request, 'limit')
 
-    t = [ {
-        "task_id": 123,
-        "ra": 12.34,
-        "decl": 45.67,
-        "descr": "some object"
-    }]
+    q = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
+            "exposure, descr, filter, binning, guiding, dither, " \
+            "defocus, calibrate, solve, vphot, other_cmd, " \
+            "min_alt, moon_distance, skip_before, skip_after, " \
+            "min_interval, comment, state, imagename, " \
+            "created, activated, performed, max_moon_phase, " \
+            "max_sun_alt, auto_center, calibrated, solved, " \
+        "sent FROM tasks, users WHERE tasks.user_id = users.user_id"
+    if user_id is not None:
+        q = q + f" AND tasks.user_id={user_id}"
+
+    q = q + " ORDER by task_id DESC"
+
+    if limit is not None:
+        q = q + f" LIMIT {limit}";
+
+    cnx = db.connect()
+    tasks = db.run_query(cnx, q)
+    cnx.close()
 
     return tasks
 
 
 def sanitize(x: str) -> str:
-    x = x.replace('\'','') # apostrophes are bad
+    x = str(x).replace('\'','') # apostrophes are bad
     x = x.replace(';','') # commas also
     x = x.replace('\\','') # and backslashes
     return x
