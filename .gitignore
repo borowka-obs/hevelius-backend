@@ -130,3 +130,7 @@ dmypy.json
 
 
 hevelius/config.py
+
+# Migration stuff
+db-iteleskop
+db-mysql
