@@ -129,8 +129,9 @@ dmypy.json
 .pyre/
 
 
-hevelius/config.py
+backend/hevelius/config.py
 
 # Migration stuff
 db-iteleskop
 db-mysql
+data/
