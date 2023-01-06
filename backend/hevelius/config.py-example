@@ -1,4 +1,8 @@
-USER = 'mylogin'
+# This defines DB credentials
+
+USER = 'hevelius'
 DBNAME = 'hevelius'
 HOST = 'localhost'
+PORT = 3306
 PASSWORD = 'secret1'
+TYPE = 'mysql'
