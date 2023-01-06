@@ -29,3 +29,5 @@ python cmd/db-admin.py migrate
 ## TODO
 
 - insert entries for tasks that only have files, but no records in tasks table.
+- remove tasks that are not completed
+- remove mymfavorites table
