@@ -53,6 +53,7 @@ def version(args):
 def config_show(args):
     """Shows current database configuration."""
     print("DB credentials:")
+    print(f"DB type:  {config.TYPE}")
     print(f"User:     {config.USER}")
     print(f"Password: {config.PASSWORD}")
     print(f"Database: {config.DBNAME}")
