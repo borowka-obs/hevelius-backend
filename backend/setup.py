@@ -6,7 +6,7 @@ with open('requirements.txt') as f:
 long_description = 'Hevelius - a software that aims to help manage \
 amateur astronomical observatory. In particular: \
 - manage and process frames \
-- control aqusition (telescopes, cameras, etc) \
+- control acquisition (telescopes, cameras, etc) \
 '
 
 setup(
