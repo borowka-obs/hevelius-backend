@@ -5,9 +5,7 @@ from os.path import isfile, join
 import sys
 import subprocess
 import argparse
-
-# This is an ugly hack. It should be removed.
-sys.path.append(".")
+from importlib.metadata import version as importlib_version
 
 from hevelius import db
 from hevelius import config
@@ -93,9 +91,10 @@ def migrate(args):
 
 
 if __name__ == '__main__':
-    print("Hevelius db-migrate 0.1")
+    print(f"Hevelius {importlib_version('hevelius')}")
+    print()
 
-    parser = argparse.ArgumentParser("Hevelius DB Migrator 0.1.0")
+    parser = argparse.ArgumentParser("hevelius")
     subparsers = parser.add_subparsers(help="commands", dest="command")
 
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
