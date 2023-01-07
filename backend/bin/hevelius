@@ -7,8 +7,13 @@ import subprocess
 import argparse
 from importlib.metadata import version as importlib_version
 
+# This is ugly hack, but it allows running code from the local dir, without
+# installing.
+sys.path.append(".")
+
 from hevelius import db
 from hevelius import config
+
 
 def stats(args):
 
