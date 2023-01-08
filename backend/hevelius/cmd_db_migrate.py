@@ -1,6 +1,8 @@
 from hevelius import config, db
 from os import listdir,pathsep
 from os.path import isfile, join
+import subprocess
+import sys
 
 def migrate(args):
     if config.TYPE == "pgsql":

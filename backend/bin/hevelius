@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 
 import sys
-import subprocess
 import argparse
 from importlib.metadata import version as importlib_version
 
@@ -11,8 +10,6 @@ sys.path.append(".")
 
 from hevelius.cmd_basic import stats, version, config_show
 from hevelius.cmd_db_migrate import migrate
-from hevelius import config
-
 
 if __name__ == '__main__':
     print(f"Hevelius {importlib_version('hevelius')}")
@@ -29,13 +26,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.command == "stats":
-        stats(args)
+        stats(args) # see cmd_basic.py
     elif args.command == "migrate":
-        migrate(args)
+        migrate(args) # see cmd_db_migrate.py
     elif args.command == "version":
-        version(args)
+        version(args) # see cmd_basic.py
     elif args.command == "config":
-        config_show(args)
+        config_show(args) # see cmd_basic.py
 
     else:
         parser.print_help()
