@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
 
-from os import listdir,pathsep
-from os.path import isfile, join
 import sys
 import subprocess
 import argparse
@@ -11,134 +9,9 @@ from importlib.metadata import version as importlib_version
 # installing.
 sys.path.append(".")
 
-from hevelius import db
+from hevelius.cmd_basic import stats, version, config_show
+from hevelius.cmd_db_migrate import migrate
 from hevelius import config
-
-
-def stats(args):
-
-    cnx = db.connect()
-
-    v = db.version_get(cnx)
-
-    print("Schema version is %d" % v)
-
-    if (v == 0):
-        print("Schema version is 0, can't show any stats")
-        return
-
-    stats = db.stats_print(cnx)
-
-    print("\nStats by state:")
-    by_state = db.stats_by_state(cnx)
-    for id,name,cnt in by_state:
-        print("%18s(%2d): %d" % (name, id, cnt))
-
-    print("\nStats by user:")
-    by_user = db.stats_by_user(cnx)
-    for name, id, cnt in by_user:
-        print("%18s(%2d): %d" % (name, id, cnt))
-
-    cnx.close()
-
-def version(args):
-    cnx = db.connect()
-
-    v = db.version_get(cnx)
-
-    print("Schema version is %d" % v)
-    cnx.close()
-
-def config_show(args):
-    """Shows current database configuration."""
-    print("DB credentials:")
-    print(f"DB type:  {config.TYPE}")
-    print(f"User:     {config.USER}")
-    print(f"Password: {config.PASSWORD}")
-    print(f"Database: {config.DBNAME}")
-    print(f"Host:     {config.HOST}")
-    print(f"Port:     {config.PORT}")
-
-def migrate(args):
-    if config.TYPE == "pgsql":
-        migrate_pgsql(args)
-    elif config.TYPE == "mysql":
-        migrate_mysql(args)
-    else:
-        print(f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
-        sys.exit(-1)
-
-def migrate_mysql(args):
-
-    DIR = "db"
-    files = [f for f in listdir(DIR) if (isfile(join(DIR, f)) and f.endswith("mysql"))   ]
-
-    files.sort()
-
-    for f in files:
-        cnx = db.connect()
-        current_ver = db.version_get(cnx)
-        cnx.close()
-
-        mig_ver = int(f[:2])
-
-        if (mig_ver > current_ver):
-            print("Migrating from %s to %s, using script %s" % (current_ver, mig_ver, f))
-
-            schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
-
-            mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST, "-p"+config.PASSWORD, "-P", str(config.PORT), config.DBNAME, "-B"], stdin=schema.stdout)
-
-            schema.stdout.close()
-            output, _ = mysql.communicate()
-
-            cnx = db.connect()
-            current_ver = db.version_get(cnx)
-            cnx.close()
-
-            print("Version after schema upgrade %s" % current_ver)
-
-        else:
-            print("Skipping %s, schema version is %s" % (f, current_ver))
-
-def migrate_pgsql(args):
-
-    DIR = "db"
-    files = [f for f in listdir(DIR) if (isfile(join(DIR, f)) and f.endswith("psql"))]
-
-    files.sort()
-
-    for f in files:
-        cnx = db.connect()
-        current_ver = db.version_get(cnx)
-        cnx.close()
-
-        try:
-            mig_ver = int(f[:2])
-        except:
-            # Skip files that don't start with a number (such as wipe.psql)
-            continue
-
-        if (mig_ver > current_ver):
-            print("Migrating from %s to %s, using script %s" % (current_ver, mig_ver, f))
-
-            #schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
-
-            # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
-            psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p", str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
-
-            #schema.stdout.close()
-            output, _ = psql.communicate()
-
-            cnx = db.connect()
-            current_ver = db.version_get(cnx)
-            cnx.close()
-
-            print("Version after schema upgrade %s" % current_ver)
-
-        else:
-            print("Skipping %s, schema version is %s" % (f, current_ver))
-
 
 
 if __name__ == '__main__':
