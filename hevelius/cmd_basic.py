@@ -1,4 +1,5 @@
 from hevelius import db, config
+from importlib.metadata import version as importlib_version
 
 def stats(args):
 
@@ -26,13 +27,24 @@ def stats(args):
 
     cnx.close()
 
-def version(args):
+def db_version(args):
     cnx = db.connect()
 
     v = db.version_get(cnx)
 
     print("Schema version is %d" % v)
     cnx.close()
+
+def hevelius_version():
+    try:
+        return importlib_version('hevelius')
+    except:
+        # Oh well, hevelius is not installed. We're running from source tree
+        pass
+
+    # TODO: try to parse setup.py and get version='x.y.z' from it.
+    return ""
+
 
 def config_show(args):
     """Shows current database configuration."""
