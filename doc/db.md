@@ -26,6 +26,10 @@ Then run the following command to import iteleskop schema with Hevelius changes:
 python cmd/db-admin.py migrate
 ```
 
+## Schema info
+
+he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
+
 ## TODO
 
 - insert entries for tasks that only have files, but no records in tasks table.
