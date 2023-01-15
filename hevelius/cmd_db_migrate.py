@@ -34,7 +34,6 @@ def migrate_mysql(args):
 
             mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST, "-p"+config.PASSWORD, "-P", str(config.PORT), config.DBNAME, "-B"], stdin=schema.stdout)
 
-            schema.stdout.close()
             output, _ = mysql.communicate()
 
             cnx = db.connect()
