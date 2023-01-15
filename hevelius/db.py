@@ -20,7 +20,7 @@ def version_get(cnx):
 
     try:
         cursor.execute(query)
-    except mysql.connector.errors.ProgrammingError:
+    except:
         # Table doesn't exist, return 0
         return 0
 
