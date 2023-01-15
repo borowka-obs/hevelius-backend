@@ -1,0 +1,12 @@
+# This defines DB credentials
+
+USER = 'hevelius'
+DBNAME = 'hevelius'
+HOST = 'localhost'
+PORT = 5432
+PASSWORD = 'secret1'
+TYPE = 'pgsql'
+
+# This defines path to the files repository
+
+REPO_PATH = '/mnt/volume1/astro'

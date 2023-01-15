@@ -37,6 +37,5 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=160 --statistics
     - name: Test with pytest
       run: |
-        pwd
-        ls -lR
-        PYTHONPATH=.:.. pytest -s -v
+        cp tests/config.py.github hevelius/
+        PYTHONPATH=. pytest -s -v
