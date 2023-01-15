@@ -1,8 +1,5 @@
 -- Schema 08: Change smallints into booleans
 
-ALTER TABLE tasks ALTER COLUMN binning   TYPE bool using binning::int::bool;
-
-
 ALTER TABLE tasks ALTER COLUMN guiding   DROP DEFAULT;
 ALTER TABLE tasks ALTER COLUMN guiding   TYPE bool using guiding::int::bool;
 ALTER TABLE tasks ALTER COLUMN guiding    SET DEFAULT True;
