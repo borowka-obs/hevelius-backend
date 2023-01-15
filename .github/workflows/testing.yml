@@ -37,5 +37,5 @@ jobs:
         flake8 . --count --exit-zero --max-complexity=10 --max-line-length=160 --statistics
     - name: Test with pytest
       run: |
-        cp tests/config.py.github hevelius/
+        cp tests/config.py.github hevelius/config.py
         PYTHONPATH=. pytest -s -v
