@@ -1,0 +1,35 @@
+-- Schema 08: Change smallints into booleans
+
+ALTER TABLE tasks ALTER COLUMN binning   TYPE bool using binning::int::bool;
+
+
+ALTER TABLE tasks ALTER COLUMN guiding   DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN guiding   TYPE bool using guiding::int::bool;
+ALTER TABLE tasks ALTER COLUMN guiding    SET DEFAULT True;
+
+ALTER TABLE tasks ALTER COLUMN dither    DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN dither    TYPE bool using dither::int::bool;
+ALTER TABLE tasks ALTER COLUMN dither    SET DEFAULT False;
+
+ALTER TABLE tasks ALTER COLUMN defocus   TYPE bool using defocus::int::bool;
+ALTER TABLE tasks ALTER COLUMN calibrate TYPE bool using calibrate::int::bool;
+ALTER TABLE tasks ALTER COLUMN solve     TYPE bool using solve::int::bool;
+ALTER TABLE tasks ALTER COLUMN vphot     TYPE bool using vphot::int::bool;
+
+ALTER TABLE tasks ALTER COLUMN auto_center DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN auto_center TYPE bool using auto_center::int::bool;
+ALTER TABLE tasks ALTER COLUMN auto_center SET DEFAULT False;
+
+ALTER TABLE tasks ALTER COLUMN calibrated  DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN calibrated  TYPE bool using calibrated::int::bool;
+ALTER TABLE tasks ALTER COLUMN calibrated  SET DEFAULT False;
+
+ALTER TABLE tasks ALTER COLUMN solved      DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN solved      TYPE bool using solved::int::bool;
+ALTER TABLE tasks ALTER COLUMN solved      SET DEFAULT False;
+
+ALTER TABLE tasks ALTER COLUMN sent        DROP DEFAULT;
+ALTER TABLE tasks ALTER COLUMN sent        TYPE bool using sent::int::bool;
+ALTER TABLE tasks ALTER COLUMN sent        SET DEFAULT False;
+
+UPDATE schema_version SET version = 8;
