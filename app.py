@@ -18,16 +18,16 @@ def root():
 
 @app.route('/histo')
 def histogram():
-   df = pd.DataFrame({
-      'Fruit': ['Apples', 'Oranges', 'Bananas', 'Apples', 'Oranges',
-      'Bananas'],
-      'Amount': [4, 1, 2, 2, 4, 5],
-      'City': ['SF', 'SF', 'SF', 'Montreal', 'Montreal', 'Montreal']
-   })
+    df = pd.DataFrame({
+        'Fruit': ['Apples', 'Oranges', 'Bananas', 'Apples', 'Oranges',
+        'Bananas'],
+        'Amount': [4, 1, 2, 2, 4, 5],
+        'City': ['SF', 'SF', 'SF', 'Montreal', 'Montreal', 'Montreal']
+    })
 
-   fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
-   graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-   return render_template('histogram.html', graphJSON=graphJSON)
+    fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
+    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+    return render_template('histogram.html', graphJSON=graphJSON)
 
 @app.route('/api/tasks', methods = ['POST', 'GET'])
 def tasks():
@@ -49,7 +49,7 @@ def tasks():
     q = q + " ORDER by task_id DESC"
 
     if limit is not None:
-        q = q + f" LIMIT {limit}";
+        q = q + f" LIMIT {limit}"
 
     cnx = db.connect()
     tasks = db.run_query(cnx, q)
@@ -110,7 +110,8 @@ def login():
     if md5pass is None:
         return { 'status': False, 'msg': 'Password not provided'}
 
-    q = f"SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"
+    q = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
+            aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"""
 
     cnx = db.connect()
     db_resp = db.run_query(cnx, q)
@@ -120,9 +121,11 @@ def login():
         print("#### No username")
         return { 'status': False, 'msg': 'Invalid credentials'} # No such username
 
-    user_id, pass_db, login, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass = db_resp[0]
+    user_id, pass_db, login, firstname, lastname, share, phone, email, permissions, aavso_id, \
+        ftp_login, ftp_pass = db_resp[0]
+
     if (md5pass.lower() != pass_db.lower()):
-        print(f"#### Login exists, but invalid password: expected {pass_db.lower()}, got {md5pass.lower()}")
+        print(f"#### Login exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
         return { 'status': False, 'msg': 'Invalid credentials'} # Password's MD5 did not match
 
     return { 'status': True,

@@ -80,7 +80,11 @@ def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = Fals
     if show_hdr:
         print(repr(h))
 
-    task_id = iteleskop.filename_to_task_id(fname)
+    details = iteleskop.parse_iteleskop_filename(fname)
+    if details:
+        task_id = details["task_id"]
+    else:
+        task_id = 0
 
     if not db.task_exists(cnx, task_id):
         print(f"Task {task_id} does not exist.")
