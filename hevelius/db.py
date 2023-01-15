@@ -18,6 +18,7 @@ def version_get(cnx):
     query = 'SELECT * from schema_version'
     cursor = cnx.cursor()
 
+    ver = ""
     try:
         cursor.execute(query)
     except:
@@ -113,6 +114,11 @@ def task_get(cnx, id):
 
     return x
 
+def task_exists(cnx, task_id):
+    """Check if task defined by task_id exists."""
+    v = run_query(cnx, f"SELECT count(*) FROM tasks where task_id={task_id}")
+    return v[0][0] == 1
+
 def tasks_get_filter(cnx, criteria):
     q = f"SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity FROM tasks WHERE {criteria}"
 
@@ -139,3 +145,64 @@ def task_update(cnx, id, fwhm = None, eccentricity = None):
     print("Updating task %d: query=[%s]" % (id, q))
 
     run_query(cnx, q)
+
+def field_names(t, names):
+    """Returns a coma separated list of fields, if they exist in the t dictionary.
+    names is a array of strings."""
+    q = ""
+    for name in names:
+        if name in t:
+            if len(q):
+                q += ", "
+            q += name
+    return q
+
+def field_values(t, names):
+    """Returns a coma separated list of field values, if they exist in the t dictionary.
+    names is a array of strings."""
+    q = ""
+    for name in names:
+        if name in t:
+            if len(q):
+                q += ", "
+            q += "'" + str(t[name]) + "'"
+    return q
+
+def field_check(t, names):
+    """Checks if all expected field names are present. Returns true if they
+    are."""
+
+    for name in names:
+        if not name in t:
+            print(f"ERROR: Required field {name} missing in {t}")
+            return False
+    return True
+
+def task_add(cnx, task):
+    """Inserts new task.
+       cnx - connection
+       task - dictionary representing a task"""
+
+    if not field_check(task, ["user_id"]):
+        print("ERROR: Required field(s) missing, can't add a task.")
+
+    fields = ["task_id", "user_id", "scope_id", "state", "object", "filter", "binning", "exposure",
+              "solve", "solved", "calibrate", "calibrated", "imagename"]
+
+    q = "INSERT INTO tasks(" + field_names(task, fields) + ") "
+    q += "VALUES(" + field_values(task, fields) + ")"
+
+
+    # TODO: Implement the actual insertion.
+    print(f"#### TODO: q={q}")
+
+def user_get_id(cnx, aavso_id=None, login=None):
+
+    q = "SELECT user_id FROM users WHERE "
+    if aavso_id:
+        q += f"aavso_id='{aavso_id}'"
+    if login:
+        q += f"login='{login}'"
+
+    v = run_query(cnx, q)
+    return v[0][0]

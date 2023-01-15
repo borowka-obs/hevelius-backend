@@ -10,6 +10,7 @@ sys.path.append(".")
 
 from hevelius.cmd_basic import stats, db_version, hevelius_version, config_show
 from hevelius.cmd_db_migrate import migrate
+from hevelius.cmd_repo import repo
 
 
 if __name__ == '__main__':
@@ -23,6 +24,7 @@ if __name__ == '__main__':
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
     version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
     config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
+    repo_parser = subparsers.add_parser('repo', help="Manages files repository on local storage.")
 
     args = parser.parse_args()
 
@@ -34,6 +36,8 @@ if __name__ == '__main__':
         db_version(args) # see cmd_basic.py
     elif args.command == "config":
         config_show(args) # see cmd_basic.py
+    elif args.command == "repo":
+        repo(args) # see cmd_repo.py
 
     else:
         parser.print_help()

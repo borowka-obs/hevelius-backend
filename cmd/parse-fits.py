@@ -69,10 +69,6 @@ def process_fits_dir(dir, show_hdr : bool, dry_run : bool):
     if not dry_run:
         cnx.close()
 
-def db_task_exists(cnx, task_id):
-    v = db.run_query(cnx, f"SELECT count(*) FROM tasks where task_id={task_id}")
-    return v[0][0] == 1
-
 def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
 
@@ -86,7 +82,7 @@ def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = Fals
 
     task_id = iteleskop.filename_to_task_id(fname)
 
-    if not db_task_exists(cnx, task_id):
+    if not db.task_exists(cnx, task_id):
         print(f"Task {task_id} does not exist.")
         # TODO: implement adding missing task to DB
 
