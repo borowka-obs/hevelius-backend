@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 
+"""
+Provides command line interface to the Hevelius project.
+"""
+
 import sys
 import argparse
 
-
-# This is ugly hack, but it allows running code from the local dir, without
-# installing.
 sys.path.append(".")
 
 from hevelius.cmd_basic import stats, db_version, hevelius_version, config_show
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
-
 
 if __name__ == '__main__':
     print(f"Hevelius {hevelius_version()}")
@@ -29,13 +29,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.command == "stats":
-        stats(args) # see cmd_basic.py
+        stats() # see cmd_basic.py
     elif args.command == "migrate":
         migrate(args) # see cmd_db_migrate.py
     elif args.command == "version":
-        db_version(args) # see cmd_basic.py
+        db_version() # see cmd_basic.py
     elif args.command == "config":
-        config_show(args) # see cmd_basic.py
+        config_show() # see cmd_basic.py
     elif args.command == "repo":
         repo(args) # see cmd_repo.py
 
