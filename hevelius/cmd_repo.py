@@ -1,6 +1,9 @@
+"""
+Code that handles files repository on disk.
+"""
+import glob
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
-import glob
 
 def task_add(cnx, fname, details):
     """Adds a new task based on a image filename, specified by fname. The

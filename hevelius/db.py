@@ -7,12 +7,18 @@ except ImportError:
     sys.exit(-1)
 
 if config.TYPE == "pgsql":
-    from hevelius.db_pgsql import connect, run_query
+    import hevelius.db_pgsql as backend
 elif config.TYPE == "mysql":
-    from hevelius.db_mysql import connect, run_query
+    import hevelius.db_mysql as backend
 else:
     print(f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
     sys.exit(-1)
+
+def connect():
+    return backend.connect()
+
+def run_query(conn, query):
+    return backend.run_query(conn, query)
 
 def version_get(cnx):
     query = 'SELECT * from schema_version'
@@ -29,7 +35,7 @@ def version_get(cnx):
         ver = i[0]
 
     cursor.close()
-    return ver
+    return int(ver)
 
 def stats_print(cnx):
 
