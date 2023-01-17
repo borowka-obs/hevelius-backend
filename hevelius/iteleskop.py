@@ -2,20 +2,15 @@ import sys
 import re
 import os
 
-def filename_to_task_id(fname):
-    # Get rid of the paths first.
-    tmp = fname[fname.rfind("/") + 1:]
+def parse_iteleskop_filename(fname: str) -> dict:
+    """
+    Parses name of the file that uses iteleskop naming convention:
 
-    # then, get the J012345 substring, which designates the task id.
-    try:
-        offset = tmp.find("J") + 1
-        tmp2 = tmp[offset:offset+6]
-        return int(tmp2)
-    except ValueError:
-        print("ERROR: Unable to parse task id from [%s], tmp=[%s] tmp2=[%s]" % (fname, tmp, tmp2), file = sys.stderr)
-        return -1
+    SFDB_(date)_J(task_id)_AVSO_FILTER_BIN_EXP_OBJECT.fit
 
-def parse_iteleskop_filename(fname):
+    :param fname: filename of the file
+    :return: dictionary with parsed parameters
+    """
 
     # Step 1: get rid of the possible leading dir name.
     dir, filename = os.path.split(fname)  # get rid of the directory
