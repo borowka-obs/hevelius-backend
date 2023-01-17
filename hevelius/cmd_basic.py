@@ -5,6 +5,7 @@ Code handling several basic commands (stats, version, config)
 from importlib.metadata import version as importlib_version
 from hevelius import db, config
 
+
 def stats():
     """
     Prints database statistics (version, overall, by state, by user)
@@ -36,6 +37,7 @@ def stats():
 
     cnx.close()
 
+
 def db_version():
     """
     Prints the database schema version.
@@ -48,6 +50,7 @@ def db_version():
 
     print(f"Schema version is {ver}")
     cnx.close()
+
 
 def hevelius_version() -> str:
     """

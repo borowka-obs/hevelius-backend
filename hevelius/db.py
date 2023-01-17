@@ -11,14 +11,18 @@ if config.TYPE == "pgsql":
 elif config.TYPE == "mysql":
     import hevelius.db_mysql as backend
 else:
-    print(f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
+    print(
+        f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
     sys.exit(-1)
+
 
 def connect():
     return backend.connect()
 
+
 def run_query(conn, query):
     return backend.run_query(conn, query)
+
 
 def version_get(cnx):
     query = 'SELECT * from schema_version'
@@ -37,6 +41,7 @@ def version_get(cnx):
     cursor.close()
     return int(ver)
 
+
 def stats_print(cnx):
 
     stats = [
@@ -49,7 +54,6 @@ def stats_print(cnx):
         ("eccentricity is not null", "with quality measured (eccen != null)"),
 
     ]
-
 
     for cond, descr in stats:
         q = "SELECT count(*) FROM tasks WHERE %s" % cond
@@ -68,20 +72,22 @@ def stats_print(cnx):
     # print("There are %d tasks, %d files, %d have FWHM, %d have eccentricity." % stats)
     # print("Missing: %d files miss FWHM, %d files miss eccentricity." % (stats[1] - stats[2], stats[1] - stats[3]))
 
-
     # return tasks_cnt[0][0], files_cnt[0][0], fwhm_cnt[0][0], eccentricity_cnt[0][0]
+
 
 def stats_by_state(cnx):
     # Get tasks list by status
-    hist = run_query(cnx, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
+    hist = run_query(
+        cnx, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
     res = []
 
     for row in hist:
-        res.append( (row[0], row[1], row[2]))
+        res.append((row[0], row[1], row[2]))
 
     return res
 
-def stats_by_user(cnx, state = 6):
+
+def stats_by_user(cnx, state=6):
     if state is None:
         cond = ""
     else:
@@ -93,8 +99,9 @@ def stats_by_user(cnx, state = 6):
 
     res = []
     for row in tasks_per_user:
-        res.append( (row[0], row[1], row[2]) )
+        res.append((row[0], row[1], row[2]))
     return res
+
 
 def task_get(cnx, id):
     q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity FROM tasks WHERE task_id = %d" % id
@@ -120,10 +127,12 @@ def task_get(cnx, id):
 
     return x
 
+
 def task_exists(cnx, task_id):
     """Check if task defined by task_id exists."""
     v = run_query(cnx, f"SELECT count(*) FROM tasks where task_id={task_id}")
     return v[0][0] == 1
+
 
 def tasks_get_filter(cnx, criteria):
     q = f"SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity FROM tasks WHERE {criteria}"
@@ -134,7 +143,8 @@ def tasks_get_filter(cnx, criteria):
 
     return tasks
 
-def task_update(cnx, id, fwhm = None, eccentricity = None):
+
+def task_update(cnx, id, fwhm=None, eccentricity=None):
     upd = ""
     if fwhm is not None:
         upd = "fwhm = %f" % fwhm
@@ -152,6 +162,7 @@ def task_update(cnx, id, fwhm = None, eccentricity = None):
 
     run_query(cnx, q)
 
+
 def field_names(t, names):
     """Returns a coma separated list of fields, if they exist in the t dictionary.
     names is a array of strings."""
@@ -162,6 +173,7 @@ def field_names(t, names):
                 q += ", "
             q += name
     return q
+
 
 def field_values(t, names):
     """Returns a coma separated list of field values, if they exist in the t dictionary.
@@ -174,6 +186,7 @@ def field_values(t, names):
             q += "'" + str(t[name]) + "'"
     return q
 
+
 def field_check(t, names):
     """Checks if all expected field names are present. Returns true if they
     are."""
@@ -183,6 +196,7 @@ def field_check(t, names):
             print(f"ERROR: Required field {name} missing in {t}")
             return False
     return True
+
 
 def task_add(cnx, task):
     """Inserts new task.
@@ -198,9 +212,9 @@ def task_add(cnx, task):
     q = "INSERT INTO tasks(" + field_names(task, fields) + ") "
     q += "VALUES(" + field_values(task, fields) + ")"
 
-
     # TODO: Implement the actual insertion.
     print(f"#### TODO: q={q}")
+
 
 def user_get_id(cnx, aavso_id=None, login=None):
 

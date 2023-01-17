@@ -12,15 +12,17 @@ from hevelius import db_mysql as db
 app = Flask(__name__)
 CORS(app)
 
+
 @app.route('/')
 def root():
     return "Home🏠 EE"
+
 
 @app.route('/histo')
 def histogram():
     df = pd.DataFrame({
         'Fruit': ['Apples', 'Oranges', 'Bananas', 'Apples', 'Oranges',
-        'Bananas'],
+                  'Bananas'],
         'Amount': [4, 1, 2, 2, 4, 5],
         'City': ['SF', 'SF', 'SF', 'Montreal', 'Montreal', 'Montreal']
     })
@@ -29,19 +31,20 @@ def histogram():
     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
     return render_template('histogram.html', graphJSON=graphJSON)
 
-@app.route('/api/tasks', methods = ['POST', 'GET'])
+
+@app.route('/api/tasks', methods=['POST', 'GET'])
 def tasks():
 
     user_id = get_param(request, 'user_id')
     limit = get_param(request, 'limit')
 
     q = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
-            "exposure, descr, filter, binning, guiding, dither, " \
-            "defocus, calibrate, solve, vphot, other_cmd, " \
-            "min_alt, moon_distance, skip_before, skip_after, " \
-            "min_interval, comment, state, imagename, " \
-            "created, activated, performed, max_moon_phase, " \
-            "max_sun_alt, auto_center, calibrated, solved, " \
+        "exposure, descr, filter, binning, guiding, dither, " \
+        "defocus, calibrate, solve, vphot, other_cmd, " \
+        "min_alt, moon_distance, skip_before, skip_after, " \
+        "min_interval, comment, state, imagename, " \
+        "created, activated, performed, max_moon_phase, " \
+        "max_sun_alt, auto_center, calibrated, solved, " \
         "sent FROM tasks, users WHERE tasks.user_id = users.user_id"
     if user_id is not None:
         q = q + f" AND tasks.user_id={user_id}"
@@ -59,10 +62,11 @@ def tasks():
 
 
 def sanitize(x: str) -> str:
-    x = str(x).replace('\'','') # apostrophes are bad
-    x = x.replace(';','') # commas also
-    x = x.replace('\\','') # and backslashes
+    x = str(x).replace('\'', '')  # apostrophes are bad
+    x = x.replace(';', '')  # commas also
+    x = x.replace('\\', '')  # and backslashes
     return x
+
 
 def get_param(request, field) -> str:
     json = request.get_json()
@@ -71,10 +75,10 @@ def get_param(request, field) -> str:
         return sanitize(x)
     return x
 
-@app.route('/api/login', methods = ['POST'])
+
+@app.route('/api/login', methods=['POST'])
 @cross_origin()
 def login():
-
     """_summary_
 
     Example request:    {"username":"tomek","password":"64a4e327e97c1e7926f9240edb123456"}
@@ -100,15 +104,15 @@ def login():
     """
 
     if not request.is_json:
-        return { 'status': False, 'msg': 'Need JSON input' }
+        return {'status': False, 'msg': 'Need JSON input'}
 
     user = get_param(request, 'username')
     md5pass = get_param(request, 'password')
 
     if user is None:
-        return { 'status': False, 'msg': 'Username not provided'}
+        return {'status': False, 'msg': 'Username not provided'}
     if md5pass is None:
-        return { 'status': False, 'msg': 'Password not provided'}
+        return {'status': False, 'msg': 'Password not provided'}
 
     q = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
             aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"""
@@ -119,24 +123,27 @@ def login():
 
     if db_resp is None or not len(db_resp):
         print("#### No username")
-        return { 'status': False, 'msg': 'Invalid credentials'} # No such username
+        # No such username
+        return {'status': False, 'msg': 'Invalid credentials'}
 
     user_id, pass_db, login, firstname, lastname, share, phone, email, permissions, aavso_id, \
         ftp_login, ftp_pass = db_resp[0]
 
     if (md5pass.lower() != pass_db.lower()):
-        print(f"#### Login exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
-        return { 'status': False, 'msg': 'Invalid credentials'} # Password's MD5 did not match
+        print(
+            f"#### Login exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
+        # Password's MD5 did not match
+        return {'status': False, 'msg': 'Invalid credentials'}
 
-    return { 'status': True,
-             'user_id': user_id,
-             'firstname': firstname,
-             'lastname': lastname,
-             'share': share,
-             'phone': phone,
-             'email': email,
-             'permissions': permissions,
-             'aavso_id': aavso_id,
-             'ftp_login': ftp_login,
-             'ftp_pass': ftp_pass,
-             'msg': 'Welcome' }
+    return {'status': True,
+            'user_id': user_id,
+            'firstname': firstname,
+            'lastname': lastname,
+            'share': share,
+            'phone': phone,
+            'email': email,
+            'permissions': permissions,
+            'aavso_id': aavso_id,
+            'ftp_login': ftp_login,
+            'ftp_pass': ftp_pass,
+            'msg': 'Welcome'}

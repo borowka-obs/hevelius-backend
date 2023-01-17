@@ -12,6 +12,7 @@ import sys
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
 
+
 def process_file(fname, cnt, total):
 
     fname = fname.replace(config.REPO_PATH + "/", "")
@@ -30,7 +31,8 @@ def process_file(fname, cnt, total):
 
         cnx.close()
 
-def process_fits_list(fname, show_hdr : bool, dry_run : bool):
+
+def process_fits_list(fname, show_hdr: bool, dry_run: bool):
     """
     Processes all FITS files listed in a specified text file.
 
@@ -60,7 +62,8 @@ def process_fits_list(fname, show_hdr : bool, dry_run : bool):
 
     cnx.close()
 
-def process_fits_dir(dir: str, show_hdr : bool, dry_run : bool):
+
+def process_fits_dir(dir: str, show_hdr: bool, dry_run: bool):
     """
     Processes all FITS files in specified directory.
 
@@ -75,7 +78,7 @@ def process_fits_dir(dir: str, show_hdr : bool, dry_run : bool):
     print(f"pattern={pattern}")
     files = glob.glob(pattern, recursive=True)
 
-    #for f in Path(dir).rglob('*.fit'):
+    # for f in Path(dir).rglob('*.fit'):
     #    files.append(f)
 
     print(f"Found {len(files)} files(s) in directory {dir}")
@@ -92,16 +95,17 @@ def process_fits_dir(dir: str, show_hdr : bool, dry_run : bool):
 
     cnx.close()
 
+
 def task_add(cnx, fname, details):
     """Adds a new task based on a image filename, specified by fname. The
        filename parsing is already done by parse_iteleskop_name() and stored in
        details dict."""
 
-    user_id = db.user_get_id(cnx, aavso_id = details["user"])
+    user_id = db.user_get_id(cnx, aavso_id=details["user"])
 
     details["user_id"] = user_id
     details["scope_id"] = 1
-    details["state"] = 6 # Complete
+    details["state"] = 6  # Complete
 
     print(details)
 
@@ -109,7 +113,8 @@ def task_add(cnx, fname, details):
 
     db.task_add(cnx, details)
 
-def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = False):
+
+def process_fits_file(cnx, fname, verb=False, show_hdr=False, dry_run=False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
 
     if verb:
@@ -125,9 +130,10 @@ def process_fits_file(cnx, fname, verb = False, show_hdr = False, dry_run = Fals
         print(f"Task {task_id} does not exist.")
         # TODO: implement adding missing task to DB
 
-    task_update_params(cnx, fname, task_id, show_hdr = show_hdr, dry_run = dry_run)
+    task_update_params(cnx, fname, task_id, show_hdr=show_hdr, dry_run=dry_run)
 
-def task_update_params(cnx, fname: str, task_id: int, show_hdr = False, dry_run = False):
+
+def task_update_params(cnx, fname: str, task_id: int, show_hdr=False, dry_run=False):
 
     h = read_fits(fname)
 
@@ -138,7 +144,6 @@ def task_update_params(cnx, fname: str, task_id: int, show_hdr = False, dry_run 
 
     q += get_int_header(h, "he_resx", "NAXIS1")
     q += get_int_header(h, "he_resy", "NAXIS2")
-
 
     q += "he_obsstart='%s', " % gets(h, "DATE-OBS")
     q += "he_exposure=%f, " % getf(h, "EXPTIME")
@@ -161,30 +166,32 @@ def task_update_params(cnx, fname: str, task_id: int, show_hdr = False, dry_run 
     q += get_float_header(h, "he_objectha", "OBJCTHA")
     q += get_string_header(h, "he_pierside", "PIERSIDE")
 
-    q += "he_site_lat=%f, " % parse_degms(gets(h,"SITELAT"))
-    q += "he_site_lon=%f, " % parse_degms(gets(h,"SITELONG"))
+    q += "he_site_lat=%f, " % parse_degms(gets(h, "SITELAT"))
+    q += "he_site_lon=%f, " % parse_degms(gets(h, "SITELONG"))
 
-    q += "he_jd=%f, " % getf(h,"JD")
+    q += "he_jd=%f, " % getf(h, "JD")
 
     q += get_float_header(h, "he_jd_helio", "JD-HELIO")
 
     q += get_float_header(h, "he_tracktime", "TRAKTIME")
 
-    q += "he_focal=%f, " % getf(h,"FOCALLEN")
-    q += "he_aperture_diam=%f, " % getf(h,"APTDIA")
-    q += "he_aperture_area=%f, " % getf(h,"APTAREA")
-    q += "he_scope='%s', " % gets(h,"TELESCOP")
-    q += "he_camera='%s', " % gets(h,"INSTRUME")
+    q += "he_focal=%f, " % getf(h, "FOCALLEN")
+    q += "he_aperture_diam=%f, " % getf(h, "APTDIA")
+    q += "he_aperture_area=%f, " % getf(h, "APTAREA")
+    q += "he_scope='%s', " % gets(h, "TELESCOP")
+    q += "he_camera='%s', " % gets(h, "INSTRUME")
 
     q += get_float_header(h, "he_moon_alt", "MOONWYS")
     q += get_float_header(h, "he_moon_angle", "MOONKAT")
     q += get_float_header(h, "he_moon_phase", "MOONFAZA")
     q += get_float_header(h, "he_sun_alt", "SUN")
-    q += parse_solved(h) # sets he_solved, he_solved_ra, he_solved_dec, he_solved_x, he_solved_y
+    # sets he_solved, he_solved_ra, he_solved_dec, he_solved_x, he_solved_y
+    q += parse_solved(h)
 
-    q += parse_quality(h) # gets FWHM, number of stars recognized
+    q += parse_quality(h)  # gets FWHM, number of stars recognized
 
-    q += " task_id=task_id" # meaningless, but it's hard to tell if q ends with a , or not at this point.
+    # meaningless, but it's hard to tell if q ends with a , or not at this point.
+    q += " task_id=task_id"
 
     q += f" WHERE task_id={task_id};"
 
@@ -197,15 +204,18 @@ def task_update_params(cnx, fname: str, task_id: int, show_hdr = False, dry_run 
     else:
         print("DB update skipped.")
 
+
 def get_int_header(header, sql, header_name):
     if not header_name in header or not len(str(header[header_name])):
         return ""
     return "%s=%i, " % (sql, geti(header, header_name))
 
+
 def get_float_header(header, sql, header_name):
     if not header_name in header or not len(str(header[header_name])):
         return ""
     return "%s=%f, " % (sql, getf(header, header_name))
+
 
 def get_string_header(header, sql, header_name):
     if not header_name in header or not len(str(header[header_name])):
@@ -226,11 +236,14 @@ def parse_ra(s):
 
     return ra*(1-2*minus)
 
+
 def parse_dec(s):
     return parse_ra(s)
 
+
 def parse_degms(s):
     return parse_ra(s)
+
 
 def parse_solved(h):
 
@@ -279,8 +292,8 @@ def parse_solved(h):
     refx = int(h["CRPIX1"])
     refy = int(h["CRPIX2"])
 
-    pixscalex = float(h["CDELT1"])*3600 # arcsec/pix in x direction
-    pixscaley = float(h["CDELT2"])*3600 # arcsec/pix in y direction
+    pixscalex = float(h["CDELT1"])*3600  # arcsec/pix in x direction
+    pixscaley = float(h["CDELT2"])*3600  # arcsec/pix in y direction
 
     q += "he_solved_ra=%f, he_solved_dec=%f, he_solved_refx=%d, he_solved_refy=%d, he_pixscalex=%f, he_pixscaley=%f, " \
          % (ra, dec, refx, refy, pixscalex, pixscaley)
@@ -299,11 +312,12 @@ def parse_solved(h):
 
     return q
 
+
 def parse_quality(header):
 
     q = ""
     if "FWHM" in header:
-        q = "he_fwhm=%f, " % getf(header,"FWHM")
+        q = "he_fwhm=%f, " % getf(header, "FWHM")
 
     if not "HISTORY" in header:
         return q
@@ -322,14 +336,18 @@ def parse_quality(header):
 
     return q
 
+
 def gets(header, param):
     return header[param]
+
 
 def getf(header, param):
     return float(header[param])
 
+
 def geti(header, param):
     return int(header[param])
+
 
 def read_fits(filename):
     """ Reads FITS file, returns its header content """
@@ -347,12 +365,14 @@ def repo(args):
         if not args.dry_run:
             cnx = db.connect()
         print(f"Processing single file: {args.file}")
-        process_fits_file(cnx, args.file, show_hdr = args.show_header, dry_run = args.dry_run)
+        process_fits_file(
+            cnx, args.file, show_hdr=args.show_header, dry_run=args.dry_run)
         if cnx:
             cnx.close()
     elif args.list:
         print(f"Processing list of files stored in {args.list}")
-        process_fits_list(args.list, show_hdr = args.show_header, dry_run = args.dry_run)
+        process_fits_list(args.list, show_hdr=args.show_header,
+                          dry_run=args.dry_run)
     else:
         if args.dir:
             path = args.dir
@@ -362,4 +382,4 @@ def repo(args):
         print(f"Processing all *.fit files in dir: {path}")
         pattern = config.REPO_PATH + '/' + '**' + '/' + '*.fit'
 
-        process_fits_dir(path, show_hdr = args.show_header, dry_run = args.dry_run)
+        process_fits_dir(path, show_hdr=args.show_header, dry_run=args.dry_run)

@@ -11,6 +11,7 @@ import subprocess
 import sys
 from hevelius import config, db
 
+
 def migrate(args):
     """
     Conducts database migration to the newest schema.
@@ -22,8 +23,10 @@ def migrate(args):
     elif config.TYPE == "mysql":
         migrate_mysql(args)
     else:
-        print(f"ERROR: Invalid database type specified in config.py: {config.TYPE}, allowed are: mysql, pgsql")
+        print(
+            f"ERROR: Invalid database type specified in config.py: {config.TYPE}, allowed are: mysql, pgsql")
         sys.exit(-1)
+
 
 def migrate_mysql(args):
     """
@@ -33,7 +36,8 @@ def migrate_mysql(args):
     """
 
     DIR = "db"
-    files = [f for f in listdir(DIR) if (isfile(join(DIR, f)) and f.endswith("mysql"))   ]
+    files = [f for f in listdir(DIR) if (
+        isfile(join(DIR, f)) and f.endswith("mysql"))]
 
     files.sort()
 
@@ -45,13 +49,16 @@ def migrate_mysql(args):
         mig_ver = int(f[:2])
 
         if mig_ver > current_ver:
-            print(f"Migrating from {current_ver} to {mig_ver}, using script {f}")
+            print(
+                f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
+            schema = subprocess.Popen(
+                ["cat", join(DIR, f)], stdout=subprocess.PIPE)
 
             mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST,
-                                     "-p"+config.PASSWORD, "-P", str(config.PORT),
-                                     config.DBNAME, "-B"], stdin=schema.stdout)
+                                     "-p" +
+                                      config.PASSWORD, "-P", str(config.PORT),
+                                      config.DBNAME, "-B"], stdin=schema.stdout)
 
             output, _ = mysql.communicate()
 
@@ -64,6 +71,7 @@ def migrate_mysql(args):
         else:
             print(f"Skipping {f}, schema version is {current_ver}")
 
+
 def migrate_pgsql(args):
     """
     Performs PostgreSQL database migration to the newest schema.
@@ -72,7 +80,8 @@ def migrate_pgsql(args):
     """
 
     DIR = "db"
-    files = [f for f in listdir(DIR) if (isfile(join(DIR, f)) and f.endswith("psql"))]
+    files = [f for f in listdir(DIR) if (
+        isfile(join(DIR, f)) and f.endswith("psql"))]
 
     files.sort()
 
@@ -88,15 +97,16 @@ def migrate_pgsql(args):
             continue
 
         if mig_ver > current_ver:
-            print(f"Migrating from {current_ver} to {mig_ver}, using script {f}")
+            print(
+                f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            #schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
+            # schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
 
             # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
             psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p",
                                      str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
 
-            #schema.stdout.close()
+            # schema.stdout.close()
             output, _ = psql.communicate()
 
             cnx = db.connect()
