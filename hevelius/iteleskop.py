@@ -17,7 +17,8 @@ def parse_iteleskop_filename(fname: str) -> dict:
     dir, filename = os.path.split(fname)  # get rid of the directory
     filename, _ = os.path.splitext(filename)  # and the extension
 
-    regex = '([S_][F_][D_][B_])_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-[0-9]{2}-[0-9]{2})_J([0-9]+)_([A-Z]+)_([A-Z0-9]+)_([0-9]x[0-9])_([0-9]+)s_(.*)'
+    #        (flags           ) (date                                                  )  (job)    (user)   (filter)    (bin)         (exp)     (object)
+    regex = '([S_][F_][D_][B_])_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-?[0-9]{2}-[0-9]{2})_J([0-9]+)_+([A-Z]+)_([A-Z0-9]+)_([0-9]x[0-9])_([0-9]+)s_(.*)'
     m = re.match(regex, filename)
     if m:
         flags, date, task_id, user, filter, bin, exp, object = m.groups()
@@ -34,7 +35,7 @@ def parse_iteleskop_filename(fname: str) -> dict:
             "user": user,
             "filter": filter,
             "binning": int(bin),
-            "exposure": exp,
+            "exposure": int(exp),
             "object": object,
             "imagename": fname,
             "solve": solved,
