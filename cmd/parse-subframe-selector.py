@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 
 # This is an ugly hack. It should be removed.
+from hevelius import iteleskop
 import sys
 import argparse
 
 sys.path.append(".")
 
-from hevelius import iteleskop
 
 try:
     from hevelius import db
 except ImportError:
     print("Make sure you have config.py filled in. Please copy config.py-example to config.py and fill it in.")
     sys.exit(-1)
+
 
 def parse_task(l):
     """ Parses a string like this: Subframe,1,1,"E:/astro/nerpio/MTOA/2020Q2/SFDB_2020-05-12_00-39-28_J131878_MTOA_CV_1x1_0300s_NGC2403.fit",8.744279e-01,2.505002e+00,7.740531e-01,8.744279e-01,2.760000e+02,1.622958e+01,1.735582e+01,400,3.436380e-02,9.298809e-01,2.496715e+00,9.148272e-02,2.159095e-02,"2020-05-11 22:39:28" """
@@ -35,6 +36,7 @@ def parse_task(l):
     t["id"] = details["task_id"]
 
     return t
+
 
 def read_csv(fname):
     with open(fname) as f:
@@ -75,9 +77,11 @@ def cmd_subframe_selector(args):
             if t["id"] > 0:
                 db.task_update(cnx, t["id"], t["fwhm"], t["eccentricity"])
             else:
-                print("WARNING: skipping line %d, because task id is %d" % (cnt, t["id"]))
+                print("WARNING: skipping line %d, because task id is %d" %
+                      (cnt, t["id"]))
         else:
-            print("Pretending to update task %d with fwhm=%f, eccentricity=%f" % (t["id"], t["fwhm"], t["eccentricity"]))
+            print("Pretending to update task %d with fwhm=%f, eccentricity=%f" % (
+                t["id"], t["fwhm"], t["eccentricity"]))
 
     cnx.close()
 
@@ -85,8 +89,10 @@ def cmd_subframe_selector(args):
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser("Hevelius Processor 0.1.0")
-    parser.add_argument("-s", "--subframe-selector", help="SubframeSelector output CSV file.", type=str, required=True)
-    parser.add_argument("-d", "--dry-run", help="Pretends to do updates.", action='store_true', default=False, required=False)
+    parser.add_argument("-s", "--subframe-selector",
+                        help="SubframeSelector output CSV file.", type=str, required=True)
+    parser.add_argument("-d", "--dry-run", help="Pretends to do updates.",
+                        action='store_true', default=False, required=False)
 
     args = parser.parse_args()
 
