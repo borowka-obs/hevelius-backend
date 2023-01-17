@@ -19,19 +19,19 @@
 -- Table structure for table filters
 --
 
-DROP TABLE IF EXISTS users CASCADE;
-DROP TABLE IF EXISTS filters CASCADE;
-DROP TABLE IF EXISTS states CASCADE;
-DROP TABLE IF EXISTS mymfavorites;
-DROP TABLE IF EXISTS objects;
-DROP TABLE IF EXISTS schema_version;
-DROP TABLE IF EXISTS user_preferences;
-DROP TABLE IF EXISTS settings;
-DROP TABLE IF EXISTS task_states;
-DROP TABLE IF EXISTS tasks;
-DROP TABLE IF EXISTS telescopes;
+-- DROP TABLE IF EXISTS users CASCADE;
+-- DROP TABLE IF EXISTS filters CASCADE;
+-- DROP TABLE IF EXISTS states CASCADE;
+-- DROP TABLE IF EXISTS mymfavorites;
+-- DROP TABLE IF EXISTS objects;
+-- DROP TABLE IF EXISTS schema_version;
+-- DROP TABLE IF EXISTS user_preferences;
+-- DROP TABLE IF EXISTS settings;
+-- DROP TABLE IF EXISTS task_states;
+-- DROP TABLE IF EXISTS tasks;
+-- DROP TABLE IF EXISTS telescopes;
 
-CREATE TABLE users (
+CREATE TABLE IF NOT EXISTS users (
   user_id SERIAL,
   login varchar(32) DEFAULT NULL,
   pass varchar(32) DEFAULT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE users (
   PRIMARY KEY (user_id)
 );
 
-CREATE TABLE filters (
+CREATE TABLE IF NOT EXISTS  filters (
   scope_id int DEFAULT NULL,
   filter_id varchar(16) DEFAULT NULL,
   descr varchar(128) DEFAULT NULL,
@@ -56,7 +56,7 @@ CREATE TABLE filters (
   PRIMARY KEY (id)
 );
 
-CREATE TABLE telescopes (
+CREATE TABLE IF NOT EXISTS  telescopes (
   scope_id int NOT NULL,
   name varchar(64) DEFAULT NULL,
   descr varchar(1024) DEFAULT NULL,
@@ -65,7 +65,7 @@ CREATE TABLE telescopes (
   PRIMARY KEY (scope_id)
 );
 
-CREATE TABLE mymfavorites (
+CREATE TABLE IF NOT EXISTS  mymfavorites (
   id SERIAL,
   fav_name text DEFAULT NULL,
   fav_source text DEFAULT NULL,
@@ -73,7 +73,7 @@ CREATE TABLE mymfavorites (
   PRIMARY KEY (id)
 );
 
-CREATE TABLE objects (
+CREATE TABLE IF NOT EXISTS  objects (
   object_id SERIAL,
   name varchar(68) NOT NULL,
   ra float DEFAULT NULL,
@@ -89,11 +89,11 @@ CREATE TABLE objects (
   PRIMARY KEY (object_id)
 ) ;
 
-CREATE TABLE schema_version (
+CREATE TABLE IF NOT EXISTS  schema_version (
   version int DEFAULT NULL
 );
 
-CREATE TABLE settings (
+CREATE TABLE IF NOT EXISTS  settings (
   settings_id SERIAL,
   name varchar(50) DEFAULT NULL,
   value varchar(1024) DEFAULT NULL,
@@ -101,20 +101,20 @@ CREATE TABLE settings (
   PRIMARY KEY (settings_id)
 );
 
-CREATE TABLE states (
+CREATE TABLE IF NOT EXISTS  states (
   id int NOT NULL UNIQUE,
   name varchar(16) DEFAULT NULL,
   descr varchar(128) DEFAULT NULL
 );
 
-CREATE TABLE task_states (
+CREATE TABLE IF NOT EXISTS  task_states (
   state int NOT NULL,
   name varchar(20) DEFAULT NULL,
   descr text DEFAULT NULL,
   PRIMARY KEY (state)
 );
 
-CREATE TABLE tasks (
+CREATE TABLE IF NOT EXISTS tasks (
   task_id SERIAL,
   user_id int NOT NULL,
   scope_id int NOT NULL,
@@ -203,7 +203,7 @@ CREATE TABLE tasks (
 );
 
 
-CREATE TABLE user_preferences (
+CREATE TABLE IF NOT EXISTS  user_preferences (
   pref_id SERIAL,
   user_id int DEFAULT NULL,
   exposure int DEFAULT 75,
