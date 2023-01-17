@@ -12,26 +12,6 @@ import sys
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
 
-
-def process_file(fname, cnt, total):
-
-    fname = fname.replace(config.REPO_PATH + "/", "")
-    print(f"Processing {cnt}/{total}: {fname}")
-    details = parse_iteleskop_filename(fname)
-
-    if details:
-        cnx = db.connect()
-        task_id = details["task_id"]
-        if db.task_exists(cnx, task_id):
-            print(f"Task {task_id} exists.")
-        else:
-            print(f"Task {task_id} does not exist.")
-
-            task_add(cnx, fname, details)
-
-        cnx.close()
-
-
 def process_fits_list(fname, show_hdr: bool, dry_run: bool):
     """
     Processes all FITS files listed in a specified text file.
@@ -107,18 +87,13 @@ def task_add(cnx, fname, details):
     details["scope_id"] = 1
     details["state"] = 6  # Complete
 
-    print(details)
-
     # TODO: load fits, get its parameters. For example code, see cmd/parse-fits.py
 
     db.task_add(cnx, details)
 
 
-def process_fits_file(cnx, fname, verb=False, show_hdr=False, dry_run=False):
+def process_fits_file(cnx, fname, verbose=False, show_hdr=False, dry_run=False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
-
-    if verb:
-        print("Processing %s file..." % fname)
 
     details = parse_iteleskop_filename(fname)
     if details:
@@ -126,19 +101,24 @@ def process_fits_file(cnx, fname, verb=False, show_hdr=False, dry_run=False):
     else:
         task_id = 0
 
+    if task_id == 0:
+        print(f"ERROR: failed to parse file {fname}, skipping.")
+        return
+
     if not db.task_exists(cnx, task_id):
-        print(f"Task {task_id} does not exist.")
-        # TODO: implement adding missing task to DB
+        print(f"Task {task_id} does not exist, adding.")
+        task_add(cnx, fname, details)
+    else:
+        print(f"Task {task_id} exists.")
 
-    task_update_params(cnx, fname, task_id, show_hdr=show_hdr, dry_run=dry_run)
+    task_update_params(cnx, fname, task_id, verbose=verbose, dry_run=dry_run)
 
-
-def task_update_params(cnx, fname: str, task_id: int, show_hdr=False, dry_run=False):
+def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=False):
 
     h = read_fits(fname)
 
-    if show_hdr:
-        print(repr(h))
+    if verbose:
+        print(f"Header file: {repr(h)}")
 
     q = "UPDATE tasks SET "
 
@@ -195,14 +175,15 @@ def task_update_params(cnx, fname: str, task_id: int, show_hdr=False, dry_run=Fa
 
     q += f" WHERE task_id={task_id};"
 
-    print(q, file=sys.stderr)
+    if verbose:
+        print(q, file=sys.stderr)
 
     if not dry_run:
         v = db.run_query(cnx, q)
-        print(f"Result: {v}")
+        print(f"Task {task_id} updated.")
 
     else:
-        print("DB update skipped.")
+        print(f"Task {task_id} update skipped (--dry-run).")
 
 
 def get_int_header(header, sql, header_name):
@@ -365,14 +346,12 @@ def repo(args):
         if not args.dry_run:
             cnx = db.connect()
         print(f"Processing single file: {args.file}")
-        process_fits_file(
-            cnx, args.file, show_hdr=args.show_header, dry_run=args.dry_run)
+        process_fits_file(cnx, args.file, show_hdr=args.show_header, dry_run=args.dry_run)
         if cnx:
             cnx.close()
     elif args.list:
         print(f"Processing list of files stored in {args.list}")
-        process_fits_list(args.list, show_hdr=args.show_header,
-                          dry_run=args.dry_run)
+        process_fits_list(args.list, show_hdr=args.show_header,dry_run=args.dry_run)
     else:
         if args.dir:
             path = args.dir
