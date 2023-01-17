@@ -12,6 +12,7 @@ def connect():
 def run_query(conn, query):
     cursor = conn.cursor() # cursor(dictionary=True) or cursor(named_tuple=True)
     cursor.execute(query)
+    result = None
     try:
         result = cursor.fetchall()
     except BaseException as err:
