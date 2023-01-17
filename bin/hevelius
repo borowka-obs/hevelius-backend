@@ -24,7 +24,13 @@ if __name__ == '__main__':
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
     version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
     config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
+
     repo_parser = subparsers.add_parser('repo', help="Manages files repository on local storage.")
+    repo_parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
+    repo_parser.add_argument("-l", "--list", help="Reads a list of FITS files (one filename per line)", type=str)
+    repo_parser.add_argument("-d", "--dir",   help="Reads all FITS files recursively", type=str)
+    repo_parser.add_argument("-s", "--show-header", help="Displays all entries in FITS header", action='store_true')
+    repo_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
 
     args = parser.parse_args()
 
