@@ -10,7 +10,7 @@ def parse_iteleskop_filename(fname: str) -> dict:
     SFDB_(date)_J(task_id)_AVSO_FILTER_BIN_EXP_OBJECT.fit
 
     :param fname: filename of the file
-    :return: dictionary with parsed parameters
+    :return: dictionary with parsed parameters (or empty dict)
     """
 
     # Step 1: get rid of the possible leading dir name.
@@ -43,4 +43,4 @@ def parse_iteleskop_filename(fname: str) -> dict:
             "calibrated": calibrated
         }
     else:
-        return None
+        return {}
