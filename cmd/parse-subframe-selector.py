@@ -31,10 +31,10 @@ def parse_task(l):
     t["stars"] = float(f[11])
 
     # Now try to get the job id from the filename. First, ignore the path...
-    t["id"] = iteleskop.filename_to_task_id(fname)
+    details = iteleskop.parse_iteleskop_filename(fname)
+    t["id"] = details["task_id"]
 
     return t
-
 
 def read_csv(fname):
     with open(fname) as f:
