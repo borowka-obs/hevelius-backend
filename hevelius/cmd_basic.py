@@ -6,38 +6,6 @@ from importlib.metadata import version as importlib_version
 from hevelius import db, config
 
 
-def stats():
-    """
-    Prints database statistics (version, overall, by state, by user)
-
-    :param args: arguments parsed by argparse
-    """
-
-    cnx = db.connect()
-
-    ver = db.version_get(cnx)
-
-    print(f"Schema version is {ver}")
-
-    if ver == 0:
-        print("DB not initialized (schema version is 0), can't show any stats")
-        return
-
-    db.stats_print(cnx)
-
-    print("\nStats by state:")
-    by_state = db.stats_by_state(cnx)
-    for state_id, name, cnt in by_state:
-        print(f"{name:>18}({state_id:2}): {cnt}")
-
-    print("\nStats by user:")
-    by_user = db.stats_by_user(cnx)
-    for name, user_id, cnt in by_user:
-        print(f"{name:>18}({user_id:2}): {cnt}")
-
-    cnx.close()
-
-
 def db_version():
     """
     Prints the database schema version.
