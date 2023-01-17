@@ -17,10 +17,14 @@ def run_query(conn, query):
     cursor = conn.cursor()  # cursor(dictionary=True) or cursor(named_tuple=True)
     cursor.execute(query)
     result = None
-    try:
-        result = cursor.fetchall()
-    except BaseException as err:
-        print(f"ERROR: Query {query} went wrong: {err}")
-    conn.commit()
+
+    if (query.lower().startswith("select")):
+        try:
+            result = cursor.fetchall()
+        except BaseException as err:
+            print(f"ERROR: Query {query} went wrong: {type(err)} {err}")
+    else:
+        conn.commit()
+
     cursor.close()
     return result

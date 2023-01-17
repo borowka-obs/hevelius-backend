@@ -198,10 +198,13 @@ def field_check(t, names):
     return True
 
 
-def task_add(cnx, task):
+def task_add(cnx, task, verbose = False, dry_run = False):
     """Inserts new task.
        cnx - connection
-       task - dictionary representing a task"""
+       task - dictionary representing a task
+       dry_run - whether really add a task or not,
+
+       return: True if added, False if not"""
 
     if not field_check(task, ["user_id"]):
         print("ERROR: Required field(s) missing, can't add a task.")
@@ -212,9 +215,16 @@ def task_add(cnx, task):
     q = "INSERT INTO tasks(" + field_names(task, fields) + ") "
     q += "VALUES(" + field_values(task, fields) + ")"
 
-    # TODO: Implement the actual insertion.
-    print(f"#### TODO: q={q}")
+    if verbose:
+        print(f"Inserting task: {q}")
 
+    if not dry_run:
+        result = run_query(cnx, q)
+        print(f"Task {task['task_id']} inserted.")
+        return True
+    else:
+        print(f"Dry-run: would add a task {task['task_id']}.")
+        return False
 
 def user_get_id(cnx, aavso_id=None, login=None):
 
