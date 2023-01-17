@@ -20,5 +20,4 @@ jobs:
         pip install pylint
     - name: Analysing the code with pylint
       run: |
-        pylint --max-line-length 160 `ls -1 hevelius/*.py cmd/*.py bin/* *.py`
-        # pylint $(git ls-files '*.py')
+        pylint --max-line-length 160 $(git ls-files '*.py')
