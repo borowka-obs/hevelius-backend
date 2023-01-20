@@ -49,8 +49,7 @@ def deg2rah(ra: float) -> str:
 
 def histogram(args):
     cnx = db.connect()
-    tasks = db.tasks_get_filter(
-        cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
+    tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
     cnx.close()
 
     # This gets a list of coords (0-359, -90..90)
