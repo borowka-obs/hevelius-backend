@@ -1,3 +1,9 @@
+"""
+
+This module is responsible for handling files from the iteleskop.org project.
+
+"""
+
 import sys
 import re
 import os
@@ -17,7 +23,8 @@ def parse_iteleskop_filename(fname: str) -> dict:
     dir, filename = os.path.split(fname)  # get rid of the directory
     filename, _ = os.path.splitext(filename)  # and the extension
 
-    #        (flags           ) (date                                                  )  (job)    (user)   (filter)    (bin)         (exp)     (object)
+    # pylint: disable=line-too-long
+    #        (flags           ) (date                                                  )  (job)    (user)    (filter)    (bin)         (exp)     (object)
     regex = '([S_][F_][D_][B_])_([0-9]{4}-[0-9]{2}-[0-9]{2}_[0-9]{2}-?[0-9]{2}-[0-9]{2})_J([0-9]+)_+([A-Z]+)_([A-Z0-9]+)_([0-9]x[0-9])_([0-9]+)s_(.*)'
     m = re.match(regex, filename)
     if m:

@@ -98,6 +98,6 @@ if __name__ == '__main__':
     parser.add_argument("-d", "--dry-run", help="Pretends to do updates.",
                         action='store_true', default=False, required=False)
 
-    args = parser.parse_args()
+    arguments = parser.parse_args()
 
-    cmd_subframe_selector(args)
+    cmd_subframe_selector(arguments)
