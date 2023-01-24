@@ -2,12 +2,8 @@
 Code that handles files repository on disk.
 """
 import glob
-
-from os import listdir
-from os.path import isfile, join
-from pathlib import Path
-from astropy.io import fits
 import sys
+from astropy.io import fits
 
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
@@ -298,7 +294,7 @@ def parse_quality(header):
 
     q = ""
     if "FWHM" in header:
-        q = "he_fwhm=%f, " % getf(header, "FWHM")
+        q = f"he_fwhm={getf(header, 'FWHM')}, "
 
     if not "HISTORY" in header:
         return q
@@ -312,7 +308,7 @@ def parse_quality(header):
         h = h.strip()
         x = h.split(" ")
         stars = int(x[1])
-        q += "he_stars=%d, " % stars
+        q += f"he_stars={stars}, "
         break
 
     return q

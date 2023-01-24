@@ -40,10 +40,8 @@ def histogram():
 
     histo = cmd_stats.histogram({})
 
-    y_labels = list(range(90, -90, -1))
-    y_labels = list(map(lambda a: str(a), y_labels))
-
-    x_labels = list(map(lambda a: cmd_stats.deg2rah(a), range(0, 360, 1)))
+    x_labels = [cmd_stats.deg2rah(a) for a in range(0, 360, 1)]
+    y_labels = [str(y) for y in range(90, -90, -1)]
 
     labels = dict(x="Right Ascension (h:m/deg)",
                   y="Declination (deg)", color="# of frames")
@@ -100,8 +98,8 @@ def sanitize(x: str) -> str:
 
 
 def get_param(req, field) -> str:
-    json = req.get_json()
-    x = json.get(field)
+    json_html_request = req.get_json()
+    x = json_html_request.get(field)
     if x:
         return sanitize(x)
     return x
@@ -154,7 +152,7 @@ def login():
         print(f"Login: No such username ({user}")
         return {'status': False, 'msg': 'Invalid credentials'}
 
-    user_id, pass_db, login, firstname, lastname, share, phone, email, permissions, aavso_id, \
+    user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id, \
         ftp_login, ftp_pass = db_resp[0]
 
     if md5pass.lower() != pass_db.lower():
