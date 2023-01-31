@@ -31,7 +31,7 @@ def version_get(cnx):
     ver = ""
     try:
         cursor.execute(query)
-    except:
+    except BaseException:
         # Table doesn't exist, return 0
         return 0
 
@@ -47,9 +47,9 @@ def stats_print(cnx):
     stats = [
         ("true", "all tasks"),
         ("imagename is not null", "with images"),
-        ("he_solved = 1",            "solved"),
-        ("he_solved is null",        "not solved (not attempted)"),
-        ("he_solved = 0",            "not solved (attempted, but failed)"),
+        ("he_solved = 1", "solved"),
+        ("he_solved is null", "not solved (not attempted)"),
+        ("he_solved = 0", "not solved (attempted, but failed)"),
         ("he_fwhm is not null", "with quality measured (FWHM != null)"),
         ("eccentricity is not null", "with quality measured (eccen != null)"),
 
@@ -93,7 +93,9 @@ def stats_by_user(cnx, state=6):
     else:
         cond = "AND state = %d" % state
 
-    q = "SELECT login, tasks.user_id, count(*) FROM tasks, users WHERE tasks.user_id = users.user_id %s GROUP BY tasks.user_id,users.login ORDER BY login;" % cond
+    q = "SELECT login, tasks.user_id, count(*) "\
+        "FROM tasks, users "\
+        "WHERE tasks.user_id = users.user_id %s GROUP BY tasks.user_id,users.login ORDER BY login;" % cond
 
     tasks_per_user = run_query(cnx, q)
 
@@ -104,7 +106,9 @@ def stats_by_user(cnx, state=6):
 
 
 def task_get(cnx, id):
-    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity FROM tasks WHERE task_id = %d" % id
+    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity "\
+        "FROM tasks "\
+        f"WHERE task_id = {id}"
 
     t = run_query(cnx, q)[0]
 
@@ -192,13 +196,13 @@ def field_check(t, names):
     are."""
 
     for name in names:
-        if not name in t:
+        if name not in t:
             print(f"ERROR: Required field {name} missing in {t}")
             return False
     return True
 
 
-def task_add(cnx, task, verbose = False, dry_run = False):
+def task_add(cnx, task, verbose=False, dry_run=False):
     """Inserts new task.
        cnx - connection
        task - dictionary representing a task
@@ -220,11 +224,12 @@ def task_add(cnx, task, verbose = False, dry_run = False):
 
     if not dry_run:
         result = run_query(cnx, q)
-        print(f"Task {task['task_id']} inserted.")
+        print(f"Task {task['task_id']} inserted, result: {result}.")
         return True
     else:
         print(f"Dry-run: would add a task {task['task_id']}.")
         return False
+
 
 def user_get_id(cnx, aavso_id=None, login=None):
 

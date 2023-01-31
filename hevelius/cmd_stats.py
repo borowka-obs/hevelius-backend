@@ -5,6 +5,7 @@ import plotly.express as px
 
 from hevelius import db
 
+
 def stats():
     """
     Prints database statistics (version, overall, by state, by user)
@@ -41,8 +42,8 @@ def deg2rah(ra: float) -> str:
     """Converts Right Ascension specified in degrees (0..359) to hour
     (0..23.59)"""
 
-    h = int(ra/15)
-    m = int(ra - h*15) * 4
+    h = int(ra / 15)
+    m = int(ra - h * 15) * 4
 
     return f"{h}h{m:02d}m ({ra}deg)"
 
@@ -57,7 +58,7 @@ def histogram(args):
     for t in tasks:
         ra = int(t[4])
         decl = int(t[5])
-        histo[90-decl, ra] += 1
+        histo[90 - decl, ra] += 1
 
     return histo
 

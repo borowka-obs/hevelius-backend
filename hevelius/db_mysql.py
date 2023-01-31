@@ -52,9 +52,9 @@ def stats_print(cnx):
     stats = [
         ("true", "all tasks"),
         ("imagename is not null", "with images"),
-        ("he_solved = 1",            "solved"),
-        ("he_solved is null",        "not solved (not attempted)"),
-        ("he_solved = 0",            "not solved (attempted, but failed)"),
+        ("he_solved = 1", "solved"),
+        ("he_solved is null", "not solved (not attempted)"),
+        ("he_solved = 0", "not solved (attempted, but failed)"),
         ("he_fwhm is not null", "with quality measured (FWHM != null)"),
         ("eccentricity is not null", "with quality measured (eccen != null)"),
 
@@ -109,7 +109,9 @@ def stats_by_user(cnx, state=6):
 
 
 def task_get(cnx, id):
-    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity FROM tasks WHERE task_id = %d" % id
+    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity "\
+        "FROM tasks "\
+        f"WHERE task_id = {id}"
 
     t = run_query(cnx, q)[0]
 

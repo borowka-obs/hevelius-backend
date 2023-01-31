@@ -15,14 +15,14 @@ except ImportError:
     sys.exit(-1)
 
 
-def parse_task(l):
-    #pylint: disable=line-too-long
+def parse_task(line: str) -> dict:
     """
     Parses a string like this:
-    Subframe,1,1,"E:/astro/nerpio/MTOA/2020Q2/SFDB_2020-05-12_00-39-28_J131878_MTOA_CV_1x1_0300s_NGC2403.fit",8.744279e-01,2.505002e+00,7.740531e-01,8.744279e-01,2.760000e+02,1.622958e+01,1.735582e+01,400,3.436380e-02,9.298809e-01,2.496715e+00,9.148272e-02,2.159095e-02,"2020-05-11 22:39:28"
+    Subframe,1,1,"E:/astro/nerpio/MTOA/2020Q2/SFDB_2020-05-12_00-39-28_J131878_MTOA_CV_1x1_0300s_NGC2403.fit",8.744279e-01,2.505002e+00,7.740531e-01, \
+    8.744279e-01,2.760000e+02,1.622958e+01,1.735582e+01,400,3.436380e-02,9.298809e-01,2.496715e+00,9.148272e-02,2.159095e-02,"2020-05-11 22:39:28"
     """
 
-    f = l.split(",")
+    f = line.split(",")
     t = {}
     fname = f[3]
 
@@ -49,17 +49,17 @@ def read_csv(fname):
     tasks = []
     found = False
     i = 0
-    for l in content:
+    for line in content:
         i += 1
-        l = l.strip()
-        if not found and l.find("SubframeHeader") == -1:
+        line = line.strip()
+        if not found and line.find("SubframeHeader") == -1:
             continue
         if not found:
             found = True
             print("Data header found in line %d" % i)
             continue
 
-        tasks.append(parse_task(l))
+        tasks.append(parse_task(line))
 
     return tasks
 

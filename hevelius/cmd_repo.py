@@ -8,6 +8,7 @@ from astropy.io import fits
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
 
+
 def process_fits_list(fname, show_hdr: bool, dry_run: bool):
     """
     Processes all FITS files listed in a specified text file.
@@ -26,14 +27,14 @@ def process_fits_list(fname, show_hdr: bool, dry_run: bool):
     cnx = db.connect()
 
     cnt = 1
-    for l in lines:
-        l = l.strip()
-        if len(l) == 0 or l[0] == "#":
+    for line in lines:
+        line = line.strip()
+        if len(line) == 0 or line[0] == "#":
             # Skip empty and commented out lines
             continue
 
-        print(f"Processing file {cnt} of {total}: {l}")
-        process_fits_file(cnx, l, show_hdr=show_hdr, dry_run=dry_run)
+        print(f"Processing file {cnt} of {total}: {line}")
+        process_fits_file(cnx, line, show_hdr=show_hdr, dry_run=dry_run)
         cnt += 1
 
     cnx.close()
@@ -109,6 +110,7 @@ def process_fits_file(cnx, fname, verbose=False, show_hdr=False, dry_run=False):
 
     task_update_params(cnx, fname, task_id, verbose=verbose, dry_run=dry_run)
 
+
 def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=False):
 
     h = read_fits(fname)
@@ -176,26 +178,26 @@ def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=Fal
 
     if not dry_run:
         v = db.run_query(cnx, q)
-        print(f"Task {task_id} updated.")
+        print(f"Task {task_id} updated, result: {v}.")
 
     else:
         print(f"Task {task_id} update skipped (--dry-run).")
 
 
 def get_int_header(header, sql, header_name):
-    if not header_name in header or not len(str(header[header_name])):
+    if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s=%i, " % (sql, geti(header, header_name))
 
 
 def get_float_header(header, sql, header_name):
-    if not header_name in header or not len(str(header[header_name])):
+    if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s=%f, " % (sql, getf(header, header_name))
 
 
 def get_string_header(header, sql, header_name):
-    if not header_name in header or not len(str(header[header_name])):
+    if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s='%s', " % (sql, gets(header, header_name))
 
@@ -209,9 +211,9 @@ def parse_ra(s):
     minus = ra < 0
     ra = abs(ra)
 
-    ra += float(dms[1])/60.0 + float(dms[2])/3600.0
+    ra += float(dms[1]) / 60.0 + float(dms[2]) / 3600.0
 
-    return ra*(1-2*minus)
+    return ra * (1 - 2 * minus)
 
 
 def parse_dec(s):
@@ -241,11 +243,11 @@ def parse_solved(h):
     # CD2_1   =   1.59806120891E-004 / Change in DEC--TAN along X-Axis
     # CD2_2   =  -7.76679979895E-005 / Change in DEC--TAN along Y-Axis
 
-    if not "PLTSOLVD" in h:
+    if "PLTSOLVD" not in h:
         return "he_solved=0, "
 
     solved = h["PLTSOLVD"]
-    if solved != True:
+    if not solved:
         return "he_solved=0, "
 
     # Ok, the header claims it's solved. Let's try to find it out
@@ -269,8 +271,8 @@ def parse_solved(h):
     refx = int(h["CRPIX1"])
     refy = int(h["CRPIX2"])
 
-    pixscalex = float(h["CDELT1"])*3600  # arcsec/pix in x direction
-    pixscaley = float(h["CDELT2"])*3600  # arcsec/pix in y direction
+    pixscalex = float(h["CDELT1"]) * 3600  # arcsec/pix in x direction
+    pixscaley = float(h["CDELT2"]) * 3600  # arcsec/pix in y direction
 
     q += "he_solved_ra=%f, he_solved_dec=%f, he_solved_refx=%d, he_solved_refy=%d, he_pixscalex=%f, he_pixscaley=%f, " \
          % (ra, dec, refx, refy, pixscalex, pixscaley)
@@ -296,7 +298,7 @@ def parse_quality(header):
     if "FWHM" in header:
         q = f"he_fwhm={getf(header, 'FWHM')}, "
 
-    if not "HISTORY" in header:
+    if "HISTORY" not in header:
         return q
 
     for h in header["HISTORY"]:
@@ -347,7 +349,7 @@ def repo(args):
             cnx.close()
     elif args.list:
         print(f"Processing list of files stored in {args.list}")
-        process_fits_list(args.list, show_hdr=args.show_header,dry_run=args.dry_run)
+        process_fits_list(args.list, show_hdr=args.show_header, dry_run=args.dry_run)
     else:
         if args.dir:
             path = args.dir
@@ -355,6 +357,4 @@ def repo(args):
             path = config.REPO_PATH
 
         print(f"Processing all *.fit files in dir: {path}")
-        pattern = config.REPO_PATH + '/' + '**' + '/' + '*.fit'
-
         process_fits_dir(path, show_hdr=args.show_header, dry_run=args.dry_run)

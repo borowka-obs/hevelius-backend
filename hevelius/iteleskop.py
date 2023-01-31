@@ -4,7 +4,6 @@ This module is responsible for handling files from the iteleskop.org project.
 
 """
 
-import sys
 import re
 import os
 
