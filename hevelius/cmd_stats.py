@@ -49,6 +49,16 @@ def deg2rah(ra: float) -> str:
 
 
 def histogram(args):
+    """
+    Generates frequency of photo frames for the whole sky.
+    Buckets are 1x1 degree.
+
+    :param args: _description_
+    :type args: _type_
+    :return: _description_
+    :rtype: _type_
+    """
+
     cnx = db.connect()
     tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
     cnx.close()
@@ -83,7 +93,10 @@ def groups(args):
         print(f"POI {p['cnt']}, ra={p['ra']}, decl={p['decl']}")
 
 
-def histogram_show(args):
+def histogram_figure_get(args):
+    """
+    Generates plotly figure with histogram data.
+    """
 
     histo = histogram(args)
 
@@ -99,5 +112,14 @@ def histogram_show(args):
     fig = px.imshow(pandas, labels=labels, y=y_labels, x=x_labels)
 
     fig['layout']['yaxis']['autorange'] = "reversed"
+
+    return fig
+
+def histogram_show(args):
+    """
+    Shows a histogram of image density for the whole sky
+    """
+
+    fig = histogram_figure_get(args)
 
     fig.show()

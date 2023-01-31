@@ -37,18 +37,7 @@ def histogram():
     # })
     # fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
 
-    histo = cmd_stats.histogram({})
-
-    x_labels = [cmd_stats.deg2rah(a) for a in range(0, 360, 1)]
-    y_labels = [str(y) for y in range(90, -90, -1)]
-
-    labels = dict(x="Right Ascension (h:m/deg)",
-                  y="Declination (deg)", color="# of frames")
-
-    pandas = pd.DataFrame(histo)
-    fig = px.imshow(pandas, labels=labels, y=y_labels, x=x_labels)
-
-    fig['layout']['yaxis']['autorange'] = "reversed"
+    fig = cmd_stats.histogram_figure_get({})
 
     graph_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
     return render_template('histogram.html', graphJSON=graph_json)
