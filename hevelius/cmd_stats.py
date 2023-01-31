@@ -115,6 +115,7 @@ def histogram_figure_get(args):
 
     return fig
 
+
 def histogram_show(args):
     """
     Shows a histogram of image density for the whole sky
