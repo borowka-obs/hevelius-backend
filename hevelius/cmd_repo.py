@@ -118,66 +118,66 @@ def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=Fal
     if verbose:
         print(f"Header file: {repr(h)}")
 
-    q = "UPDATE tasks SET "
+    query = "UPDATE tasks SET "
 
-    q += get_int_header(h, "he_resx", "NAXIS1")
-    q += get_int_header(h, "he_resy", "NAXIS2")
+    query += get_int_header(h, "he_resx", "NAXIS1")
+    query += get_int_header(h, "he_resy", "NAXIS2")
 
-    q += "he_obsstart='%s', " % gets(h, "DATE-OBS")
-    q += "he_exposure=%f, " % getf(h, "EXPTIME")
+    query += "he_obsstart='%s', " % gets(h, "DATE-OBS")
+    query += "he_exposure=%f, " % getf(h, "EXPTIME")
 
-    q += get_float_header(h, "he_settemp", "SET-TEMP")
-    q += get_float_header(h, "he_ccdtemp", "CCD-TEMP")
+    query += get_float_header(h, "he_settemp", "SET-TEMP")
+    query += get_float_header(h, "he_ccdtemp", "CCD-TEMP")
 
-    q += "he_pixwidth=%f, " % getf(h, "XPIXSZ")
-    q += "he_pixheight=%f, " % getf(h, "YPIXSZ")
-    q += "he_xbinning=%d, " % geti(h, "XBINNING")
-    q += "he_ybinning=%d, " % geti(h, "YBINNING")
-    q += "he_filter='%s', " % gets(h, "FILTER")
+    query += "he_pixwidth=%f, " % getf(h, "XPIXSZ")
+    query += "he_pixheight=%f, " % getf(h, "YPIXSZ")
+    query += "he_xbinning=%d, " % geti(h, "XBINNING")
+    query += "he_ybinning=%d, " % geti(h, "YBINNING")
+    query += "he_filter='%s', " % gets(h, "FILTER")
 
     if "OBJCTRA" in h:
-        q += "he_objectra=%f, " % parse_ra(gets(h, "OBJCTRA"))
-        q += "he_objectdec=%f, " % parse_dec(gets(h, "OBJCTDEC"))
+        query += "he_objectra=%f, " % parse_ra(gets(h, "OBJCTRA"))
+        query += "he_objectdec=%f, " % parse_dec(gets(h, "OBJCTDEC"))
 
-    q += get_float_header(h, "he_objectalt", "OBJCTALT")
-    q += get_float_header(h, "he_objectaz", "OBJCTAZ")
-    q += get_float_header(h, "he_objectha", "OBJCTHA")
-    q += get_string_header(h, "he_pierside", "PIERSIDE")
+    query += get_float_header(h, "he_objectalt", "OBJCTALT")
+    query += get_float_header(h, "he_objectaz", "OBJCTAZ")
+    query += get_float_header(h, "he_objectha", "OBJCTHA")
+    query += get_string_header(h, "he_pierside", "PIERSIDE")
 
-    q += "he_site_lat=%f, " % parse_degms(gets(h, "SITELAT"))
-    q += "he_site_lon=%f, " % parse_degms(gets(h, "SITELONG"))
+    query += "he_site_lat=%f, " % parse_degms(gets(h, "SITELAT"))
+    query += "he_site_lon=%f, " % parse_degms(gets(h, "SITELONG"))
 
-    q += "he_jd=%f, " % getf(h, "JD")
+    query += "he_jd=%f, " % getf(h, "JD")
 
-    q += get_float_header(h, "he_jd_helio", "JD-HELIO")
+    query += get_float_header(h, "he_jd_helio", "JD-HELIO")
 
-    q += get_float_header(h, "he_tracktime", "TRAKTIME")
+    query += get_float_header(h, "he_tracktime", "TRAKTIME")
 
-    q += "he_focal=%f, " % getf(h, "FOCALLEN")
-    q += "he_aperture_diam=%f, " % getf(h, "APTDIA")
-    q += "he_aperture_area=%f, " % getf(h, "APTAREA")
-    q += "he_scope='%s', " % gets(h, "TELESCOP")
-    q += "he_camera='%s', " % gets(h, "INSTRUME")
+    query += "he_focal=%f, " % getf(h, "FOCALLEN")
+    query += "he_aperture_diam=%f, " % getf(h, "APTDIA")
+    query += "he_aperture_area=%f, " % getf(h, "APTAREA")
+    query += "he_scope='%s', " % gets(h, "TELESCOP")
+    query += "he_camera='%s', " % gets(h, "INSTRUME")
 
-    q += get_float_header(h, "he_moon_alt", "MOONWYS")
-    q += get_float_header(h, "he_moon_angle", "MOONKAT")
-    q += get_float_header(h, "he_moon_phase", "MOONFAZA")
-    q += get_float_header(h, "he_sun_alt", "SUN")
+    query += get_float_header(h, "he_moon_alt", "MOONWYS")
+    query += get_float_header(h, "he_moon_angle", "MOONKAT")
+    query += get_float_header(h, "he_moon_phase", "MOONFAZA")
+    query += get_float_header(h, "he_sun_alt", "SUN")
     # sets he_solved, he_solved_ra, he_solved_dec, he_solved_x, he_solved_y
-    q += parse_solved(h)
+    query += parse_solved(h)
 
-    q += parse_quality(h)  # gets FWHM, number of stars recognized
+    query += parse_quality(h)  # gets FWHM, number of stars recognized
 
     # meaningless, but it's hard to tell if q ends with a , or not at this point.
-    q += " task_id=task_id"
+    query += " task_id=task_id"
 
-    q += f" WHERE task_id={task_id};"
+    query += f" WHERE task_id={task_id};"
 
     if verbose:
-        print(q, file=sys.stderr)
+        print(query, file=sys.stderr)
 
     if not dry_run:
-        v = db.run_query(cnx, q)
+        v = db.run_query(cnx, query)
         print(f"Task {task_id} updated, result: {v}.")
 
     else:
