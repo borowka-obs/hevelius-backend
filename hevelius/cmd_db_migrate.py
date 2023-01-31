@@ -54,9 +54,9 @@ def migrate_mysql(args):
                 schema = subprocess.Popen(
                     ["cat", join(dir, f)], stdout=subprocess.PIPE)
                 mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST,
-                                        "-p" +
-                                        config.PASSWORD, "-P", str(config.PORT),
-                                        config.DBNAME, "-B"], stdin=schema.stdout)
+                                          "-p" +
+                                          config.PASSWORD, "-P", str(config.PORT),
+                                          config.DBNAME, "-B"], stdin=schema.stdout)
             else:
                 print("Skipping (--dry-run).")
 

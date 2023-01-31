@@ -1,3 +1,9 @@
+"""
+An abstract interface to databases (PostgreSQL or MySQL).
+Depending on the hevelius.config content, it imports either
+hevelius.db_pgsql or hevelius.db_mysql.
+"""
+
 import sys
 
 try:
@@ -17,16 +23,25 @@ else:
 
 
 def connect():
+    """
+    Opens connection to a database, returns DB connection object.
+    """
     return backend.connect()
 
 
 def run_query(conn, query):
+    """
+    Runs specified SQL query
+    """
     return backend.run_query(conn, query)
 
 
-def version_get(cnx):
+def version_get(conn) -> int:
+    """
+    Retrieves database schema version from the database.
+    """
     query = 'SELECT * from schema_version'
-    cursor = cnx.cursor()
+    cursor = conn.cursor()
 
     ver = ""
     try:
@@ -42,7 +57,10 @@ def version_get(cnx):
     return int(ver)
 
 
-def stats_print(cnx):
+def stats_print(conn):
+    """
+    Retrieves and prints various statistics.
+    """
 
     stats = [
         ("true", "all tasks"),
@@ -58,7 +76,7 @@ def stats_print(cnx):
     for cond, descr in stats:
         q = "SELECT count(*) FROM tasks WHERE %s" % cond
 
-        result = run_query(cnx, q)[0][0]
+        result = run_query(conn, q)[0][0]
 
         print("Tasks %40s: %d" % (descr, result))
 
@@ -75,10 +93,10 @@ def stats_print(cnx):
     # return tasks_cnt[0][0], files_cnt[0][0], fwhm_cnt[0][0], eccentricity_cnt[0][0]
 
 
-def stats_by_state(cnx):
+def stats_by_state(conn):
     # Get tasks list by status
     hist = run_query(
-        cnx, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
+        conn, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
     res = []
 
     for row in hist:
@@ -87,7 +105,7 @@ def stats_by_state(cnx):
     return res
 
 
-def stats_by_user(cnx, state=6):
+def stats_by_user(conn, state=6):
     if state is None:
         cond = ""
     else:
@@ -97,7 +115,7 @@ def stats_by_user(cnx, state=6):
         "FROM tasks, users "\
         "WHERE tasks.user_id = users.user_id %s GROUP BY tasks.user_id,users.login ORDER BY login;" % cond
 
-    tasks_per_user = run_query(cnx, q)
+    tasks_per_user = run_query(conn, q)
 
     res = []
     for row in tasks_per_user:
@@ -105,12 +123,12 @@ def stats_by_user(cnx, state=6):
     return res
 
 
-def task_get(cnx, id):
+def task_get(conn, id):
     q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity "\
         "FROM tasks "\
         f"WHERE task_id = {id}"
 
-    t = run_query(cnx, q)[0]
+    t = run_query(conn, q)[0]
 
     x = {}
     x["id"] = t[0]
@@ -132,23 +150,25 @@ def task_get(cnx, id):
     return x
 
 
-def task_exists(cnx, task_id):
+def task_exists(conn, task_id):
     """Check if task defined by task_id exists."""
-    v = run_query(cnx, f"SELECT count(*) FROM tasks where task_id={task_id}")
+    v = run_query(conn, f"SELECT count(*) FROM tasks where task_id={task_id}")
     return v[0][0] == 1
 
 
-def tasks_get_filter(cnx, criteria):
-    q = f"SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity FROM tasks WHERE {criteria}"
+def tasks_get_filter(conn, criteria):
+    query = "SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity "\
+        "FROM tasks "\
+        f"WHERE {criteria}"
 
-    tasks = run_query(cnx, q)
+    tasks = run_query(conn, query)
 
     print(f"Selected {len(tasks)} task(s)")
 
     return tasks
 
 
-def task_update(cnx, id, fwhm=None, eccentricity=None):
+def task_update(conn, id, fwhm=None, eccentricity=None):
     upd = ""
     if fwhm is not None:
         upd = "fwhm = %f" % fwhm
@@ -164,7 +184,7 @@ def task_update(cnx, id, fwhm=None, eccentricity=None):
 
     print("Updating task %d: query=[%s]" % (id, q))
 
-    run_query(cnx, q)
+    run_query(conn, q)
 
 
 def field_names(t, names):
@@ -202,7 +222,7 @@ def field_check(t, names):
     return True
 
 
-def task_add(cnx, task, verbose=False, dry_run=False):
+def task_add(conn, task, verbose=False, dry_run=False):
     """Inserts new task.
        cnx - connection
        task - dictionary representing a task
@@ -223,7 +243,7 @@ def task_add(cnx, task, verbose=False, dry_run=False):
         print(f"Inserting task: {q}")
 
     if not dry_run:
-        result = run_query(cnx, q)
+        result = run_query(conn, q)
         print(f"Task {task['task_id']} inserted, result: {result}.")
         return True
     else:
@@ -231,7 +251,8 @@ def task_add(cnx, task, verbose=False, dry_run=False):
         return False
 
 
-def user_get_id(cnx, aavso_id=None, login=None):
+def user_get_id(conn, aavso_id=None, login=None) -> str:
+    """"""
 
     q = "SELECT user_id FROM users WHERE "
     if aavso_id:
@@ -239,5 +260,5 @@ def user_get_id(cnx, aavso_id=None, login=None):
     if login:
         q += f"login='{login}'"
 
-    v = run_query(cnx, q)
+    v = run_query(conn, q)
     return v[0][0]
