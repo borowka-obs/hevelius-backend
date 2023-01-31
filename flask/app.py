@@ -50,7 +50,7 @@ def tasks():
     user_id = get_param(request, 'user_id')
     limit = get_param(request, 'limit')
 
-    q = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
+    query = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
         "exposure, descr, filter, binning, guiding, dither, " \
         "defocus, calibrate, solve, vphot, other_cmd, " \
         "min_alt, moon_distance, skip_before, skip_after, " \
@@ -59,36 +59,39 @@ def tasks():
         "max_sun_alt, auto_center, calibrated, solved, " \
         "sent FROM tasks, users WHERE tasks.user_id = users.user_id"
     if user_id is not None:
-        q = q + f" AND tasks.user_id={user_id}"
+        query = query + f" AND tasks.user_id={user_id}"
 
-    q = q + " ORDER by task_id DESC"
+    query = query + " ORDER by task_id DESC"
 
     if limit is not None:
-        q = q + f" LIMIT {limit}"
+        query = query + f" LIMIT {limit}"
 
     cnx = db.connect()
-    tasks_list = db.run_query(cnx, q)
+    tasks_list = db.run_query(cnx, query)
     cnx.close()
 
     return tasks_list
 
 
-def sanitize(x: str) -> str:
+def sanitize(txt: str) -> str:
     """
     Sanitizes x input (removes backslashes)
     """
-    x = str(x).replace('\'', '')  # apostrophes are bad
-    x = x.replace(';', '')  # commas also
-    x = x.replace('\\', '')  # and backslashes
-    return x
+    txt = str(txt).replace('\'', '')  # apostrophes are bad
+    txt = txt.replace(';', '')  # commas also
+    txt = txt.replace('\\', '')  # and backslashes
+    return txt
 
 
 def get_param(req, field) -> str:
+    """
+    Attempts to retrieve parameter passed in JSON
+    """
     json_html_request = req.get_json()
-    x = json_html_request.get(field)
-    if x:
-        return sanitize(x)
-    return x
+    param = json_html_request.get(field)
+    if param:
+        return sanitize(param)
+    return param
 
 
 @app.route('/api/login', methods=['POST'])
@@ -127,11 +130,11 @@ def login():
     if md5pass is None:
         return {'status': False, 'msg': 'Password not provided'}
 
-    q = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
+    query = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
             aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"""
 
     cnx = db.connect()
-    db_resp = db.run_query(cnx, q)
+    db_resp = db.run_query(cnx, query)
     cnx.close()
 
     if db_resp is None or not len(db_resp):
