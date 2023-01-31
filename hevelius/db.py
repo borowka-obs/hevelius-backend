@@ -74,9 +74,9 @@ def stats_print(conn):
     ]
 
     for cond, descr in stats:
-        q = "SELECT count(*) FROM tasks WHERE %s" % cond
+        query = f"SELECT count(*) FROM tasks WHERE {cond}"
 
-        result = run_query(conn, q)[0][0]
+        result = run_query(conn, query)[0][0]
 
         print("Tasks %40s: %d" % (descr, result))
 
@@ -94,9 +94,11 @@ def stats_print(conn):
 
 
 def stats_by_state(conn):
+    """
+    Retrieves task statistics per task state.
+    """
     # Get tasks list by status
-    hist = run_query(
-        conn, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
+    hist = run_query(conn, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
     res = []
 
     for row in hist:
@@ -106,14 +108,17 @@ def stats_by_state(conn):
 
 
 def stats_by_user(conn, state=6):
+    """
+    returns tuple with statistics by user
+    """
     if state is None:
         cond = ""
     else:
-        cond = "AND state = %d" % state
+        cond = f"AND state = {state}"
 
     q = "SELECT login, tasks.user_id, count(*) "\
         "FROM tasks, users "\
-        "WHERE tasks.user_id = users.user_id %s GROUP BY tasks.user_id,users.login ORDER BY login;" % cond
+        f"WHERE tasks.user_id = users.user_id {cond} GROUP BY tasks.user_id,users.login ORDER BY login;"
 
     tasks_per_user = run_query(conn, q)
 
@@ -124,6 +129,9 @@ def stats_by_user(conn, state=6):
 
 
 def task_get(conn, id):
+    """
+    Retrieves a task with all parameters.
+    """
     q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity "\
         "FROM tasks "\
         f"WHERE task_id = {id}"
@@ -178,37 +186,37 @@ def task_update(conn, id, fwhm=None, eccentricity=None):
         upd += "eccentricity = %f" % eccentricity
 
     if not len(upd):
-        print("Nothing to update in task %d, aborting" % id)
+        print(f"Nothing to update in task {id}, aborting")
 
-    q = "UPDATE tasks SET %s WHERE task_id=%d" % (upd, id)
+    query = f"UPDATE tasks SET {upd} WHERE task_id={id}"
 
-    print("Updating task %d: query=[%s]" % (id, q))
+    print("Updating task %d: query=[%s]" % (id, query))
 
-    run_query(conn, q)
+    run_query(conn, query)
 
 
 def field_names(t, names):
     """Returns a coma separated list of fields, if they exist in the t dictionary.
     names is a array of strings."""
-    q = ""
+    query = ""
     for name in names:
         if name in t:
-            if len(q):
-                q += ", "
-            q += name
-    return q
+            if len(query):
+                query += ", "
+            query += name
+    return query
 
 
 def field_values(t, names):
     """Returns a coma separated list of field values, if they exist in the t dictionary.
     names is a array of strings."""
-    q = ""
+    query = ""
     for name in names:
         if name in t:
-            if len(q):
-                q += ", "
-            q += "'" + str(t[name]) + "'"
-    return q
+            if len(query):
+                query += ", "
+            query += "'" + str(t[name]) + "'"
+    return query
 
 
 def field_check(t, names):
@@ -236,14 +244,14 @@ def task_add(conn, task, verbose=False, dry_run=False):
     fields = ["task_id", "user_id", "scope_id", "state", "object", "filter", "binning", "exposure",
               "solve", "solved", "calibrate", "calibrated", "imagename"]
 
-    q = "INSERT INTO tasks(" + field_names(task, fields) + ") "
-    q += "VALUES(" + field_values(task, fields) + ")"
+    query = "INSERT INTO tasks(" + field_names(task, fields) + ") "
+    query += "VALUES(" + field_values(task, fields) + ")"
 
     if verbose:
-        print(f"Inserting task: {q}")
+        print(f"Inserting task: {query}")
 
     if not dry_run:
-        result = run_query(conn, q)
+        result = run_query(conn, query)
         print(f"Task {task['task_id']} inserted, result: {result}.")
         return True
     else:
@@ -252,13 +260,15 @@ def task_add(conn, task, verbose=False, dry_run=False):
 
 
 def user_get_id(conn, aavso_id=None, login=None) -> str:
-    """"""
+    """
+    Retrieves an user_id for specified user.
+    """
 
-    q = "SELECT user_id FROM users WHERE "
+    query = "SELECT user_id FROM users WHERE "
     if aavso_id:
-        q += f"aavso_id='{aavso_id}'"
+        query += f"aavso_id='{aavso_id}'"
     if login:
-        q += f"login='{login}'"
+        query += f"login='{login}'"
 
-    v = run_query(conn, q)
+    v = run_query(conn, query)
     return v[0][0]
