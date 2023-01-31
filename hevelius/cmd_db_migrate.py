@@ -36,10 +36,8 @@ def migrate_mysql(args):
     """
 
     DIR = "db"
-    files = [f for f in listdir(DIR) if (
-        isfile(join(DIR, f)) and f.endswith("mysql"))]
-
-    files.sort()
+    files = sorted([f for f in listdir(DIR) if (
+        isfile(join(DIR, f)) and f.endswith("mysql"))])
 
     for f in files:
         cnx = db.connect()
@@ -80,10 +78,8 @@ def migrate_pgsql(args):
     """
 
     DIR = "db"
-    files = [f for f in listdir(DIR) if (
-        isfile(join(DIR, f)) and f.endswith("psql"))]
-
-    files.sort()
+    files = sorted([f for f in listdir(DIR) if (
+        isfile(join(DIR, f)) and f.endswith("psql"))])
 
     for f in files:
         cnx = db.connect()
@@ -92,7 +88,7 @@ def migrate_pgsql(args):
 
         try:
             mig_ver = int(f[:2])
-        except:
+        except BaseException:
             # Skip files that don't start with a number (such as wipe.psql)
             continue
 

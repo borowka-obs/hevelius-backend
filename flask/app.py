@@ -28,7 +28,6 @@ def histogram():
     """Generates 2D diagram of observation density. Returns a HTML page with
     embedded plotly image."""
 
-
     # example data input
     # df = pd.DataFrame({
     #     'Fruit': ['Apples', 'Oranges', 'Bananas', 'Apples', 'Oranges',
@@ -36,7 +35,7 @@ def histogram():
     #     'Amount': [4, 1, 2, 2, 4, 5],
     #     'City': ['SF', 'SF', 'SF', 'Montreal', 'Montreal', 'Montreal']
     # })
-    #fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
+    # fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
 
     histo = cmd_stats.histogram({})
 
