@@ -18,7 +18,7 @@ def process_fits_list(fname, show_hdr: bool, dry_run: bool):
     :param dry_run: bool governing if DB changes are to be done or not.
     """
 
-    with open(fname) as f:
+    with open(fname, encoding="utf-8") as f:
         lines = f.readlines()
 
     total = len(lines)
@@ -123,46 +123,46 @@ def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=Fal
     query += get_int_header(h, "he_resx", "NAXIS1")
     query += get_int_header(h, "he_resy", "NAXIS2")
 
-    query += "he_obsstart='%s', " % gets(h, "DATE-OBS")
-    query += "he_exposure=%f, " % getf(h, "EXPTIME")
+    query += f"he_obsstart='{gets(h, 'DATE-OBS')}', "
+    query += f"he_exposure={getf(h, 'EXPTIME')}, "
 
     query += get_float_header(h, "he_settemp", "SET-TEMP")
     query += get_float_header(h, "he_ccdtemp", "CCD-TEMP")
 
-    query += "he_pixwidth=%f, " % getf(h, "XPIXSZ")
-    query += "he_pixheight=%f, " % getf(h, "YPIXSZ")
-    query += "he_xbinning=%d, " % geti(h, "XBINNING")
-    query += "he_ybinning=%d, " % geti(h, "YBINNING")
-    query += "he_filter='%s', " % gets(h, "FILTER")
+    query += f"he_pixwidth={getf(h, 'XPIXSZ')}, "
+    query += f"he_pixheight={getf(h, 'YPIXSZ')}, "
+    query += f"he_xbinning={geti(h, 'XBINNING')}, "
+    query += f"he_ybinning={geti(h, 'YBINNING')}, "
+    query += f"he_filter='{gets(h, 'FILTER')}', "
 
     if "OBJCTRA" in h:
-        query += "he_objectra=%f, " % parse_ra(gets(h, "OBJCTRA"))
-        query += "he_objectdec=%f, " % parse_dec(gets(h, "OBJCTDEC"))
+        query += f"he_objectra={parse_ra(gets(h, 'OBJCTRA'))}, "
+        query += f"he_objectdec={parse_dec(gets(h, 'OBJCTDEC'))}, "
 
     query += get_float_header(h, "he_objectalt", "OBJCTALT")
     query += get_float_header(h, "he_objectaz", "OBJCTAZ")
     query += get_float_header(h, "he_objectha", "OBJCTHA")
     query += get_string_header(h, "he_pierside", "PIERSIDE")
 
-    query += "he_site_lat=%f, " % parse_degms(gets(h, "SITELAT"))
-    query += "he_site_lon=%f, " % parse_degms(gets(h, "SITELONG"))
+    query += f"he_site_lat={parse_degms(gets(h, 'SITELAT'))}, "
+    query += f"he_site_lon={parse_degms(gets(h, 'SITELONG'))}, "
 
-    query += "he_jd=%f, " % getf(h, "JD")
+    query += f"he_jd={getf(h, 'JD')}, "
 
     query += get_float_header(h, "he_jd_helio", "JD-HELIO")
 
     query += get_float_header(h, "he_tracktime", "TRAKTIME")
 
-    query += "he_focal=%f, " % getf(h, "FOCALLEN")
-    query += "he_aperture_diam=%f, " % getf(h, "APTDIA")
-    query += "he_aperture_area=%f, " % getf(h, "APTAREA")
-    query += "he_scope='%s', " % gets(h, "TELESCOP")
-    query += "he_camera='%s', " % gets(h, "INSTRUME")
+    query += f"he_focal={getf(h, 'FOCALLEN')}, "
+    query += f"he_aperture_diam={getf(h, 'APTDIA')}, "
+    query += f"he_aperture_area={getf(h, 'APTAREA')}, "
+    query += f"he_scope='{gets(h, 'TELESCOP')}', "
+    query += f"he_camera='{gets(h, 'INSTRUME')}', "
 
-    query += get_float_header(h, "he_moon_alt", "MOONWYS")
-    query += get_float_header(h, "he_moon_angle", "MOONKAT")
-    query += get_float_header(h, "he_moon_phase", "MOONFAZA")
-    query += get_float_header(h, "he_sun_alt", "SUN")
+    query += get_float_header(h, "he_moon_alt", 'MOONWYS')
+    query += get_float_header(h, "he_moon_angle", 'MOONKAT')
+    query += get_float_header(h, "he_moon_phase", 'MOONFAZA')
+    query += get_float_header(h, "he_sun_alt", 'SUN')
     # sets he_solved, he_solved_ra, he_solved_dec, he_solved_x, he_solved_y
     query += parse_solved(h)
 
@@ -185,25 +185,34 @@ def task_update_params(cnx, fname: str, task_id: int, verbose=False, dry_run=Fal
 
 
 def get_int_header(header, sql, header_name):
+    """
+    Returns specified integer field from the header
+    """
     if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s=%i, " % (sql, geti(header, header_name))
 
 
 def get_float_header(header, sql, header_name):
+    """
+    Returns specified float field from the header
+    """
     if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s=%f, " % (sql, getf(header, header_name))
 
 
 def get_string_header(header, sql, header_name):
+    """
+    Returns specified string field from the header
+    """
     if header_name not in header or not len(str(header[header_name])):
         return ""
     return "%s='%s', " % (sql, gets(header, header_name))
 
 
 def parse_ra(s):
-    """ Converts '18 18 49.00'' into 18.123456 """
+    """ Converts Right Ascension from one format to another: '18 18 49.00'' into 18.123456 """
     dms = s.split(" ")
 
     ra = float(dms[0])
@@ -217,14 +226,23 @@ def parse_ra(s):
 
 
 def parse_dec(s):
+    """
+    Parse declination.
+    """
     return parse_ra(s)
 
 
 def parse_degms(s):
+    """
+    Parse degrees/minutes/seconds
+    """
     return parse_ra(s)
 
 
 def parse_solved(h):
+    """
+    Returns string formatting that specifies if the frame was solved or not.
+    """
 
     # Here's example FITS header this code is supposed to parse.
     # PA      =   6.40789182622E+001 / [deg, 0-360 CCW] Position angle of plate
