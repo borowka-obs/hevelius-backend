@@ -5,12 +5,12 @@ Sadly, I forgot how to generate them, so this thing
 is pending rewrite or deletion.
 """
 
+from hevelius import iteleskop
 import sys
 import argparse
 
 # This is an ugly hack. It should be removed.
 sys.path.append(".")
-from hevelius import iteleskop
 
 try:
     from hevelius import db
