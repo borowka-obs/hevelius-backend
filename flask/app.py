@@ -4,10 +4,8 @@ Flask application that provides a REST API to the Hevelius backend.
 
 from flask import Flask, render_template, request
 from flask_cors import CORS, cross_origin
-import pandas as pd
 import json
 import plotly
-import plotly.express as px
 
 from hevelius import cmd_stats, db
 
