@@ -35,9 +35,9 @@ def migrate_mysql(args):
     :param args: arguments parsed by argparse
     """
 
-    DIR = "db"
-    files = sorted([f for f in listdir(DIR) if (
-        isfile(join(DIR, f)) and f.endswith("mysql"))])
+    dir = "db"
+    files = sorted([f for f in listdir(dir) if (
+        isfile(join(dir, f)) and f.endswith("mysql"))])
 
     for f in files:
         cnx = db.connect()
@@ -50,13 +50,15 @@ def migrate_mysql(args):
             print(
                 f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            schema = subprocess.Popen(
-                ["cat", join(DIR, f)], stdout=subprocess.PIPE)
-
-            mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST,
-                                     "-p" +
-                                      config.PASSWORD, "-P", str(config.PORT),
-                                      config.DBNAME, "-B"], stdin=schema.stdout)
+            if not args.dry_run:
+                schema = subprocess.Popen(
+                    ["cat", join(dir, f)], stdout=subprocess.PIPE)
+                mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST,
+                                        "-p" +
+                                        config.PASSWORD, "-P", str(config.PORT),
+                                        config.DBNAME, "-B"], stdin=schema.stdout)
+            else:
+                print("Skipping (--dry-run).")
 
             output, _ = mysql.communicate()
 
@@ -96,14 +98,15 @@ def migrate_pgsql(args):
             print(
                 f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            # schema = subprocess.Popen(["cat", join(DIR,f)], stdout=subprocess.PIPE)
+            if not args.dry_run:
+                # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
+                psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p",
+                                        str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
+            else:
+                print("Skipping (--dry-run).")
 
-            # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
-            psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p",
-                                     str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
-
-            # schema.stdout.close()
-            output, _ = psql.communicate()
+            # this returns std output, (something else)
+            _, _ = psql.communicate()
 
             cnx = db.connect()
             current_ver = db.version_get(cnx)
