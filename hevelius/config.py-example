@@ -8,5 +8,7 @@ PASSWORD = 'secret1'
 TYPE = 'pgsql'
 
 # This defines path to the files repository
-
 REPO_PATH = '/mnt/volume1/astro'
+
+# This defines the path for generating backups
+BACKUP_PATH = '/mnt/volume1/astro/backup'
