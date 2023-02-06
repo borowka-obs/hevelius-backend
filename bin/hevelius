@@ -9,7 +9,7 @@ import argparse
 
 sys.path.append(".")
 
-from hevelius.cmd_basic import db_version, hevelius_version, config_show
+from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
 from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
@@ -25,6 +25,7 @@ if __name__ == '__main__':
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
     version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
     config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
+    backup_parser = subparsers.add_parser('backup', help="Generates DB backup.")
 
     repo_parser = subparsers.add_parser('repo', help="Manages files repository on local storage.")
     repo_parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
@@ -52,6 +53,8 @@ if __name__ == '__main__':
         histogram_show(args) # see cmd_stats.py
     elif args.command == "groups":
         groups(args) # see cmd_stats.py
+    elif args.command == "backup":
+        backup(args) # see cmd_backup.py
 
     else:
         parser.print_help()
