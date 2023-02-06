@@ -9,6 +9,7 @@ import subprocess
 import pathlib
 from os import path
 
+
 def db_version():
     """
     Prints the database schema version.
@@ -59,6 +60,7 @@ def config_show():
     print("Files repository path: {config.REPO_PATH}")
     print("Backup storage path:   {config.BACKUP_PATH}")
 
+
 def backup(args):
     """
     Generated DB backup
@@ -71,7 +73,7 @@ def backup(args):
     pathlib.Path(config.BACKUP_PATH).mkdir(parents=True, exist_ok=True)
 
     psql = subprocess.Popen(["pg_dump", "-U", config.USER, "-h", config.HOST, "-p",
-                                str(config.PORT), config.DBNAME, "-f", full_path ])
+                            str(config.PORT), config.DBNAME, "-f", full_path])
     # this returns std output, (something else)
     output, _ = psql.communicate()
 
