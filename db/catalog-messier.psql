@@ -1,3 +1,6 @@
+DELETE FROM objects WHERE name LIKE 'M%';
+
+
 COPY hevelius.objects (name, altname, ra, decl, type, const, magn, x, y, distance) FROM stdin;
 M1	"NGC 1952 Crab Nebula"	5.5750	22.02	SN	Tau	8.4	6.0	4.0	6.30
 M2	"NGC 7089"	21.5583	0.82	GC	Aqr	6.5	12.9	12.9	37.50
