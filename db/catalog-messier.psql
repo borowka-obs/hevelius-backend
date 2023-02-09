@@ -1,4 +1,13 @@
 DELETE FROM objects WHERE name LIKE 'M%';
+DELETE FROM catalogs WHERE shortname="M";
+
+INSERT INTO catalogs(shortname, name, filename, descr, url, version)
+VALUES('M',
+       'Messier Catalog',
+       'catalog-messier.psql',
+       'Probably the most famous astronomical catalog.',
+       'https://en.wikipedia.org/wiki/Messier_object',
+       '1.0');
 
 
 COPY hevelius.objects (name, altname, ra, decl, type, const, magn, x, y, distance) FROM stdin;

@@ -1,4 +1,14 @@
 DELETE FROM objects WHERE name LIKE 'C%';
+DELETE FROM catalogs WHERE shortname="C";
+
+INSERT INTO catalogs(shortname, name, filename, descr, url, version)
+VALUES('C',
+       'Caldwell catalog',
+       'catalog-caldwell.psql',
+       'Written by Sir Patrick C. Moore. C. stands for Caldwell',
+       '',
+       '1.0');
+
 
 COPY hevelius.objects (name, altname, ra, decl, type, const, magn, x, y, comment) FROM stdin;
 C1 	"188 "	0.7400	85.33	OC 	Cep 	8.1 	14	14	\N
@@ -111,3 +121,5 @@ C107 	"6101 "	16.4300	-72.20	GC 	Aps 	9.3 	11	11	\N
 C108 	"4372 "	12.4300	-72.67	GC 	Mus 	7.8 	19	19	\N
 C109 	"3195 "	10.1583	-80.87	PN 	Cha 	0 	0.6	0.6	\N
 \.
+
+DELETE FROM catalogs WHERE
