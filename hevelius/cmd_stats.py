@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.express as px
 
 from hevelius import db
+from hevelius.utils import deg2rah
 
 
 def stats():
@@ -36,16 +37,6 @@ def stats():
         print(f"{name:>18}({user_id:2}): {cnt}")
 
     cnx.close()
-
-
-def deg2rah(ra: float) -> str:
-    """Converts Right Ascension specified in degrees (0..359) to hour
-    (0..23.59)"""
-
-    h = int(ra / 15)
-    m = int(ra - h * 15) * 4
-
-    return f"{h}h{m:02d}m ({ra}deg)"
 
 
 def histogram(args):
