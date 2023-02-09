@@ -25,6 +25,16 @@
 --
 
 DELETE FROM objects WHERE name LIKE 'IC%';
+DELETE FROM catalogs WHERE shortname="IC";
+
+INSERT INTO catalogs(shortname, name, filename, descr, url, version)
+VALUES('IC',
+       'Index Catalogue of Nebulae and Clusters of Stars',
+       'catalog-ic.psql',
+       'Supplementary calatalogue, that expands NGC.',
+       'https://en.wikipedia.org/wiki/New_General_Catalogue#Index_Catalogue',
+       '1.0');
+
 
 --
 -- Data for Name: objects; Type: TABLE DATA; Schema: hevelius; Owner: hevelius
