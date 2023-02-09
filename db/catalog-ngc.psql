@@ -7,7 +7,15 @@
 --
 
 DELETE FROM objects WHERE name LIKE 'NGC%';
+DELETE FROM catalogs WHERE shortname="NGC";
 
+INSERT INTO catalogs(shortname, name, filename, descr, url, version)
+VALUES('NGC',
+       'A New General Catalogue of Nebulae and Clusters of Stars, being the Catalogue of the Late Sir John F. W. Herschel, Bart., revised, corrected, and enlarged',
+       'catalog-ngc.psql',
+       'This is the most commonly used catalog of star clusters, galaxies and nebulae',
+       '',
+       '1.0');
 
 COPY hevelius.objects (name, ra, decl, descr, comment, type, epoch, const, magn, x, y) FROM stdin;
 NGC1	0.121083	27.7083	\N	\N	Gx	\N	PEG	13.6	1.9	1.2

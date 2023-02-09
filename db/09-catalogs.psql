@@ -1,0 +1,13 @@
+ALTER TABLE objects ADD COLUMN altname varchar(128);
+ALTER TABLE objects ADD COLUMN distance float;
+ALTER TABLE objects ALTER COLUMN type TYPE varchar(4);
+
+CREATE TABLE catalogs
+    (name varchar unique,
+     shortname varchar(32) primary key,
+     filename varchar(64),
+     descr text,
+     url text,
+     version varchar(32));
+
+UPDATE schema_version SET version = 9;
