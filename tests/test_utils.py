@@ -33,6 +33,7 @@ def test_deg2rah(ra: float, h: int, m: int):
     result = deg2rah(ra)
     assert result == expected
 
+
 class TestParse(unittest.TestCase):
     """Tests parsing functions (parse_ra, parse_dec)"""
 
@@ -43,7 +44,6 @@ class TestParse(unittest.TestCase):
         self.assertAlmostEqual(parse_ra('11h22m33s'), 11.37583333)
         self.assertAlmostEqual(parse_ra('11h22m33.4s'), 11.375944444444)
         self.assertAlmostEqual(parse_ra('11.2345'), 11.2345)
-
 
     def test_parse_dec(self):
         """Tests if declination can be parsed properly"""
@@ -62,6 +62,7 @@ class TestParse(unittest.TestCase):
         self.assertAlmostEqual(parse_dec('11.2345'), 11.2345)
         self.assertAlmostEqual(parse_dec('+11.2345'), 11.2345)
         self.assertAlmostEqual(parse_dec('-11.2345'), -11.2345)
+
 
 class TestFormat(unittest.TestCase):
     """Tests printing functions: format_ra, format_dec"""
