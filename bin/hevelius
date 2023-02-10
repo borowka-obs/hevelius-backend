@@ -13,6 +13,7 @@ from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
 from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
+from hevelius.cmd_catalog import catalog, format_get
 
 if __name__ == '__main__':
     print(f"Hevelius {hevelius_version()}")
@@ -37,6 +38,13 @@ if __name__ == '__main__':
     distrib_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
     groups_parser = subparsers.add_parser('groups', help="Shows frames' groups")
 
+    # Default values set to the first Messier object
+    catalog_parser = subparsers.add_parser('catalog', help="Finds astronomical objects in a catalog")
+    catalog_parser.add_argument('-r', "--ra", help="Right Ascension (HH MM [SS] format)", type=str, default="05 34 31")
+    catalog_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
+    catalog_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
+    catalog_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
+
     args = parser.parse_args()
 
     if args.command == "stats":
@@ -50,11 +58,13 @@ if __name__ == '__main__':
     elif args.command == "repo":
         repo(args) # see cmd_repo.py
     elif args.command == "distrib":
-        histogram_show(args) # see cmd_stats.py
+        histogram_show(args)  # see cmd_stats.py
     elif args.command == "groups":
-        groups(args) # see cmd_stats.py
+        groups(args)  # see cmd_stats.py
     elif args.command == "backup":
-        backup(args) # see cmd_backup.py
+        backup(args)  # see cmd_backup.py
+    elif args.command == "catalog":
+        catalog(args)  # see cmd_catalog.py
 
     else:
         parser.print_help()
