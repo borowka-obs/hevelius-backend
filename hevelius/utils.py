@@ -88,7 +88,7 @@ def parse_dec(dec: str) -> float:
     return dec_float
 
 
-def format_ra(ra:float) -> str:
+def format_ra(ra: float) -> str:
     """Formats Right Ascension as HH MM SS, returns str"""
     h = int(ra)
 
