@@ -4,6 +4,8 @@ Depending on the hevelius.config content, it imports either
 hevelius.db_pgsql or hevelius.db_mysql.
 """
 
+from typing import List
+
 import sys
 
 try:
@@ -272,3 +274,35 @@ def user_get_id(conn, aavso_id=None, login=None) -> str:
 
     v = run_query(conn, query)
     return v[0][0]
+
+
+def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str = "") -> List:
+    """
+    Returns objects from the catalogs that are close (within radius degrees) to
+    the specified RA/DEC coordinates
+
+    :return: a list of objects, together with some of their details
+    """
+    query = "SELECT object_id, name, altname, ra, decl FROM objects "\
+            f"WHERE sqrt( (ra - {ra})^2 + (decl - {decl}) ^2) < {radius}"
+    if len(order):
+        query = query + f" ORDER BY {order}"
+    result = run_query(conn, query)
+
+    return result
+
+
+def tasks_radius_get(conn, ra: float, decl: float, radius: float, order: str = "") -> List:
+    """
+    Returns frames (completed tasks) that are close (within radius degrees) to
+    the specified RA/DEC coordinates
+
+    :return: a list of tasks together with some of their details
+    """
+    query = "SELECT task_id, object, imagename, he_fwhm, ra, decl, comment FROM tasks "\
+            f"WHERE state=6 AND sqrt( (ra-{ra})^2 + (decl - {decl})^2) < {radius}"
+    if len(order):
+        query = query + f" ORDER BY {order}"
+    result = run_query(conn, query)
+
+    return result
