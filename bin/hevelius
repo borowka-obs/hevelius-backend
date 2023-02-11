@@ -39,6 +39,7 @@ if __name__ == '__main__':
 
     distrib_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
     groups_parser = subparsers.add_parser('groups', help="Shows frames' groups")
+    groups_parser.add_argument("-m", "--min", help="Minimum number of frames in a group", type=int, default=200)
 
     # Default values set to the first Messier object
     catalog_parser = subparsers.add_parser('catalog', help="Finds astronomical objects in a catalog")
