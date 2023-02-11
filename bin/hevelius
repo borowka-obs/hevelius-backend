@@ -24,6 +24,8 @@ if __name__ == '__main__':
 
     stats_parser = subparsers.add_parser('stats', help="Show database statistics")
     migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
+    migrate_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
+
     version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
     config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
     backup_parser = subparsers.add_parser('backup', help="Generates DB backup.")
