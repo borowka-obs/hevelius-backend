@@ -17,6 +17,7 @@ def format_get(format: str) -> str:
 
     return format
 
+
 def catalog(args):
     """
     Searches the objects catalog for objects close to specified coordinates.
