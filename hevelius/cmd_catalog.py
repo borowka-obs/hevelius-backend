@@ -3,6 +3,7 @@ from hevelius.utils import parse_dec, parse_ra, format_dec, format_ra
 from argparse import ArgumentTypeError
 import sys
 
+
 def format_get(format: str) -> str:
     """
     Ensures that the specified output format allowed. Allowed values are:
