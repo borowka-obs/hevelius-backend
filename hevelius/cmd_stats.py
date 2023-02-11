@@ -55,11 +55,13 @@ def histogram(args):
     cnx.close()
 
     # This gets a list of coords (0-359, -90..90)
+
+    # decl (89.99 .. -16)
     histo = np.zeros((180, 360))
     for t in tasks:
         ra = int(t[4])
         decl = int(t[5])
-        histo[90 - decl, ra] += 1
+        histo[90 - decl][ra] += 1
 
     return histo
 
@@ -71,18 +73,32 @@ def groups(args):
     print(f"Showing groups with more than {min_frames} frame(s)")
     cnt = 0
     poi = []
-    for decl in range(0, 360):
-        for ra in range(0, 180):
-            if histo[ra][decl] > min_frames:
+    for decl in range(0, 180):
+        for ra in range(0, 360):
+            if histo[decl][ra] > min_frames:
+                actual_decl = 90-decl
+                actual_ra = ra/15
                 poi.append(
-                    {"cnt": int(histo[ra][decl]), "ra": ra, "decl": decl})
+                    {"cnt": int(histo[decl][ra]), "ra": actual_ra, "decl": actual_decl})
                 cnt += 1
 
     poi = sorted(poi, key=lambda p: p['cnt'], reverse=True)
 
-    for p in poi:
-        print(f"POI {p['cnt']}, ra={p['ra']}, decl={p['decl']}")
+    conn = db.connect()
 
+    for p in poi:
+        # Get a list of objects in the vicinity
+        ra = p['ra']
+        decl = p['decl']
+        objects = db.catalog_radius_get(conn, ra, decl, 1.0)
+        tasks = db.tasks_radius_get(conn, ra, decl, 1.0)
+        txt = f"{len(objects)} object(s), {len(tasks)} task(s):"
+        for obj in objects:
+            txt = txt + f"{obj[1]} "
+
+        print(f"{p['cnt']} frame(s), ra={ra}, decl={decl} {txt}")
+
+    conn.close()
 
 def histogram_figure_get(args):
     """
