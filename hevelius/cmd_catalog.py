@@ -29,6 +29,7 @@ def catalog(args):
     ra = 0
     decl = 0
     if len(args.object):
+        print(f"Looking for object {args.object}")
         obj = db.catalog_get(conn, args.object)
         if obj != []:
             print(obj)
@@ -65,7 +66,7 @@ def catalog(args):
     # Print a space separated list of task IDs
     for frame in frames:
         if format == "filenames":
-            print(frame[3])
+            print(frame[2])
         elif format == "brief":
             sys.stdout.write(f"{frame[0]} ")
         elif format == "full":
