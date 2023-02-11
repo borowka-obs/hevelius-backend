@@ -100,6 +100,7 @@ def groups(args):
 
     conn.close()
 
+
 def histogram_figure_get(args):
     """
     Generates plotly figure with histogram data.
