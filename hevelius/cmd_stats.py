@@ -69,7 +69,7 @@ def histogram(args):
 def groups(args):
     histo = histogram(args)
 
-    min_frames = 200
+    min_frames = args.min
     print(f"Showing groups with more than {min_frames} frame(s)")
     cnt = 0
     poi = []
