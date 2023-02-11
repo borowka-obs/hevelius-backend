@@ -1,13 +1,9 @@
 --
--- PostgreSQL database dump
---
-
---
--- Data for Name: objects; Type: TABLE DATA; Schema: hevelius; Owner: hevelius
+-- This is New General Catalogue (NGC) of Nebulae and Clusters of Stars
 --
 
 DELETE FROM objects WHERE name LIKE 'NGC%';
-DELETE FROM catalogs WHERE shortname="NGC";
+DELETE FROM catalogs WHERE shortname='NGC';
 
 INSERT INTO catalogs(shortname, name, filename, descr, url, version)
 VALUES('NGC',
@@ -17,7 +13,7 @@ VALUES('NGC',
        '',
        '1.0');
 
-COPY hevelius.objects (name, ra, decl, descr, comment, type, epoch, const, magn, x, y) FROM stdin;
+COPY objects (name, ra, decl, descr, comment, type, epoch, const, magn, x, y) FROM stdin;
 NGC1	0.121083	27.7083	\N	\N	Gx	\N	PEG	13.6	1.9	1.2
 NGC2	0.121417	27.6781	\N	\N	Gx	\N	PEG	15	1.4	0.6
 NGC3	0.121333	8.30083	\N	\N	Gx	\N	PSC	14.4	1.1	0.6

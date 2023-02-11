@@ -1,5 +1,11 @@
+--
+-- This is a catalog of objects in the Caldwell catalog.
+--
+-- The catalog is written by Sir Patrick C. Moore. C. stands for Caldwell.
+--
+
 DELETE FROM objects WHERE name LIKE 'C%';
-DELETE FROM catalogs WHERE shortname="C";
+DELETE FROM catalogs WHERE shortname='C';
 
 INSERT INTO catalogs(shortname, name, filename, descr, url, version)
 VALUES('C',
@@ -9,8 +15,7 @@ VALUES('C',
        '',
        '1.0');
 
-
-COPY hevelius.objects (name, altname, ra, decl, type, const, magn, x, y, comment) FROM stdin;
+COPY objects (name, altname, ra, decl, type, const, magn, x, y, comment) FROM stdin;
 C1 	"188 "	0.7400	85.33	OC 	Cep 	8.1 	14	14	\N
 C2 	"40 "	0.2167	72.53	PN 	Cep 	11.6 	0.6	0.6	\N
 C3 	"4236 "	12.2783	69.47	SbG 	Dra 	9.7 	21	7	\N
@@ -122,4 +127,3 @@ C108 	"4372 "	12.4300	-72.67	GC 	Mus 	7.8 	19	19	\N
 C109 	"3195 "	10.1583	-80.87	PN 	Cha 	0 	0.6	0.6	\N
 \.
 
-DELETE FROM catalogs WHERE

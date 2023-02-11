@@ -1,5 +1,9 @@
+--
+-- This is Messier catalog
+--
+
 DELETE FROM objects WHERE name LIKE 'M%';
-DELETE FROM catalogs WHERE shortname="M";
+DELETE FROM catalogs WHERE shortname='M';
 
 INSERT INTO catalogs(shortname, name, filename, descr, url, version)
 VALUES('M',
@@ -10,7 +14,7 @@ VALUES('M',
        '1.0');
 
 
-COPY hevelius.objects (name, altname, ra, decl, type, const, magn, x, y, distance) FROM stdin;
+COPY objects (name, altname, ra, decl, type, const, magn, x, y, distance) FROM stdin;
 M1	"NGC 1952 Crab Nebula"	5.5750	22.02	SN	Tau	8.4	6.0	4.0	6.30
 M2	"NGC 7089"	21.5583	0.82	GC	Aqr	6.5	12.9	12.9	37.50
 M3	"NGC 5272"	13.7033	28.38	GC	Cvn	6.2	16.2	16.2	33.90
