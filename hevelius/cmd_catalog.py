@@ -24,28 +24,38 @@ def catalog(args):
     Searches the objects catalog for objects close to specified coordinates.
     """
 
-    ra = parse_ra(args.ra)
-    decl = parse_dec(args.decl)
-    radius = float(args.proximity)
+    conn = db.connect()
 
+    ra = 0
+    decl = 0
+    if len(args.object):
+        obj = db.catalog_get(conn, args.object)
+        if obj != []:
+            print(obj)
+            ra = obj[0][3]
+            decl = obj[0][4]
+            print(f"Found object {args.object} in a catalog, using its coords: RA {ra} DEC {decl}")
+    else:
+        ra = parse_ra(args.ra)
+        decl = parse_dec(args.decl)
+
+    radius = float(args.proximity)
     format = format_get(args.format)
 
-    cnx = db.connect()
-
     if format != "csv":
-        print(f"Looking for objects close to {format_ra(ra)},{format_dec(decl)}, within a radius of {radius} deg")
+        print(f"Looking for objects close to RA {format_ra(ra)} DEC {format_dec(decl)}, within a radius of {radius} deg")
 
-        objects = db.catalog_radius_get(cnx, ra, decl, radius)
+        objects = db.catalog_radius_get(conn, ra, decl, radius)
 
         print(f"Found {len(objects)} object(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}")
         for object in objects:
             print(object)
 
-    frames = db.tasks_radius_get(cnx, ra, decl, radius)
+    frames = db.tasks_radius_get(conn, ra, decl, radius)
 
     if format != "csv":
         print(f"Found {len(frames)} frame(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}")
-    cnx.close()
+    conn.close()
 
     if format == "none":
         return

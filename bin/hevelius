@@ -47,6 +47,7 @@ if __name__ == '__main__':
     catalog_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
     catalog_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
     catalog_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
+    catalog_parser.add_argument('-o', "--object", help="catalog object to look for", type=str, default="")
 
     args = parser.parse_args()
 
