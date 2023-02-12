@@ -11,3 +11,5 @@ of the features are usable already.
 - [Catalogs](doc/catalogs.md) - Hevelius comes with several astronomical catalogs.
 - [Database details](doc/db.md)
 - [Developer's guide](doc/devel.md)
+- [Security info](SECURITY.md)
+- [License](LICENSE)
