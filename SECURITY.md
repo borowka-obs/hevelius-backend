@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-Hevelius is a very young project. The only supported version is the latest.
+Hevelius is a very young project. The only supported version is the latest code from the `master` branch.
 
 | Version | Supported          |
 | ------- | ------------------ |
-| master  | :white_check_mark: |
+| master  | :heavy_check_mark: |
 
 ## Reporting a Vulnerability
 
