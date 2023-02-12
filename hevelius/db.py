@@ -291,6 +291,7 @@ def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str =
 
     return result
 
+
 def catalog_get(conn, name: str) -> List:
     """
     Returns an object of specified name
@@ -299,6 +300,7 @@ def catalog_get(conn, name: str) -> List:
     result = run_query(conn, query)
 
     return result
+
 
 def tasks_radius_get(conn, ra: float, decl: float, radius: float, order: str = "") -> List:
     """

@@ -4,10 +4,7 @@
 Provides command line interface to the Hevelius project.
 """
 
-import sys
 import argparse
-
-sys.path.append(".")
 
 from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
 from hevelius.cmd_stats import stats, histogram_show, groups
@@ -52,15 +49,15 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.command == "stats":
-        stats() # see cmd_stats.py
+        stats()  # see cmd_stats.py
     elif args.command == "migrate":
-        migrate(args) # see cmd_db_migrate.py
+        migrate(args)  # see cmd_db_migrate.py
     elif args.command == "version":
-        db_version() # see cmd_basic.py
+        db_version()  # see cmd_basic.py
     elif args.command == "config":
-        config_show() # see cmd_basic.py
+        config_show()  # see cmd_basic.py
     elif args.command == "repo":
-        repo(args) # see cmd_repo.py
+        repo(args)  # see cmd_repo.py
     elif args.command == "distrib":
         histogram_show(args)  # see cmd_stats.py
     elif args.command == "groups":

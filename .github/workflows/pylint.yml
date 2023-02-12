@@ -24,8 +24,8 @@ jobs:
 
     - name: Linting with flake8
       run: |
-        flake8 --config .flake8 --color=auto $(git ls-files '*.py')
+        flake8 --config .flake8 --color=auto $(git ls-files '*.py') bin/hevelius
 
     - name: Linting with pylint
       run: |
-        pylint --rcfile .pylint $(git ls-files '*.py')
+        pylint --rcfile .pylint $(git ls-files '*.py') bin/hevelius
