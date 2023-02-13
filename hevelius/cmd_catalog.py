@@ -1,5 +1,6 @@
 from hevelius import db
 from hevelius.utils import parse_dec, parse_ra, format_dec, format_ra
+from hevelius import config
 from argparse import ArgumentTypeError
 import sys
 
@@ -12,9 +13,11 @@ def format_get(format: str) -> str:
     - csv - print all found frames in CSV format
     - brief - print a space separated list on the screen
     - full - print everything on the screen
+    - pixinsight - print a list of frames in PixInsight format (useful for
+                    importing into SubframeSelector)
     """
-    if format not in ["none", "filenames", "csv", "brief", "full"]:
-        raise ArgumentTypeError(f"unsupported format: {format}, allowed are: none, filenames, csv, brief, full")
+    if format not in ["none", "filenames", "csv", "brief", "full", "pixinsight"]:
+        raise ArgumentTypeError(f"unsupported format: {format}, allowed are: none, filenames, csv, brief, full, pixinsight")
 
     return format
 
@@ -73,4 +76,6 @@ def catalog(args):
             print(f"Task {frame[0]}: RA {frame[4]} DEC {frame[5]}, object: {frame[1]}, file: {frame[2]}, fwhm: {frame[3]}")
         elif format == "csv":
             print(f"{frame[0]},{frame[1]},{frame[2]},{frame[3]},{frame[4]},{frame[5]},{frame[6]}")
+        elif format == "pixinsight":
+            print(f'   [true, "{config.REPO_PATH}/{frame[2]}", "", ""],')
     print("")

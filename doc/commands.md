@@ -12,7 +12,12 @@ Hevelius will find catalog objects for you and also list frames that are in the
 database. You can use `--format XXX` to specify the output format. See `--help`
 for details as the formats are being updated frequently. As of time of writing
 this text, the following formats were supported: `none`, `filenames`, `csv`,
-`brief`, `full`.
+`brief`, `full`, `pixinsight`.
+
+The `pixinsight` format is intended to be used with PixInsight's
+SubframeSelector. To import the list, open PixInsight, menu Process ->
+ImageInspection -> SubframeSelector, then click on the `edit instance source code`
+(square icon at the bottom), then paste the content into `P.subframes`.
 
 An example command line call:
 
