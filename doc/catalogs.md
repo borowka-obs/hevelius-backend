@@ -27,3 +27,20 @@ INSERT 0 1
 COPY 110
 hevelius=>
 ```
+
+## Catalog designations
+
+- BN = Bright nebula
+- GC = Globular cluster
+- OC = Open cluster
+- EG = Elliptical (type) galaxy
+- DN = Dark nebula
+- IG = Irregular galaxy
+- PN = Planetary nebula
+- SN = Supernova remnant
+- SG = Spiral (type) galaxy
+- N  = Diffuse Nebula
+- SC = Star Cloud
+- AS = Asterism
+- DS = Double Star
+- LG = Lenticular (S0) Galaxy
