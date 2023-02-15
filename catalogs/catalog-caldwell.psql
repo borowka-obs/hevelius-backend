@@ -16,114 +16,113 @@ VALUES('C',
        '1.0');
 
 COPY objects (name, altname, ra, decl, type, const, magn, x, y, comment) FROM stdin;
-C1 	"188 "	0.7400	85.33	OC 	Cep 	8.1 	14	14	\N
-C2 	"40 "	0.2167	72.53	PN 	Cep 	11.6 	0.6	0.6	\N
-C3 	"4236 "	12.2783	69.47	SbG 	Dra 	9.7 	21	7	\N
-C4 	"7023 "	21.0300	68.20	BN 	Cep 	6.8 	18	18	Reflection Nebula
-C5 	"IC342 "	3.7800	68.10	SBG 	Cam 	9.2 	18	17	\N
-C6 	"6543 "	17.9767	66.63	PN 	Dra 	8.8 	0.3	5.8	Cat's Eye Nebula
-C7 	"2403 "	7.6150	65.60	ScG 	Cam 	8.9 	18	10	\N
-C8 	"559 "	1.4917	63.30	OC 	Cas 	9.5 	4	4	\N
-C9 	"Sh2-155 "	22.9467	62.62	BN 	Cep 	7.7 	50	10	Cave Nebula
-C10 	"663 "	1.7667	61.25	OC 	Cas 	7.1 	16	16	\N
-C11 	"7635 "	23.3450	61.20	BN 	Cas 	7.0 	15	8	Bubble Nebula
-C12 	"6946 "	20.5800	60.15	ScG 	Cep 	9.7 	11	9	\N
-C13 	"457 "	1.3183	58.33	OC 	Cas 	6.4 	13 	13 	Phi Cas Cluster
-C14 	"869/884 "	2.3333	57.13	OdC	Per 	4.3 	30	30	Sword Handle
-C15 	"6826 "	19.7467	50.52	PN 	Cyg 	9.8 	0.5	2.3	Blinking Nebula
-C16 	"7243 "	22.2550	49.88	OC 	Lac 	6.4 	21	21	\N
-C17 	"147 "	0.5533	48.50	dEG 	Cas 	9.3 	13	8	\N
-C18 	"185 "	0.6500	48.33	dEG 	Cas 	9.2 	12	9	\N
-C19 	"IC5146 "	21.8917	47.27	BN 	Cyg 	10.0 	12	12	Cocoon Neb
-C20 	"7000 "	20.9800	44.33	BN 	Cyg 	6.0 	120	100	North American Nebula
-C21 	"4449 "	12.4700	44.10	IG 	CVn 	9.4 	5	3	\N
-C22 	"7662 "	23.4317	42.55	PN 	And 	9.2 	0.3	2.2	\N
-C23 	"891 "	2.3767	42.35	SbG 	And 	9.9 	14	2	\N
-C24 	"1275 "	3.3300	41.52	Sey 	Per 	11.6 	2.6	1	Per A radio source
-C25 	"2419 "	7.6350	38.88	GC 	Lyn 	10.4 	4.1	4.1	\N
-C26 	"4244 "	12.2917	37.82	SG 	CVn 	10.6 	16	2.5	\N
-C27 	"6888 "	20.2000	38.35	BN 	Cyg 	7.5 	20	10	Crescent Nebula
-C28 	"752 "	1.9633	37.68	OC 	And 	5.7 	50	50	\N
-C29 	"5005 "	13.1817	37.05	SbG 	CVn 	9.8 	5.4	2	\N
-C30 	"7331 "	22.6183	34.42	SbG 	Peg 	9.5 	11	4	\N
-C31 	"IC405 "	5.2700	34.27	BN 	Aur 	6.0 	30	19	Flaming Star Nebula
-C32 	"4631 "	12.7017	32.53	ScG 	CVn 	9.3 	15	3	\N
-C33 	"6992/5 "	20.9400	31.72	SN 	Cyg 	0 	60	8	East Veil Nebula
-C34 	"6960 "	20.7617	30.72	SN 	Cyg 	0 	70	6	West Veil Nebula
-C35 	"4889 "	13.0017	27.98	E4G 	Com 	11.4 	3	2	Brightest in cluster
-C36 	"4559 "	12.6000	27.97	ScG 	Com 	9.8 	10	4	\N
-C37 	"6885 "	20.2000	26.48	OC 	Vul 	5.7 	7	7	\N
-C38 	"4565 "	12.6050	25.98	SbG 	Com 	9.6 	16	3	\N
-C39 	"2392 "	7.4867	20.92	PN 	Gem 	9.9 	0.2	0.7	Eskimo Nebula
-C40 	"3626 "	11.3350	18.35	SbG 	Leo 	10.9 	3	2	\N
-C41 	"-- "	4.4500	16.00	OC 	Tau 	1.0 	330 	330 	Hyades
-C42 	"7006 "	21.0250	16.18	GC 	Del 	10.6 	2.8 	2.8 	Very distant globular
-C43 	"7814 "	0.0550	16.15	SbG 	Peg 	10.5 	6	2	\N
-C44 	"7479 "	23.0817	12.32	SBbG 	Peg 	11.0 	4	3	\N
-C45 	"5248 "	13.6250	8.88	ScG 	Boo 	10.2 	6	4	\N
-C46 	"2261 "	6.6533	8.73	BN 	Mon 	10.0 	2	1	Hubble's Variable Neb.
-C47 	"6934 "	20.5700	7.40	GC 	Del 	8.9 	5.9	5.9	\N
-C48 	"2775 "	9.1717	7.03	SaG 	Can 	10.3 	4.5	3	\N
-C49 	"2237-9 "	6.5383	5.05	BN 	Mon 	0 	80	60	Rosette Nebula
-C50 	"2244 "	6.5400	4.87	OC 	Mon 	4.8 	24	24	\N
-C51 	"IC1613 "	1.0800	2.12	IG 	Cet 	9.0 	12	11	\N
-C52 	"4697 "	12.8100	-5.80	E4G 	Vir 	9.3 	6	3	\N
-C53 	"3115 "	10.0867	-7.72	E6G 	Sex 	9.1 	8	3	Spindle Galaxy
-C54 	"2506 "	8.0033	-10.78	OC 	Mon 	7.6 	7	7	\N
-C55 	"7009 "	21.0700	-11.37	PN 	Aqr 	8.3 	2.5	1	Saturn Nebula
-C56 	"246 "	0.7833	-11.88	PN 	Cet 	8.0 	3.8	3.8	\N
-C57 	"6822 "	19.7483	-14.80	IG 	Sgr 	9.3 	10	9	Barnard's Galaxy
-C58 	"2360 "	7.2967	-15.62	OC 	CMa 	7.2 	13	13	\N
-C59 	"3242 "	10.4133	-18.63	PN 	Hya 	8.6 	0.3	21	Ghost of Jupiter
-C60 	"4038 "	12.0317	-18.87	ScG 	Crv 	11.3 	2.6	1.8	The Antennae
-C61 	"4039 "	12.0317	-18.88	ScG 	Crv 	13.0 	3.2	2.2	The Antennae
-C62 	"247 "	0.7850	-20.77	SG 	Cet 	8.9 	20	7	\N
-C63 	"7293 "	22.4933	-20.80	PN 	Aqr 	6.5 	13 	13 	Helix Nebula
-C64 	"2362 "	7.3133	-24.95	OC 	CMa 	4.1 	8 	8 	Tau CMa Cluster
-C65 	"253 "	0.7933	-25.28	SG 	Scl 	7.1 	25	7	Sculptor Galaxy
-C66 	"5694 "	14.6600	-26.53	GC 	Hya 	10.2 	3.6	3.6	\N
-C67 	"1097 "	2.7717	-30.28	SBbG 	For 	9.2 	9	6	\N
-C68 	"6729 "	19.0317	-36.95	BN 	CrA 	9.7 	1.0 	1.0 	R CrA Nebula
-C69 	"6302 "	17.2283	-37.10	PN 	Sco 	12.8 	0.8 	0.8 	Bug Nebula
-C70 	"300 "	0.9150	-37.68	SdG 	Scl 	8.1 	20	13	\N
-C71 	"2477 "	7.8717	-38.55	OC 	Pup 	5.8 	27	27	\N
-C72 	"55 "	0.2483	-39.18	SBG 	Scl 	8.2 	32	6	Brightest in Scl Cluster
-C73 	"1851 "	5.2350	-40.05	GC 	Col 	7.3 	11	11	\N
-C74 	"3132 "	10.1283	-40.43	PN 	Vel 	8.2 	0.8	0.8	\N
-C75 	"6124 "	16.4267	-40.67	OC 	Sco 	5.8 	29	29	\N
-C76 	"6231 "	16.9000	-41.80	OC 	Sco 	2.6 	15	15	\N
-C77 	"5128 "	13.4250	-43.02	PG 	Cen 	7.0 	18	14	Cen A radio source
-C78 	"6541 "	18.1333	-43.70	GC 	CrA 	6.6 	13	13	\N
-C79 	"3201 "	10.2933	-46.42	GC 	Vel 	6.7 	18	18	\N
-C80 	"5139 "	13.4467	-47.48	GC 	Cen 	3.6 	36 	36 	Omega Centauri
-C81 	"6352 "	17.4250	-48.42	GC 	Ara 	8.1 	7	7	\N
-C82 	"6193 "	16.6883	-48.77	OC 	Ara 	5.2 	15	15	\N
-C83 	"4945 "	13.0900	-49.47	SBG 	Cen 	9.5 	20	4	\N
-C84 	"5286 "	13.7733	-51.37	GC 	Cen 	7.6 	9	9	\N
-C85 	"IC2391 "	8.6700	-53.07	OC 	Vel 	2.5 	50 	50 	o (Omicron) Vel Cluster
-C86 	"6397 "	17.6783	-53.67	GC 	Ara 	5.6 	26	26	\N
-C87 	"1261 "	3.2050	-55.22	GC 	Hor 	8.4 	7	7	\N
-C88 	"5823 "	15.0950	-55.60	OC 	Cir 	7.9 	10	10	\N
-C89 	"6087 "	16.3150	-57.90	OC 	Nor 	5.4 	12 	12 	S Nor Cluster
-C90 	"2867 "	9.3567	-58.32	PN 	Car 	9.7 	0.2	0.2	\N
-C91 	"3532 "	11.1067	-58.67	OC 	Car 	3.0 	55	55	\N
-C92 	"3372 "	10.7300	-59.87	BN 	Car 	6.2 	120	120	Eta Carinae Nebula
-C93 	"6752 "	19.1817	-59.98	GC 	Pav 	5.4 	20	20	\N
-C94 	"4755 "	12.8933	-60.33	OC 	Cru 	4.2 	10 	10 	Jewel Box Cluster
-C95 	"6025 "	16.0617	-60.50	OC 	TrA 	5.1 	12	12	\N
-C96 	"2516 "	7.9717	-60.87	OC 	Car 	3.8 	30	30	\N
-C97 	"3766 "	11.6017	-61.62	OC 	Cen 	5.3 	12	12	\N
-C98 	"4609 "	12.7050	-62.97	OC 	Cru 	6.9 	5	5	\N
-C99 	"-- "	12.8833	-63.00	DN 	Cru 	0 	400	300	Coal Sack
-C100 	"IC2944 "	11.6100	-63.03	OC 	Cen 	4.5 	15 	15 	- (Lambda) Cen Cluster
-C101 	"6744 "	19.1633	-63.85	SBG 	Pav 	9.0 	16	10	\N
-C102 	"IC2602 "	10.7200	-64.40	OC 	Car 	1.9 	50 	50 	÷ (Theta) Car Cluster
-C103 	"2070 "	5.6450	-69.10	BN 	Dor 	1.0 	40	25	Tarantula Neb. in LMC
-C104 	"362 "	1.0533	-70.85	GC 	Tuc 	6.6 	13	13	\N
-C105 	"4833 "	12.9933	-70.88	GC 	Mus 	7.3 	14	14	\N
-C106 	"104 "	0.4017	-72.08	GC 	Tuc 	4.0 	31 	31 	47 Tucanae
-C107 	"6101 "	16.4300	-72.20	GC 	Aps 	9.3 	11	11	\N
-C108 	"4372 "	12.4300	-72.67	GC 	Mus 	7.8 	19	19	\N
-C109 	"3195 "	10.1583	-80.87	PN 	Cha 	0 	0.6	0.6	\N
+C1	"188 "	0.7400	85.33	OC 	Cep 	8.1 	14	14	\N
+C2	"40 "	0.2167	72.53	PN 	Cep 	11.6 	0.6	0.6	\N
+C3	"4236 "	12.2783	69.47	SbG 	Dra 	9.7 	21	7	\N
+C4	"7023 "	21.0300	68.20	BN 	Cep 	6.8 	18	18	Reflection Nebula
+C5	"IC342 "	3.7800	68.10	SBG 	Cam 	9.2 	18	17	\N
+C6	"6543 "	17.9767	66.63	PN 	Dra 	8.8 	0.3	5.8	Cat's Eye Nebula
+C7	"2403 "	7.6150	65.60	ScG 	Cam 	8.9 	18	10	\N
+C8	"559 "	1.4917	63.30	OC 	Cas 	9.5 	4	4	\N
+C9	"Sh2-155 "	22.9467	62.62	BN 	Cep 	7.7 	50	10	Cave Nebula
+C10	"663 "	1.7667	61.25	OC 	Cas 	7.1 	16	16	\N
+C11	"7635 "	23.3450	61.20	BN 	Cas 	7.0 	15	8	Bubble Nebula
+C12	"6946 "	20.5800	60.15	ScG 	Cep 	9.7 	11	9	\N
+C13	"457 "	1.3183	58.33	OC 	Cas 	6.4 	13 	13 	Phi Cas Cluster
+C14	"869/884 "	2.3333	57.13	OdC	Per 	4.3 	30	30	Sword Handle
+C15	"6826 "	19.7467	50.52	PN 	Cyg 	9.8 	0.5	2.3	Blinking Nebula
+C16	"7243 "	22.2550	49.88	OC 	Lac 	6.4 	21	21	\N
+C17	"147 "	0.5533	48.50	dEG 	Cas 	9.3 	13	8	\N
+C18	"185 "	0.6500	48.33	dEG 	Cas 	9.2 	12	9	\N
+C19	"IC5146 "	21.8917	47.27	BN 	Cyg 	10.0 	12	12	Cocoon Neb
+C20	"7000 "	20.9800	44.33	BN 	Cyg 	6.0 	120	100	North American Nebula
+C21	"4449 "	12.4700	44.10	IG 	CVn 	9.4 	5	3	\N
+C22	"7662 "	23.4317	42.55	PN 	And 	9.2 	0.3	2.2	\N
+C23	"891 "	2.3767	42.35	SbG 	And 	9.9 	14	2	\N
+C24	"1275 "	3.3300	41.52	Sey 	Per 	11.6 	2.6	1	Per A radio source
+C25	"2419 "	7.6350	38.88	GC 	Lyn 	10.4 	4.1	4.1	\N
+C26	"4244 "	12.2917	37.82	SG 	CVn 	10.6 	16	2.5	\N
+C27	"6888 "	20.2000	38.35	BN 	Cyg 	7.5 	20	10	Crescent Nebula
+C28	"752 "	1.9633	37.68	OC 	And 	5.7 	50	50	\N
+C29	"5005 "	13.1817	37.05	SbG 	CVn 	9.8 	5.4	2	\N
+C30	"7331 "	22.6183	34.42	SbG 	Peg 	9.5 	11	4	\N
+C31	"IC405 "	5.2700	34.27	BN 	Aur 	6.0 	30	19	Flaming Star Nebula
+C32	"4631 "	12.7017	32.53	ScG 	CVn 	9.3 	15	3	\N
+C33	"6992/5 "	20.9400	31.72	SN 	Cyg 	0 	60	8	East Veil Nebula
+C34	"6960 "	20.7617	30.72	SN 	Cyg 	0 	70	6	West Veil Nebula
+C35	"4889 "	13.0017	27.98	E4G 	Com 	11.4 	3	2	Brightest in cluster
+C36	"4559 "	12.6000	27.97	ScG 	Com 	9.8 	10	4	\N
+C37	"6885 "	20.2000	26.48	OC 	Vul 	5.7 	7	7	\N
+C38	"4565 "	12.6050	25.98	SbG 	Com 	9.6 	16	3	\N
+C39	"2392 "	7.4867	20.92	PN 	Gem 	9.9 	0.2	0.7	Eskimo Nebula
+C40	"3626 "	11.3350	18.35	SbG 	Leo 	10.9 	3	2	\N
+C41	"-- "	4.4500	16.00	OC 	Tau 	1.0 	330 	330 	Hyades
+C42	"7006 "	21.0250	16.18	GC 	Del 	10.6 	2.8 	2.8 	Very distant globular
+C43	"7814 "	0.0550	16.15	SbG 	Peg 	10.5 	6	2	\N
+C44	"7479 "	23.0817	12.32	SBbG 	Peg 	11.0 	4	3	\N
+C45	"5248 "	13.6250	8.88	ScG 	Boo 	10.2 	6	4	\N
+C46	"2261 "	6.6533	8.73	BN 	Mon 	10.0 	2	1	Hubble's Variable Neb.
+C47	"6934 "	20.5700	7.40	GC 	Del 	8.9 	5.9	5.9	\N
+C48	"2775 "	9.1717	7.03	SaG 	Can 	10.3 	4.5	3	\N
+C49	"2237-9 "	6.5383	5.05	BN 	Mon 	0 	80	60	Rosette Nebula
+C50	"2244 "	6.5400	4.87	OC 	Mon 	4.8 	24	24	\N
+C51	"IC1613 "	1.0800	2.12	IG 	Cet 	9.0 	12	11	\N
+C52	"4697 "	12.8100	-5.80	E4G 	Vir 	9.3 	6	3	\N
+C53	"3115 "	10.0867	-7.72	E6G 	Sex 	9.1 	8	3	Spindle Galaxy
+C54	"2506 "	8.0033	-10.78	OC 	Mon 	7.6 	7	7	\N
+C55	"7009 "	21.0700	-11.37	PN 	Aqr 	8.3 	2.5	1	Saturn Nebula
+C56	"246 "	0.7833	-11.88	PN 	Cet 	8.0 	3.8	3.8	\N
+C57	"6822 "	19.7483	-14.80	IG 	Sgr 	9.3 	10	9	Barnard's Galaxy
+C58	"2360 "	7.2967	-15.62	OC 	CMa 	7.2 	13	13	\N
+C59	"3242 "	10.4133	-18.63	PN 	Hya 	8.6 	0.3	21	Ghost of Jupiter
+C60	"4038 "	12.0317	-18.87	ScG 	Crv 	11.3 	2.6	1.8	The Antennae
+C61	"4039 "	12.0317	-18.88	ScG 	Crv 	13.0 	3.2	2.2	The Antennae
+C62	"247 "	0.7850	-20.77	SG 	Cet 	8.9 	20	7	\N
+C63	"7293 "	22.4933	-20.80	PN 	Aqr 	6.5 	13 	13 	Helix Nebula
+C64	"2362 "	7.3133	-24.95	OC 	CMa 	4.1 	8 	8 	Tau CMa Cluster
+C65	"253 "	0.7933	-25.28	SG 	Scl 	7.1 	25	7	Sculptor Galaxy
+C66	"5694 "	14.6600	-26.53	GC 	Hya 	10.2 	3.6	3.6	\N
+C67	"1097 "	2.7717	-30.28	SBbG 	For 	9.2 	9	6	\N
+C68	"6729 "	19.0317	-36.95	BN 	CrA 	9.7 	1.0 	1.0 	R CrA Nebula
+C69	"6302 "	17.2283	-37.10	PN 	Sco 	12.8 	0.8 	0.8 	Bug Nebula
+C70	"300 "	0.9150	-37.68	SdG 	Scl 	8.1 	20	13	\N
+C71	"2477 "	7.8717	-38.55	OC 	Pup 	5.8 	27	27	\N
+C72	"55 "	0.2483	-39.18	SBG 	Scl 	8.2 	32	6	Brightest in Scl Cluster
+C73	"1851 "	5.2350	-40.05	GC 	Col 	7.3 	11	11	\N
+C74	"3132 "	10.1283	-40.43	PN 	Vel 	8.2 	0.8	0.8	\N
+C75	"6124 "	16.4267	-40.67	OC 	Sco 	5.8 	29	29	\N
+C76	"6231 "	16.9000	-41.80	OC 	Sco 	2.6 	15	15	\N
+C77	"5128 "	13.4250	-43.02	PG 	Cen 	7.0 	18	14	Cen A radio source
+C78	"6541 "	18.1333	-43.70	GC 	CrA 	6.6 	13	13	\N
+C79	"3201 "	10.2933	-46.42	GC 	Vel 	6.7 	18	18	\N
+C80	"5139 "	13.4467	-47.48	GC 	Cen 	3.6 	36 	36 	Omega Centauri
+C81	"6352 "	17.4250	-48.42	GC 	Ara 	8.1 	7	7	\N
+C82	"6193 "	16.6883	-48.77	OC 	Ara 	5.2 	15	15	\N
+C83	"4945 "	13.0900	-49.47	SBG 	Cen 	9.5 	20	4	\N
+C84	"5286 "	13.7733	-51.37	GC 	Cen 	7.6 	9	9	\N
+C85	"IC2391 "	8.6700	-53.07	OC 	Vel 	2.5 	50 	50 	o (Omicron) Vel Cluster
+C86	"6397 "	17.6783	-53.67	GC 	Ara 	5.6 	26	26	\N
+C87	"1261 "	3.2050	-55.22	GC 	Hor 	8.4 	7	7	\N
+C88	"5823 "	15.0950	-55.60	OC 	Cir 	7.9 	10	10	\N
+C89	"6087 "	16.3150	-57.90	OC 	Nor 	5.4 	12 	12 	S Nor Cluster
+C90	"2867 "	9.3567	-58.32	PN 	Car 	9.7 	0.2	0.2	\N
+C91	"3532 "	11.1067	-58.67	OC 	Car 	3.0 	55	55	\N
+C92	"3372 "	10.7300	-59.87	BN 	Car 	6.2 	120	120	Eta Carinae Nebula
+C93	"6752 "	19.1817	-59.98	GC 	Pav 	5.4 	20	20	\N
+C94	"4755 "	12.8933	-60.33	OC 	Cru 	4.2 	10 	10 	Jewel Box Cluster
+C95	"6025 "	16.0617	-60.50	OC 	TrA 	5.1 	12	12	\N
+C96	"2516 "	7.9717	-60.87	OC 	Car 	3.8 	30	30	\N
+C97	"3766 "	11.6017	-61.62	OC 	Cen 	5.3 	12	12	\N
+C98	"4609 "	12.7050	-62.97	OC 	Cru 	6.9 	5	5	\N
+C99	"-- "	12.8833	-63.00	DN 	Cru 	0 	400	300	Coal Sack
+C100	"IC2944 "	11.6100	-63.03	OC 	Cen 	4.5 	15 	15 	- (Lambda) Cen Cluster
+C101	"6744 "	19.1633	-63.85	SBG 	Pav 	9.0 	16	10	\N
+C102	"IC2602 "	10.7200	-64.40	OC 	Car 	1.9 	50 	50 	÷ (Theta) Car Cluster
+C103	"2070 "	5.6450	-69.10	BN 	Dor 	1.0 	40	25	Tarantula Neb. in LMC
+C104	"362 "	1.0533	-70.85	GC 	Tuc 	6.6 	13	13	\N
+C105	"4833 "	12.9933	-70.88	GC 	Mus 	7.3 	14	14	\N
+C106	"104 "	0.4017	-72.08	GC 	Tuc 	4.0 	31 	31 	47 Tucanae
+C107	"6101 "	16.4300	-72.20	GC 	Aps 	9.3 	11	11	\N
+C108	"4372 "	12.4300	-72.67	GC 	Mus 	7.8 	19	19	\N
+C109	"3195 "	10.1583	-80.87	PN 	Cha 	0 	0.6	0.6	\N
 \.
-
