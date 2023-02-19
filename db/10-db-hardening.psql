@@ -23,5 +23,6 @@ ALTER TABLE tasks ADD COLUMN sensor_id integer;
 ALTER TABLE tasks ADD CONSTRAINT fk_sensor FOREIGN KEY(sensor_id) REFERENCES sensors(sensor_id);
 ALTER TABLE tasks DROP CONSTRAINT fk_user_id;
 ALTER TABLE tasks RENAME CONSTRAINT tasks_ibfk_1 to fk_user;
+ALTER TABLE tasks DROP COLUMN fwhm;
 
 UPDATE schema_version SET version = 10;
