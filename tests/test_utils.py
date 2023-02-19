@@ -4,7 +4,7 @@ Tests utility functions
 
 import unittest
 import pytest
-from hevelius.utils import deg2rah, hm2deg, parse_ra, parse_dec, format_ra, format_dec
+from hevelius.utils import deg2rah, hm2deg, parse_ra, parse_dec, format_ra, format_dec, constellation2abbrev, abbrev2constellation
 
 
 # test written by ChatGPT (☉_☉)
@@ -78,3 +78,46 @@ class TestFormat(unittest.TestCase):
         self.assertEqual(format_dec(17.25), '17 15 00.0')
         self.assertEqual(format_dec(-8.3156), '-08 18 56.2')
         self.assertEqual(format_dec(-17.25), '-17 15 00.0')
+
+
+class TestConstellationNames(unittest.TestCase):
+    def setUp(self):
+        self.test_data = {
+            'And': 'Andromeda',
+            'Aqr': 'Aquarius',
+            'CMa': 'Canis Major',
+            'Lup': 'Lupus',
+            'Vir': 'Virgo'
+            }
+
+    def test_constellation2abbrev(self):
+        self.assertEqual(constellation2abbrev('Andromeda'), 'And')
+        self.assertEqual(constellation2abbrev('Antlia'), 'Ant')
+        self.assertEqual(constellation2abbrev('Apus'), 'Aps')
+        self.assertEqual(constellation2abbrev('Aquarius'), 'Aqr')
+        self.assertEqual(constellation2abbrev('Aquila'), 'Aql')
+        self.assertEqual(constellation2abbrev('Ara'), 'Ara')
+        self.assertEqual(constellation2abbrev('Aries'), 'Ari')
+        self.assertEqual(constellation2abbrev('Auriga'), 'Aur')
+        self.assertEqual(constellation2abbrev('Boötes'), 'Boo')
+        self.assertEqual(constellation2abbrev('Caelum'), 'Cae')
+        self.assertEqual(constellation2abbrev('Camelopardalis'), 'Cam')
+        self.assertEqual(constellation2abbrev('Cancer'), 'Cnc')
+
+
+    def test_invalid_constellations(self):
+        with self.assertRaises(ValueError):
+            constellation2abbrev('invalid_string')
+
+    def test_abbreviation_to_constellation(self):
+        for abbr, expected_result in self.test_data.items():
+            result = abbrev2constellation(abbr)
+            self.assertEqual(
+                result,
+                expected_result,
+                msg=f"Failed for abbr: {abbr} Result: {result}, Expected Result: {expected_result}"
+            )
+
+    def test_value_error_raised(self):
+        with self.assertRaises(ValueError):
+            abbrev2constellation('Plo')
