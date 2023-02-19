@@ -1,0 +1,27 @@
+-- Added sensors table for cameras.
+-- Removed mymfavorites table.
+-- Various small items to make the DB more robust
+
+ALTER TABLE telescopes ADD CONSTRAINT scope_id_unique UNIQUE(scope_id);
+
+-- Create table to hold info about cameras
+CREATE TABLE sensors(sensor_id serial,
+                    NAME varchar(128),
+                    resx int,
+                    resy int,
+                    pixel_x float,
+                    pixel_y float,
+                    bits smallint,
+                    width float, -- GENERATED ALWAYS AS (resx*pixel_x/1000) STORED,
+                    height float, -- GENERATED ALWAYS AS (resy*pixel_y/1000) STORED,
+                    PRIMARY KEY(sensor_id));
+
+DROP TABLE mymfavorites;
+
+-- Add information about cameras
+ALTER TABLE tasks ADD COLUMN sensor_id integer;
+ALTER TABLE tasks ADD CONSTRAINT fk_sensor FOREIGN KEY(sensor_id) REFERENCES sensors(sensor_id);
+ALTER TABLE tasks DROP CONSTRAINT fk_user_id;
+ALTER TABLE tasks RENAME CONSTRAINT tasks_ibfk_1 to fk_user;
+
+UPDATE schema_version SET version = 10;
