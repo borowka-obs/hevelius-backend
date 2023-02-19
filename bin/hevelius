@@ -4,7 +4,10 @@
 Provides command line interface to the Hevelius project.
 """
 
+import sys
 import argparse
+
+sys.path.append(".")
 
 from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
 from hevelius.cmd_stats import stats, histogram_show, groups
