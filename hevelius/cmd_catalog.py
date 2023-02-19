@@ -56,17 +56,29 @@ def catalog(args):
         for object in objects:
             object_print(object, format)
 
-    frames = db.tasks_radius_get(conn, ra, decl, radius)
 
-    if format != "csv":
-        print(f"Found {len(frames)} frame(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}")
+    filter=""
+    if args.bin:
+        filter = f" AND binning={args.bin}"
+    if args.focal:
+        filter += f" AND he_focal={args.focal}"
+    if args.resx:
+        filter += f" AND he_resx={args.resx}"
+    if args.resy:
+        filter += f" AND he_resx={args.resy}"
+
+
+    frames = db.tasks_radius_get(conn, ra, decl, radius, filter=filter, order="he_fwhm ASC")
+
+    print(f"Found {len(frames)} frame(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}," +
+          f" binning={args.bin}, focal={args.focal}, resx={args.resx}, resy={args.resy}")
     conn.close()
 
     if format == "none":
         return
 
     if format == "csv":
-        print("# task_id, object, filename, fwhm, ra, decl, comment")
+        print("# task_id, object, filename, fwhm, ra, decl, comment, he_resx, he_resy, filter, he_focal, binning")
     # Print a space separated list of task IDs
     for frame in frames:
         if format == "filenames":
@@ -76,7 +88,7 @@ def catalog(args):
         elif format == "full":
             print(f"Task {frame[0]}: RA {frame[4]} DEC {frame[5]}, object: {frame[1]}, file: {frame[2]}, fwhm: {frame[3]}")
         elif format == "csv":
-            print(f"{frame[0]},{frame[1]},{frame[2]},{frame[3]},{frame[4]},{frame[5]},{frame[6]}")
+            print(f"{frame[0]},{frame[1]},{frame[2]},{frame[3]},{frame[4]},{frame[5]},{frame[6]},{frame[7]},{frame[8]},{frame[9]},{frame[10]}, {frame[11]}")
         elif format == "pixinsight":
             print(f'   [true, "{config.REPO_PATH}/{frame[2]}", "", ""],')
     print("")
