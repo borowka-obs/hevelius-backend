@@ -21,6 +21,8 @@ def format_get(format: str) -> str:
 
     return format
 
+def object_print(obj, format: str):
+    print(f"Object {obj[1]} at RA {format_ra(obj[3])} DEC {format_dec(obj[4])}")
 
 def catalog(args):
     """
@@ -35,7 +37,6 @@ def catalog(args):
         print(f"Looking for object {args.object}")
         obj = db.catalog_get(conn, args.object)
         if obj != []:
-            print(obj)
             ra = obj[0][3]
             decl = obj[0][4]
             print(f"Found object {args.object} in a catalog, using its coords: RA {ra} DEC {decl}")
@@ -53,7 +54,7 @@ def catalog(args):
 
         print(f"Found {len(objects)} object(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}")
         for object in objects:
-            print(object)
+            object_print(object, format)
 
     frames = db.tasks_radius_get(conn, ra, decl, radius)
 
