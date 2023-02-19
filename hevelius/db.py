@@ -302,17 +302,18 @@ def catalog_get(conn, name: str) -> List:
     return result
 
 
-def tasks_radius_get(conn, ra: float, decl: float, radius: float, order: str = "") -> List:
+def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = "", order: str = "") -> List:
     """
     Returns frames (completed tasks) that are close (within radius degrees) to
     the specified RA/DEC coordinates
 
     :return: a list of tasks together with some of their details
     """
-    query = "SELECT task_id, object, imagename, he_fwhm, ra, decl, comment FROM tasks "\
-            f"WHERE state=6 AND sqrt( (ra-{ra})^2 + (decl - {decl})^2) < {radius}"
+    query = "SELECT task_id, object, imagename, he_fwhm, ra, decl, comment, he_resx, he_resy, filter, he_focal, binning FROM tasks "\
+            f"WHERE state=6 {filter} AND sqrt( (ra-{ra})^2 + (decl - {decl})^2) < {radius}"
     if len(order):
         query = query + f" ORDER BY {order}"
+
     result = run_query(conn, query)
 
     return result

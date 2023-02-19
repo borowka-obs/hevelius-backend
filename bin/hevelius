@@ -36,6 +36,8 @@ if __name__ == '__main__':
     repo_parser.add_argument("-d", "--dir",   help="Reads all FITS files recursively", type=str)
     repo_parser.add_argument("-s", "--show-header", help="Displays all entries in FITS header", action='store_true')
     repo_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
+    repo_parser.add_argument("--sanity-db", help="Goes through the list of tasks in a database and checks if all files are present", action='store_true')
+    repo_parser.add_argument("--sanity-files", help="Goes through the list of files and check if related tasks are present", action='store_true')
 
     distrib_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
     groups_parser = subparsers.add_parser('groups', help="Shows frames' groups")
@@ -48,6 +50,10 @@ if __name__ == '__main__':
     catalog_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
     catalog_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
     catalog_parser.add_argument('-o', "--object", help="catalog object to look for", type=str, default="")
+    catalog_parser.add_argument('-b', "--bin", help="filtering: binning of the frames to look for (1..4, 0 means any)", type=int, default=0)
+    catalog_parser.add_argument("--focal", help="filtering: focal length (mm)", type=int, default=0)
+    catalog_parser.add_argument("--resx", help="filtering: X resolution (pixels)", type=int, default=0)
+    catalog_parser.add_argument("--resy", help="filtering: y resolution (pixels)", type=int, default=0)
 
     args = parser.parse_args()
 
