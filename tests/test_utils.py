@@ -104,7 +104,6 @@ class TestConstellationNames(unittest.TestCase):
         self.assertEqual(constellation2abbrev('Camelopardalis'), 'Cam')
         self.assertEqual(constellation2abbrev('Cancer'), 'Cnc')
 
-
     def test_invalid_constellations(self):
         with self.assertRaises(ValueError):
             constellation2abbrev('invalid_string')
