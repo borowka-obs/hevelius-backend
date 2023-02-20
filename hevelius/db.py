@@ -134,7 +134,7 @@ def task_get(conn, id):
     """
     Retrieves a task with all parameters.
     """
-    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, fwhm, eccentricity "\
+    q = "SELECT task_id, state, user_id, imagename, object, descr, comment, ra, decl, exposure, filter, binning, guiding, he_fwhm, eccentricity "\
         "FROM tasks "\
         f"WHERE task_id = {id}"
 
@@ -167,7 +167,7 @@ def task_exists(conn, task_id):
 
 
 def tasks_get_filter(conn, criteria):
-    query = "SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, fwhm, eccentricity "\
+    query = "SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, he_fwhm, eccentricity "\
         "FROM tasks "\
         f"WHERE {criteria}"
 
