@@ -90,7 +90,8 @@ CONSTELLATION_NAMES = {
         "Vul": "Vulpecula"
     }
 
-def constellation2abbrev(cons:str) -> str:
+
+def constellation2abbrev(cons: str) -> str:
     """
     Provides Abbreviation for a full constellation name
     """
