@@ -15,20 +15,25 @@ from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
 
-if __name__ == '__main__':
-    print(f"Hevelius {hevelius_version()}")
-    print()
+
+def run():
+    """
+    Parses command line arguments and runs the appropriate command.
+    """
 
     parser = argparse.ArgumentParser("hevelius")
     subparsers = parser.add_subparsers(help="commands", dest="command")
 
-    stats_parser = subparsers.add_parser('stats', help="Show database statistics")
-    migrate_parser = subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
-    migrate_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
+    # config_parser =
+    subparsers.add_parser('config', help="Shows current Hevelius (DB,file repository) configuration.")
 
-    version_parser = subparsers.add_parser('version', help="Shows the current DB schema version.")
-    config_parser = subparsers.add_parser('config', help="Shows current DB configuration.")
-    backup_parser = subparsers.add_parser('backup', help="Generates DB backup.")
+    db_parser = subparsers.add_parser('db', help="Manages database")
+    db_subparsers = db_parser.add_subparsers(help="Commands related to database", dest="db_command")
+    db_subparsers.add_parser('version', help="Shows the current DB schema version.")  # version_parser
+    db_subparsers.add_parser('backup', help="Generates DB backup.")  # backup_parser
+    migrate_parser = db_subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
+    migrate_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
+    db_subparsers.add_parser('stats', help="Show database statistics")  # stats_parser
 
     repo_parser = subparsers.add_parser('repo', help="Manages files repository on local storage.")
     repo_parser.add_argument('-f', "--file", help="Reads a single FITS file", type=str)
@@ -39,12 +44,14 @@ if __name__ == '__main__':
     repo_parser.add_argument("--sanity-db", help="Goes through the list of tasks in a database and checks if all files are present", action='store_true')
     repo_parser.add_argument("--sanity-files", help="Goes through the list of files and check if related tasks are present", action='store_true')
 
-    distrib_parser = subparsers.add_parser('distrib', help="Shows photos distribution")
-    groups_parser = subparsers.add_parser('groups', help="Shows frames' groups")
+    data_parser = subparsers.add_parser('data', help="Explores, analyses and digs through available data (data mining)")
+    data_subparsers = data_parser.add_subparsers(help="Commands related to data", dest="data_command")
+    data_subparsers.add_parser('distrib', help="Shows photos distribution")  # distrib_parser
+    groups_parser = data_subparsers.add_parser('groups', help="Shows frames' groups")
     groups_parser.add_argument("-m", "--min", help="Minimum number of frames in a group", type=int, default=200)
 
     # Default values set to the first Messier object
-    catalog_parser = subparsers.add_parser('catalog', help="Finds astronomical objects in a catalog")
+    catalog_parser = data_subparsers.add_parser('catalog', help="Finds astronomical objects in a catalog")
     catalog_parser.add_argument('-r', "--ra", help="Right Ascension (HH MM [SS] format)", type=str, default="05 34 31")
     catalog_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
     catalog_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
@@ -57,24 +64,39 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    if args.command == "stats":
-        stats()  # see cmd_stats.py
-    elif args.command == "migrate":
-        migrate(args)  # see cmd_db_migrate.py
-    elif args.command == "version":
-        db_version()  # see cmd_basic.py
+    # db commands: version, migrate, backup, stats
+    if args.command == "db":
+        if args.db_command == "version":
+            return db_version()  # see cmd_basic.py
+        elif args.db_command == "migrate":
+            return migrate(args)  # see cmd_db_migrate.py
+        elif args.db_command == "backup":
+            return backup(args)  # see cmd_backup.py
+        elif args.db_command == "stats":
+            stats()  # see cmd_stats.py
+        else:
+            parser.print_help()
+            return
+    if args.command == "data":
+        if args.data_command == "distrib":
+            return histogram_show(args)  # see cmd_stats.py
+        elif args.data_command == "groups":
+            return groups(args)  # see cmd_stats.py
+        elif args.data_command == "catalog":
+            catalog(args)  # see cmd_catalog.py
+        else:
+            parser.print_help()
+            return
     elif args.command == "config":
         config_show()  # see cmd_basic.py
     elif args.command == "repo":
         repo(args)  # see cmd_repo.py
-    elif args.command == "distrib":
-        histogram_show(args)  # see cmd_stats.py
-    elif args.command == "groups":
-        groups(args)  # see cmd_stats.py
-    elif args.command == "backup":
-        backup(args)  # see cmd_backup.py
-    elif args.command == "catalog":
-        catalog(args)  # see cmd_catalog.py
-
     else:
         parser.print_help()
+
+
+if __name__ == '__main__':
+    print(f"Hevelius {hevelius_version()}")
+    print()
+
+    run()
