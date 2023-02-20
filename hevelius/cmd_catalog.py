@@ -21,8 +21,11 @@ def format_get(format: str) -> str:
 
     return format
 
+
 def object_print(obj, format: str):
+    """prints info about catalog object"""
     print(f"Object {obj[1]} at RA {format_ra(obj[3])} DEC {format_dec(obj[4])}")
+
 
 def catalog(args):
     """
@@ -56,8 +59,7 @@ def catalog(args):
         for object in objects:
             object_print(object, format)
 
-
-    filter=""
+    filter = ""
     if args.bin:
         filter = f" AND binning={args.bin}"
     if args.focal:
@@ -66,7 +68,6 @@ def catalog(args):
         filter += f" AND he_resx={args.resx}"
     if args.resy:
         filter += f" AND he_resx={args.resy}"
-
 
     frames = db.tasks_radius_get(conn, ra, decl, radius, filter=filter, order="he_fwhm ASC")
 
