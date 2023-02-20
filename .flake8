@@ -23,3 +23,7 @@ extend-ignore =
 #    E4,
 #    E51,
 #    W234
+
+per-file-ignores =
+    # E402: module level import not at top of file (need to do PYTHONPATH trickery)
+    bin/hevelius:E402
