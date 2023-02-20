@@ -57,8 +57,8 @@ def config_show():
 
     print()
 
-    print("Files repository path: {config.REPO_PATH}")
-    print("Backup storage path:   {config.BACKUP_PATH}")
+    print(f"Files repository path: {config.REPO_PATH}")
+    print(f"Backup storage path:   {config.BACKUP_PATH}")
 
 
 def backup(args):
