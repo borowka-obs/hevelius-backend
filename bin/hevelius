@@ -61,6 +61,8 @@ def run():
     catalog_parser.add_argument("--focal", help="filtering: focal length (mm)", type=int, default=0)
     catalog_parser.add_argument("--resx", help="filtering: X resolution (pixels)", type=int, default=0)
     catalog_parser.add_argument("--resy", help="filtering: y resolution (pixels)", type=int, default=0)
+    catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
+    catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
     args = parser.parse_args()
 

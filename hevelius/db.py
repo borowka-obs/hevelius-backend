@@ -317,3 +317,19 @@ def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = 
     result = run_query(conn, query)
 
     return result
+
+def sensor_get_by_name(conn, name: str) -> dict:
+    """
+    Retrieves a sensor for a sensor with specified name.
+    """
+    query = f"SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height FROM sensors WHERE name LIKE '%{name}%'"
+    result = run_query(conn, query)
+
+    if len(result) == 0:
+        raise ValueError(f"Unable to find sensor '{name}'")
+    if len(result) > 1:
+        txt = ""
+        for s in result:
+            txt += f"{s[1]}, "
+        raise ValueError(f"More than one sensor matching '{name}': {txt} please be more specific")
+    return result[0]
