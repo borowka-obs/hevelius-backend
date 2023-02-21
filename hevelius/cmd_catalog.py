@@ -59,6 +59,7 @@ def catalog(args):
         for object in objects:
             object_print(object, format)
 
+
     filter = ""
     if args.bin:
         filter = f" AND binning={args.bin}"
@@ -68,6 +69,22 @@ def catalog(args):
         filter += f" AND he_resx={args.resx}"
     if args.resy:
         filter += f" AND he_resx={args.resy}"
+
+    sensor_id = 0
+    if args.sensor != "":
+        # OK, user specified sensor, need to find its ID
+        sensor = db.sensor_get_by_name(conn, args.sensor)
+        if sensor == []:
+            print(f"Sensor {args.sensor} not found in the database")
+            return
+        sensor_id = sensor[0]
+        print(f"Found sensor id ({sensor_id}): " + str(sensor))
+
+    if args.sensor_id != 0:
+        sensor_id = args.sensor_id
+
+    if sensor_id != 0:
+        filter += f" AND sensor_id={sensor_id}"
 
     frames = db.tasks_radius_get(conn, ra, decl, radius, filter=filter, order="he_fwhm ASC")
 
