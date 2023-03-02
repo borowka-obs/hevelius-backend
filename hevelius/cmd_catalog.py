@@ -59,7 +59,6 @@ def catalog(args):
         for object in objects:
             object_print(object, format)
 
-
     filter = ""
     if args.bin:
         filter = f" AND binning={args.bin}"
