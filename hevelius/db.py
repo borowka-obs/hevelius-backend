@@ -24,11 +24,23 @@ else:
     sys.exit(-1)
 
 
-def connect():
+def connect(cfg={}):
     """
     Opens connection to a database, returns DB connection object.
     """
-    return backend.connect()
+
+    if 'database' not in cfg:
+        cfg['database'] = config.DBNAME
+    if 'user' not in cfg:
+        cfg['user'] = config.USER
+    if 'password' not in cfg:
+        cfg['password'] = config.PASSWORD
+    if 'host' not in cfg:
+        cfg['host'] = config.HOST
+    if 'port' not in cfg:
+        cfg['port'] = config.PORT
+
+    return backend.connect(cfg)
 
 
 def run_query(conn, query):
@@ -317,6 +329,7 @@ def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = 
     result = run_query(conn, query)
 
     return result
+
 
 def sensor_get_by_name(conn, name: str) -> dict:
     """

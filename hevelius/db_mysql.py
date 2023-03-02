@@ -1,16 +1,12 @@
-
-
 import mysql.connector
-from hevelius import config
 
 
-def connect():
+def connect(config):
     try:
-        cnx = mysql.connector.connect(user=config.USER, password=config.PASSWORD,
-                                      database=config.DBNAME, host=config.HOST, port=config.PORT)
+        # supported parameters: user, password, database, host, port
+        cnx = mysql.connector.connect(**config)
     except BaseException as e:
-        print("ERROR: Failed to connect to DB: user=%s, database=%s, host=%s, port=%d: %s" % (
-            config.USER, config.DBNAME, config.HOST, config.PORT, e))
+        print(f"ERROR: Failed to connect to DB: user={config['user']}, database={config['database']}, host={config['host']}, port={config['port']}: {e}")
         raise
     return cnx
 
