@@ -1,14 +1,14 @@
 import psycopg2
-from hevelius import config
 
 
-def connect():
+def connect(config):
+
     try:
-        conn = psycopg2.connect(database=config.DBNAME, user=config.USER,
-                                password=config.PASSWORD, host=config.HOST, port=config.PORT)
+        # supported parameters: user, password, database, host, port
+        conn = psycopg2.connect(**config)
     except BaseException as e:
         print(
-            f"ERROR: Failed to connect to DB: user={config.USER}, database={config.DBNAME}, host={config.HOST}, port={config.PORT}: {e}")
+            f"ERROR: Failed to connect to DB: user={config['user']}, database={config['database']}, host={config['host']}, port={config['port']}: {e}")
         raise
     return conn
 

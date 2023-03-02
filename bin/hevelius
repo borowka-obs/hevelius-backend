@@ -75,7 +75,7 @@ def run():
         elif args.db_command == "backup":
             return backup(args)  # see cmd_backup.py
         elif args.db_command == "stats":
-            stats()  # see cmd_stats.py
+            return stats()  # see cmd_stats.py
         else:
             parser.print_help()
             return
@@ -85,14 +85,14 @@ def run():
         elif args.data_command == "groups":
             return groups(args)  # see cmd_stats.py
         elif args.data_command == "catalog":
-            catalog(args)  # see cmd_catalog.py
+            return catalog(args)  # see cmd_catalog.py
         else:
             parser.print_help()
             return
     elif args.command == "config":
-        config_show()  # see cmd_basic.py
+        return config_show()  # see cmd_basic.py
     elif args.command == "repo":
-        repo(args)  # see cmd_repo.py
+        return repo(args)  # see cmd_repo.py
     else:
         parser.print_help()
 
