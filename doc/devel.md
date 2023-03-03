@@ -11,9 +11,9 @@ python3 -m flask run
 
 ## Useful developer tasks
 
-1. Check code with pylint: `pylint --rcfile .pylint $(git ls-files '*.py')`
+1. Check code with pylint: `pylint --rcfile .pylint $(git ls-files '*.py') bin/hevelius`
 
-2. Check code with flake8: `flake8 --config .flake8 --color=auto $(git ls-files '*.py')`
+2. Check code with flake8: `flake8 --config .flake8 --color=auto $(git ls-files '*.py') bin/hevelius`
 
 3. Fix trivial esthetics in the code: `autopep8 --in-place --max-line-length 160 --aggressive --aggressive $(git ls-files '*.py')`
 
