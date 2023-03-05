@@ -9,6 +9,7 @@ import argparse
 
 sys.path.append(".")
 
+# pylint: disable=wrong-import-position
 from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
 from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
@@ -70,31 +71,26 @@ def run():
     if args.command == "db":
         if args.db_command == "version":
             return db_version()  # see cmd_basic.py
-        elif args.db_command == "migrate":
+        if args.db_command == "migrate":
             return migrate(args)  # see cmd_db_migrate.py
-        elif args.db_command == "backup":
+        if args.db_command == "backup":
             return backup(args)  # see cmd_backup.py
-        elif args.db_command == "stats":
+        if args.db_command == "stats":
             return stats()  # see cmd_stats.py
-        else:
-            parser.print_help()
-            return
+        return parser.print_help()
     if args.command == "data":
         if args.data_command == "distrib":
             return histogram_show(args)  # see cmd_stats.py
-        elif args.data_command == "groups":
+        if args.data_command == "groups":
             return groups(args)  # see cmd_stats.py
-        elif args.data_command == "catalog":
+        if args.data_command == "catalog":
             return catalog(args)  # see cmd_catalog.py
-        else:
-            parser.print_help()
-            return
-    elif args.command == "config":
+        return parser.print_help()
+    if args.command == "config":
         return config_show()  # see cmd_basic.py
-    elif args.command == "repo":
+    if args.command == "repo":
         return repo(args)  # see cmd_repo.py
-    else:
-        parser.print_help()
+    return parser.print_help()
 
 
 if __name__ == '__main__':
