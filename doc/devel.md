@@ -8,7 +8,6 @@ cd flask/
 python3 -m flask run
 ```
 
-
 ## Useful developer tasks
 
 1. Check code with pylint: `pylint --rcfile .pylint $(git ls-files '*.py') bin/hevelius`
@@ -19,7 +18,6 @@ python3 -m flask run
 
 4. Run Flask app: `python -m flask --app flask/app.py run`
 
-
 ## Running tests
 
 `python -m pytest -s -v`
@@ -27,3 +25,10 @@ python3 -m flask run
 If you want keep the database after test, set HEVELIUS_DEBUG env variable, e.g.:
 
 `HEVELIUS_DEBUG=1 python -m pytest -s -v`
+
+You need to provide database password when running tests. One way is to set the
+PGPASSWORD variable. Another is to set an entry in `~/.pgpass` file, e.g.
+
+```
+localhost:5432:hevelius:hevelius:secret1
+```
