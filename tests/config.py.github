@@ -2,7 +2,7 @@
 
 USER = 'hevelius'
 DBNAME = 'hevelius'
-HOST = 'postgres'
+HOST = 'localhost'
 PORT = 5432
 PASSWORD = 'postgres'
 TYPE = 'pgsql'
