@@ -1,10 +1,7 @@
 import psycopg2
-from hevelius import db
 
 
 def connect(config):
-
-    config = db.config_get(config)
 
     try:
         # supported parameters: user, password, database, host, port
