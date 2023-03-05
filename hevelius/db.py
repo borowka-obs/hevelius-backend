@@ -23,7 +23,11 @@ else:
         f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
     sys.exit(-1)
 
-def config_get(cfg = {}):
+
+def config_get(cfg={}):
+    """
+    Returns a dictionary with database connection parameters, with defaults filled in.
+    """
     if 'database' not in cfg:
         cfg['database'] = config.DBNAME
     if 'user' not in cfg:
@@ -35,6 +39,7 @@ def config_get(cfg = {}):
     if 'port' not in cfg:
         cfg['port'] = config.PORT
     return cfg
+
 
 def connect(cfg={}):
     """

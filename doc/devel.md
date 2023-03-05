@@ -18,3 +18,12 @@ python3 -m flask run
 3. Fix trivial esthetics in the code: `autopep8 --in-place --max-line-length 160 --aggressive --aggressive $(git ls-files '*.py')`
 
 4. Run Flask app: `python -m flask --app flask/app.py run`
+
+
+## Running tests
+
+`python -m pytest -s -v`
+
+If you want keep the database after test, set HEVELIUS_DEBUG env variable, e.g.:
+
+`HEVELIUS_DEBUG=1 python -m pytest -s -v`
