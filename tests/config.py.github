@@ -1,6 +1,6 @@
 # This defines DB credentials
 
-USER = 'hevelius'
+USER = 'postgres'
 DBNAME = 'hevelius'
 HOST = 'localhost'
 PORT = 5432
