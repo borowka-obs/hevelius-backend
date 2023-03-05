@@ -28,12 +28,15 @@ def migrate(args):
         sys.exit(-1)
 
 
-def migrate_mysql(args):
+def migrate_mysql(args, cfg={}):
     """
     Performs MySQL database migration to the newest schema.
 
     :param args: arguments parsed by argparse
     """
+
+    # Fill in the defaults of DB connection, if not specified
+    cfg = db.config_get(cfg)
 
     dir = "db"
     files = sorted([f for f in listdir(dir) if (
@@ -53,10 +56,10 @@ def migrate_mysql(args):
             if not args.dry_run:
                 schema = subprocess.Popen(
                     ["cat", join(dir, f)], stdout=subprocess.PIPE)
-                mysql = subprocess.Popen(["mysql", "-u", config.USER, "-h", config.HOST,
+                mysql = subprocess.Popen(["mysql", "-u", cfg['user'], "-h", cfg['host'],
                                           "-p" +
-                                          config.PASSWORD, "-P", str(config.PORT),
-                                          config.DBNAME, "-B"], stdin=schema.stdout)
+                                          cfg['password'], "-P", str(cfg['port']),
+                                          cfg['database'], "-B"], stdin=schema.stdout)
             else:
                 print("Skipping (--dry-run).")
 
@@ -79,6 +82,9 @@ def migrate_pgsql(args, cfg={}):
     :param args: arguments parsed by argparse
     """
 
+    # Fill in the defaults of DB connection, if not specified
+    cfg = db.config_get(cfg)
+
     DIR = "db"
     files = sorted([f for f in listdir(DIR) if (
         isfile(join(DIR, f)) and f.endswith("psql"))])
@@ -100,8 +106,8 @@ def migrate_pgsql(args, cfg={}):
 
             if not args["dry_run"]:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
-                psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p",
-                                        str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
+                psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
+                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f])
             else:
                 print("Skipping (--dry-run).")
 
