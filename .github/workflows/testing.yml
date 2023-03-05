@@ -30,7 +30,6 @@ jobs:
         env:
           # Provide the password for postgres
           POSTGRES_PASSWORD: postgres
-          PGPASSWORD: postgres
         # Set health checks to wait until postgres has started
         options: >-
           --health-cmd pg_isready
@@ -59,4 +58,4 @@ jobs:
         run: |
           cp tests/config.py.github hevelius/config.py
           set
-          python -m pytest -s -v
+          PGPASSWORD=postgres python -m pytest -s -v
