@@ -11,14 +11,13 @@ on:
 
 jobs:
 
-  strategy:
-    matrix:
-      python-version: ["3.10"]
-
   container-job:
     # Containers must run in Linux based operating systems
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    strategy:
+      matrix:
+        python-version: ["3.10"]
 
     # Service containers to run with `container-job`
     services:
