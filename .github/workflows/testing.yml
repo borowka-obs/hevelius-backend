@@ -29,6 +29,7 @@ jobs:
           - 5432:5432
         env:
           # Provide the password for postgres
+          POSTGRES_PASSWORD: postgres
           PGPASSWORD: postgres
         # Set health checks to wait until postgres has started
         options: >-
