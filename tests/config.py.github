@@ -2,9 +2,9 @@
 
 USER = 'hevelius'
 DBNAME = 'hevelius'
-HOST = 'localhost'
+HOST = 'postgres'
 PORT = 5432
-PASSWORD = 'secret1'
+PASSWORD = 'postgres'
 TYPE = 'pgsql'
 
 # This defines path to the files repository
