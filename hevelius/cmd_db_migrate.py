@@ -72,7 +72,7 @@ def migrate_mysql(args):
             print(f"Skipping {f}, schema version is {current_ver}")
 
 
-def migrate_pgsql(args):
+def migrate_pgsql(args, cfg={}):
     """
     Performs PostgreSQL database migration to the newest schema.
 
@@ -84,7 +84,7 @@ def migrate_pgsql(args):
         isfile(join(DIR, f)) and f.endswith("psql"))])
 
     for f in files:
-        cnx = db.connect()
+        cnx = db.connect(cfg)
         current_ver = db.version_get(cnx)
         cnx.close()
 
@@ -98,7 +98,7 @@ def migrate_pgsql(args):
             print(
                 f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            if not args.dry_run:
+            if not args["dry_run"]:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
                 psql = subprocess.Popen(["psql", "-U", config.USER, "-h", config.HOST, "-p",
                                         str(config.PORT), config.DBNAME, "-f", DIR + "/" + f])
