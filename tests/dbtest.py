@@ -6,7 +6,7 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from hevelius import config
-from hevelius.cmd_db_migrate import migrate_pgsql
+from hevelius.cmd_db_migrate import migrate_pgsql, run_file
 
 # The relative path to the root directory.
 _root_dir = os.path.dirname(os.path.realpath(__file__))
@@ -39,6 +39,7 @@ def _standard_seed_db(config):
     '''Migrate and seed the test database.'''
     migrate_pgsql({"dry_run": False}, cfg=config)
 
+    x = run_file(config, "db/test-data.psql")
 
 @contextmanager
 def setup_database_test_case():

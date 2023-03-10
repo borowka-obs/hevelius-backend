@@ -75,6 +75,23 @@ def migrate_mysql(args, cfg={}):
             print(f"Skipping {f}, schema version is {current_ver}")
 
 
+def run_file(cfg, filename):
+    """
+    Runs SQL commands from a file.
+    """
+
+    # Fill in the defaults of DB connection, if not specified
+    cfg = db.config_get(cfg)
+
+    conn = db.connect(cfg)
+
+    with open(filename, "r") as f:
+        sql = f.read()
+        db.run_query(conn, sql)
+
+    conn.close()
+
+
 def migrate_pgsql(args, cfg={}):
     """
     Performs PostgreSQL database migration to the newest schema.
