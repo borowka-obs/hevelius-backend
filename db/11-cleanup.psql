@@ -1,0 +1,6 @@
+DROP TABLE task_states;
+
+ALTER TABLE states RENAME TO task_states;
+
+
+UPDATE schema_version SET version = 11;
