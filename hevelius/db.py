@@ -120,7 +120,7 @@ def stats_by_state(conn):
     Retrieves task statistics per task state.
     """
     # Get tasks list by status
-    hist = run_query(conn, 'SELECT id, name, count(*) FROM tasks, states WHERE tasks.state = states.id GROUP BY state, id, name ORDER BY id')
+    hist = run_query(conn, 'SELECT id, name, count(*) FROM tasks, task_states WHERE tasks.state = task_states.id GROUP BY state, id, name ORDER BY id')
     res = []
 
     for row in hist:
