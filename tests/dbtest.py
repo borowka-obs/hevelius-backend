@@ -39,7 +39,8 @@ def _standard_seed_db(config):
     '''Migrate and seed the test database.'''
     migrate_pgsql({"dry_run": False}, cfg=config)
 
-    x = run_file(config, "db/test-data.psql")
+    run_file(config, "db/test-data.psql")
+
 
 @contextmanager
 def setup_database_test_case():
