@@ -48,3 +48,40 @@ class DbTest(unittest.TestCase):
             self.assertAlmostEqual(height, case['exp_height'])
 
         conn.close()
+
+    @use_repository
+    def test_tasks_radius_get(self, config):
+        """Test that tasks can be retrieved by filter."""
+
+        conn = db.connect(config)
+        tasks = db.tasks_radius_get(conn, 0, 25, 1, "", "task_id DESC")
+        conn.close()
+
+        self.assertGreaterEqual(len(tasks), 10)
+        self.assertEqual(tasks[0][0], 87775)
+        self.assertEqual(tasks[1][0], 70556)
+        self.assertEqual(tasks[2][0], 69426)
+        # Let's assume the remaining tasks have correct task_ids, too.
+
+    @use_repository
+    def test_tasks_radius_get_filter(self, config):
+        """Test that tasks can be retrieved by filter."""
+
+        cases = [
+            { "filter": "AND scope_id=1", "exp_count": 7},
+            { "filter": "AND scope_id=2", "exp_count": 4},
+            { "filter": "AND scope_id=4", "exp_count": 0},
+            { "filter": "AND sensor_id=1", "exp_count": 1},
+            { "filter": "AND sensor_id=2", "exp_count": 10},
+            { "filter": "AND he_resx=3326", "exp_count": 1},
+            { "filter": "AND he_resy=2504", "exp_count": 1},
+            { "filter": "AND scope_id=4", "exp_count": 0}
+        ]
+
+        conn = db.connect(config)
+
+        for case in cases:
+            tasks = db.tasks_radius_get(conn, 0, 0, 360, case['filter'], "")
+            self.assertEqual(len(tasks), case['exp_count'])
+
+        conn.close()
