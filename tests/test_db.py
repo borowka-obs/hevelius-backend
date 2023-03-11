@@ -68,14 +68,14 @@ class DbTest(unittest.TestCase):
         """Test that tasks can be retrieved by filter."""
 
         cases = [
-            { "filter": "AND scope_id=1", "exp_count": 7},
-            { "filter": "AND scope_id=2", "exp_count": 4},
-            { "filter": "AND scope_id=4", "exp_count": 0},
-            { "filter": "AND sensor_id=1", "exp_count": 1},
-            { "filter": "AND sensor_id=2", "exp_count": 10},
-            { "filter": "AND he_resx=3326", "exp_count": 1},
-            { "filter": "AND he_resy=2504", "exp_count": 1},
-            { "filter": "AND scope_id=4", "exp_count": 0}
+            {"filter": "AND scope_id=1", "exp_count": 7},
+            {"filter": "AND scope_id=2", "exp_count": 4},
+            {"filter": "AND scope_id=4", "exp_count": 0},
+            {"filter": "AND sensor_id=1", "exp_count": 1},
+            {"filter": "AND sensor_id=2", "exp_count": 10},
+            {"filter": "AND he_resx=3326", "exp_count": 1},
+            {"filter": "AND he_resy=2504", "exp_count": 1},
+            {"filter": "AND scope_id=4", "exp_count": 0}
         ]
 
         conn = db.connect(config)
