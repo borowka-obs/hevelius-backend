@@ -27,7 +27,8 @@ If you want keep the database after test, set HEVELIUS_DEBUG env variable, e.g.:
 `HEVELIUS_DEBUG=1 python -m pytest -s -v`
 
 You need to provide database password when running tests. One way is to set the
-PGPASSWORD variable. Another is to set an entry in `~/.pgpass` file, e.g.
+PGPASSWORD variable. Another is to set an entry in `~/.pgpass` file. The format
+is `hostname:port:database_name:username:password` e.g.
 
 ```
 localhost:5432:hevelius:hevelius:secret1
