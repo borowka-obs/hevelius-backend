@@ -1,7 +1,5 @@
 from hevelius import db
 import unittest
-import pytest
-
 from tests.dbtest import use_repository
 
 
@@ -18,10 +16,21 @@ class DbTest(unittest.TestCase):
 
     @use_repository
     def test_sensor(self, config):
-        conn = db.connect()
+        conn = db.connect(config)
 
         cases = [
-            { "name": "FLI", "exp_sensor_id": 2, "exp_name": "FLI Proline 16803", "exp_resx": 4096, "exp_resy": 4096, "exp_pixel_x": 9.0, "exp_pixel_y": 9.0, "exp_bits": 16, "exp_width": 36.8, "exp_height": 36.8 }
+            {
+                "name": "FLI",
+                "exp_sensor_id": 2,
+                "exp_name": "FLI Proline 16803",
+                "exp_resx": 4096,
+                "exp_resy": 4096,
+                "exp_pixel_x": 9.0,
+                "exp_pixel_y": 9.0,
+                "exp_bits": 16,
+                "exp_width": 36.8,
+                "exp_height": 36.8
+            }
         ]
 
         for case in cases:
