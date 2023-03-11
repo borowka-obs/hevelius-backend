@@ -7,6 +7,7 @@ class DbTest(unittest.TestCase):
 
     @use_repository
     def test_db_version_get(self, config):
+        """Test that the database schema version is correct."""
 
         conn = db.connect(config)
         version = db.version_get(conn)
@@ -16,6 +17,7 @@ class DbTest(unittest.TestCase):
 
     @use_repository
     def test_sensor(self, config):
+        """Test that the sensors information can be retrieved."""
         conn = db.connect(config)
 
         cases = [
