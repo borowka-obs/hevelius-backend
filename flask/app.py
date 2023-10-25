@@ -12,7 +12,7 @@ from hevelius import cmd_stats, db
 # By default, Flask searches for templates in the templates/ dir.
 # Other params: debug=True, port=8080
 app = Flask(__name__)
-CORS(app)
+CORS(app, support_credentials=True)
 
 
 @app.route('/')
