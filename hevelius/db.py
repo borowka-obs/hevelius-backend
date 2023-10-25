@@ -301,7 +301,8 @@ def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str =
     Returns objects from the catalogs that are close (within radius degrees) to
     the specified RA/DEC coordinates
 
-    TODO: Implement proper distance calculation, see https://physics.stackexchange.com/questions/224950/how-can-i-convert-right-ascension-and-declination-to-distances
+    TODO: Implement proper distance calculation, see
+    https://physics.stackexchange.com/questions/224950/how-can-i-convert-right-ascension-and-declination-to-distances
 
     :return: a list of objects, together with some of their details
     """
