@@ -42,5 +42,5 @@ six==1.16.0
     #   python-dateutil
 tenacity==8.1.0
     # via plotly
-werkzeug==3.0.1
+werkzeug==3.0.3
     # via flask
