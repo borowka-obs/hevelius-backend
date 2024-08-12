@@ -12,7 +12,7 @@ flask==2.3.2
     # via
     #   -r requirements.in
     #   flask-cors
-flask-cors==3.0.10
+flask-cors==4.0.1
     # via -r requirements.in
 itsdangerous==2.1.2
     # via flask
@@ -37,9 +37,7 @@ python-dateutil==2.8.2
 pytz==2022.7
     # via pandas
 six==1.16.0
-    # via
-    #   flask-cors
-    #   python-dateutil
+    # via python-dateutil
 tenacity==8.1.0
     # via plotly
 werkzeug==3.0.3
