@@ -75,7 +75,7 @@ def setup_database_test_case():
             print("HEVELIUS_DEBUG is set, not dropping the test database.")
         else:
             drop_database_query = f"DROP DATABASE {test_config['database']};"
-            print(f"HEVELIUS_DEBUG not set, dropping database: {test_config['database']}")
+            print("HEVELIUS_DEBUG not set, dropping the test database.")
             maintenance_cursor.execute(drop_database_query)
 
         maintenance_cursor.close()
