@@ -322,13 +322,13 @@ def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str =
         ))) < {radius}
     """.format(ra=ra, decl=decl, radius=radius)
 
-
     if order:
         query += f" ORDER BY {order}"
 
     result = run_query(conn, query)
 
     return result
+
 
 def catalog_get(conn, name: str) -> List:
     """

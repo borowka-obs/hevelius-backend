@@ -50,7 +50,7 @@ class DbTest(unittest.TestCase):
         conn.close()
 
     @use_repository
-    def test_tasks_radius_get(self, config):
+    def test_tasks_radius_get1(self, config):
         """Test that tasks can be retrieved by filter."""
 
         conn = db.connect(config)
@@ -87,7 +87,7 @@ class DbTest(unittest.TestCase):
         conn.close()
 
     @use_repository
-    def test_catalog_radius_get(self, config):
+    def test_catalog_radius_get2(self, config):
         """Test that objects can be retrieved by radius search."""
         conn = db.connect(config)
 
@@ -96,7 +96,7 @@ class DbTest(unittest.TestCase):
             {
                 "ra": 15.0,  # 15h = 225 degrees
                 "dec": 0.0,
-                "radius": 360.0, # all sky
+                "radius": 360.0,  # all sky
                 "exp_count": 11  # Expected number of objects within radius - all 12 objects
             },
 
@@ -104,7 +104,7 @@ class DbTest(unittest.TestCase):
                 "ra": 12.0,  # 12h = 180 degrees
                 "dec": -90.0,
                 "radius": 30.0,
-                "exp_count": 1 # only one object so far south - Coal Sack
+                "exp_count": 1  # only one object so far south - Coal Sack
             },
 
             {
@@ -116,14 +116,12 @@ class DbTest(unittest.TestCase):
         ]
 
         for case in cases2:
-             objects = db.catalog_radius_get(conn, case["ra"], case["dec"],
-                                         case["radius"])
-             self.assertEqual(len(objects), case["exp_count"],
-                 f"Expected {case['exp_count']} objects within {case['radius']} degrees of "
-                 f"RA={case['ra']}h DEC={case['dec']}, but found {len(objects)}")
+            objects = db.catalog_radius_get(conn, case["ra"], case["dec"], case["radius"])
+            self.assertEqual(len(objects), case["exp_count"],
+                             f"Expected {case['exp_count']} objects within {case['radius']} degrees of "
+                             f"RA={case['ra']}h DEC={case['dec']}, but found {len(objects)}")
 
         conn.close()
-
 
     @use_repository
     def test_tasks_radius_get(self, config):
@@ -159,11 +157,11 @@ class DbTest(unittest.TestCase):
 
         for case in cases:
             tasks = db.tasks_radius_get(conn, case["ra"], case["dec"],
-                                    case["radius"], case["filter"])
+                                        case["radius"], case["filter"])
             self.assertEqual(len(tasks), case["exp_count"],
-                f"Expected {case['exp_count']} tasks within {case['radius']} degrees of "
-                f"RA={case['ra']} DEC={case['dec']} with filter '{case['filter']}', "
-                f"but found {len(tasks)}")
+                             f"Expected {case['exp_count']} tasks within {case['radius']} degrees of "
+                             f"RA={case['ra']} DEC={case['dec']} with filter '{case['filter']}', "
+                             f"but found {len(tasks)}")
 
             # For tasks that are returned, verify they have all expected fields
             for task in tasks:
