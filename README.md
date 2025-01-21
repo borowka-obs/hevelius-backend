@@ -6,7 +6,7 @@ of the features are usable already.
 
 ## Current capabilities
 
-Status as of February 2023:
+Status as of Jan 2025:
 
 - **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
@@ -20,6 +20,7 @@ Status as of February 2023:
   tasks to Pix or at least export/import data in a format that's compatible with PixInsight.
 - **Command line iterface**: Currently Hevelius has a command line interface written in `python`. A Rest API and gui front-end
   is planned, but currently not a priority.
+- **Ability to search based on distance**. Implemented proper Haversine formula.
 
 ## Documentation
 
