@@ -299,21 +299,36 @@ def user_get_id(conn, aavso_id=None, login=None) -> str:
 def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str = "") -> List:
     """
     Returns objects from the catalogs that are close (within radius degrees) to
-    the specified RA/DEC coordinates
+    the specified RA/DEC coordinates.
 
-    TODO: Implement proper distance calculation, see
-    https://physics.stackexchange.com/questions/224950/how-can-i-convert-right-ascension-and-declination-to-distances
+    Useful links:
+    - https://physics.stackexchange.com/questions/224950/how-can-i-convert-right-ascension-and-declination-to-distances
+    - https://en.wikipedia.org/wiki/Haversine_formula
 
-    :return: a list of objects, together with some of their details
+    Uses the Haversine formula for proper spherical distance calculation.
+    RA must be in hours (0-24), Dec in degrees (-90 to +90).
     """
-    query = "SELECT object_id, name, altname, ra, decl FROM objects "\
-            f"WHERE sqrt( (ra - {ra})^2 + (decl - {decl}) ^2) < {radius}"
-    if len(order):
-        query = query + f" ORDER BY {order}"
+
+    ra *= 15.0  # Specified in hours, convert to degrees
+
+    # Haversine formula in SQL
+    query = """
+        SELECT object_id, name, altname, ra, decl
+        FROM objects
+        WHERE degrees(2 * asin(sqrt(
+            pow(sin(radians(decl - {decl}) / 2), 2) +
+            cos(radians({decl})) * cos(radians(decl)) *
+            pow(sin(radians(ra*15 - {ra}) / 2), 2)
+        ))) < {radius}
+    """.format(ra=ra, decl=decl, radius=radius)
+
+
+    if order:
+        query += f" ORDER BY {order}"
+
     result = run_query(conn, query)
 
     return result
-
 
 def catalog_get(conn, name: str) -> List:
     """
@@ -328,17 +343,25 @@ def catalog_get(conn, name: str) -> List:
 def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = "", order: str = "") -> List:
     """
     Returns frames (completed tasks) that are close (within radius degrees) to
-    the specified RA/DEC coordinates
+    the specified RA/DEC coordinates using proper spherical distance calculation.
 
-    :return: a list of tasks together with some of their details
+    RA must be in degrees (0-360), Dec in degrees (-90 to +90).
     """
-    query = "SELECT task_id, object, imagename, he_fwhm, ra, decl, comment, he_resx, he_resy, filter, he_focal, binning FROM tasks "\
-            f"WHERE state=6 {filter} AND sqrt( (ra-{ra})^2 + (decl - {decl})^2) < {radius}"
-    if len(order):
-        query = query + f" ORDER BY {order}"
 
+    query = """
+        SELECT task_id, object, imagename, he_fwhm, ra, decl, comment,
+               he_resx, he_resy, filter, he_focal, binning
+        FROM tasks
+        WHERE state=6 {filter} AND degrees(2 * asin(sqrt(
+            pow(sin(radians(decl - {decl}) / 2), 2) +
+            cos(radians({decl})) * cos(radians(decl)) *
+            pow(sin(radians(ra - {ra}) / 2), 2)
+        ))) < {radius}
+    """.format(ra=ra, decl=decl, radius=radius, filter=filter)
+
+    if order:
+        query += f" ORDER BY {order}"
     result = run_query(conn, query)
-
     return result
 
 

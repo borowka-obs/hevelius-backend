@@ -55,7 +55,7 @@ def catalog(args):
 
         objects = db.catalog_radius_get(conn, ra, decl, radius)
 
-        print(f"Found {len(objects)} object(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius}")
+        print(f"Found {len(objects)} object(s) that match criteria: distance from RA {format_ra(ra)} DEC {format_dec(decl)} no larger than {radius} degrees")
         for object in objects:
             object_print(object, format)
 

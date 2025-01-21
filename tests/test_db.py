@@ -85,3 +85,92 @@ class DbTest(unittest.TestCase):
             self.assertEqual(len(tasks), case['exp_count'])
 
         conn.close()
+
+    @use_repository
+    def test_catalog_radius_get(self, config):
+        """Test that objects can be retrieved by radius search."""
+        conn = db.connect(config)
+
+        # Test cases with RA in hours (0-24), Dec in degrees (-90 to +90)
+        cases2 = [
+            {
+                "ra": 15.0,  # 15h = 225 degrees
+                "dec": 0.0,
+                "radius": 360.0, # all sky
+                "exp_count": 11  # Expected number of objects within radius - all 12 objects
+            },
+
+            {
+                "ra": 12.0,  # 12h = 180 degrees
+                "dec": -90.0,
+                "radius": 30.0,
+                "exp_count": 1 # only one object so far south - Coal Sack
+            },
+
+            {
+                "ra": 12.0317,
+                "dec": -18.87,
+                "radius": 0.5,
+                "exp_count": 2  # The Antennae galaxies are close to these coordinates
+            }
+        ]
+
+        for case in cases2:
+             objects = db.catalog_radius_get(conn, case["ra"], case["dec"],
+                                         case["radius"])
+             self.assertEqual(len(objects), case["exp_count"],
+                 f"Expected {case['exp_count']} objects within {case['radius']} degrees of "
+                 f"RA={case['ra']}h DEC={case['dec']}, but found {len(objects)}")
+
+        conn.close()
+
+
+    @use_repository
+    def test_tasks_radius_get(self, config):
+        """Test that tasks can be retrieved by radius search."""
+        conn = db.connect(config)
+
+        # For test data, see db/test-data.psql
+
+        # Test cases with RA and Dec in degrees (0-360, -90 to +90)
+        cases = [
+            {
+                "ra": 0.0,
+                "dec": 25.0,
+                "radius": 3.0,
+                "filter": "",
+                "exp_count": 10  # Return all Z Peg tasks (10 of them)
+            },
+            {
+                "ra": 0.0,
+                "dec": 0.0,
+                "radius": 360.0,  # Full sky
+                "filter": "",
+                "exp_count": 11  # All 11 tasks
+            },
+            {
+                "ra": 12.60,
+                "dec": 25.98,
+                "radius": 3.0,
+                "filter": "",
+                "exp_count": 1  # task 800 - ngc 4565
+            }
+        ]
+
+        for case in cases:
+            tasks = db.tasks_radius_get(conn, case["ra"], case["dec"],
+                                    case["radius"], case["filter"])
+            self.assertEqual(len(tasks), case["exp_count"],
+                f"Expected {case['exp_count']} tasks within {case['radius']} degrees of "
+                f"RA={case['ra']} DEC={case['dec']} with filter '{case['filter']}', "
+                f"but found {len(tasks)}")
+
+            # For tasks that are returned, verify they have all expected fields
+            for task in tasks:
+                self.assertEqual(len(task), 12)  # Verify all columns are present
+                # task_id, object, imagename, he_fwhm, ra, decl, comment,
+                # he_resx, he_resy, filter, he_focal, binning
+                self.assertIsNotNone(task[0])  # task_id should not be None
+                self.assertEqual(type(task[0]), int)  # task_id should be integer
+
+        conn.close()
