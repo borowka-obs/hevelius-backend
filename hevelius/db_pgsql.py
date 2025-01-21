@@ -18,7 +18,7 @@ def run_query(conn, query):
     cursor.execute(query)
     result = None
 
-    if (query.lower().startswith("select")):
+    if (query.strip().lower().startswith("select")):
         try:
             result = cursor.fetchall()
         except BaseException as err:
