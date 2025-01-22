@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - ChangeLog added
 - Implemented Haversine formula for calculating proper spherical distance calculation (#10)
+- Added missing dependency: astropy (#34)
 
 ## 0.0.3 - release date unspecified
 
