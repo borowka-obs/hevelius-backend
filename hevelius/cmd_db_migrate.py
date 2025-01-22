@@ -102,6 +102,8 @@ def migrate_pgsql(args, cfg={}):
     # Fill in the defaults of DB connection, if not specified
     cfg = db.config_get(cfg)
 
+    dry_run = args.get('dry_run') if isinstance(args, dict) else args.dry_run
+
     DIR = "db"
     files = sorted([f for f in listdir(DIR) if (
         isfile(join(DIR, f)) and f.endswith("psql"))])
@@ -121,7 +123,7 @@ def migrate_pgsql(args, cfg={}):
             print(
                 f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
-            if not args["dry_run"]:
+            if not dry_run:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
                                         str(cfg['port']), cfg['database'], "-f", DIR + "/" + f])
