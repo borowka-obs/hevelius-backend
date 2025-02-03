@@ -3,17 +3,60 @@ Flask application that provides a REST API to the Hevelius backend.
 """
 
 from flask import Flask, render_template, request
-from flask_cors import CORS, cross_origin
+from flask_cors import CORS
+from flask_smorest import Api, Blueprint
+import yaml
 import json
 import plotly
+from marshmallow import Schema, fields
+from flask.views import MethodView
 
 from hevelius import cmd_stats, db
 
 # By default, Flask searches for templates in the templates/ dir.
 # Other params: debug=True, port=8080
+
+# Initialize Flask app
 app = Flask(__name__)
 CORS(app, support_credentials=True)
 
+# Load OpenAPI spec from YAML
+with open('openapi.yaml') as f:
+    spec = yaml.safe_load(f)
+
+# Configure API documentation
+app.config["API_TITLE"] = spec["info"]["title"]
+app.config["API_VERSION"] = spec["info"]["version"]
+app.config["OPENAPI_VERSION"] = spec["openapi"]
+app.config["OPENAPI_URL_PREFIX"] = "/"
+app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
+app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
+app.config["API_SPEC_OPTIONS"] = {"spec": spec}
+
+# Initialize API
+api = Api(app)
+
+# Create blueprint
+blp = Blueprint("api", __name__, url_prefix="/api")
+
+# Define schemas for request/response validation
+class LoginRequestSchema(Schema):
+    username = fields.String(required=True, description="Username")
+    password = fields.String(required=True, description="Password MD5 hash")
+
+class LoginResponseSchema(Schema):
+    status = fields.Boolean()
+    user_id = fields.Integer()
+    firstname = fields.String()
+    lastname = fields.String()
+    share = fields.Float()
+    phone = fields.String()
+    email = fields.String()
+    permissions = fields.Integer()
+    aavso_id = fields.String()
+    ftp_login = fields.String()
+    ftp_pass = fields.String()
+    msg = fields.String()
 
 @app.route('/')
 def root():
@@ -97,72 +140,63 @@ def get_param(req, field) -> str:
     return param
 
 
-@app.route('/api/login', methods=['POST'])
-@cross_origin()
-def login():
-    """
+@blp.route("/login")
+class LoginResource(MethodView):
+    @blp.arguments(LoginRequestSchema)
+    @blp.response(200, LoginResponseSchema)
+    def post(self, login_data):
+        """Login endpoint
 
-    Example request:    {"username":"tomek","password":"1264a4e31234abcdef"}
+        Returns user information if credentials are valid
+        """
+        user = login_data.get('username')
+        md5pass = login_data.get('password')
 
-    Example response:
-    {
-        "aavso_id":"MTOA",
-        "email":"some.mail@example.org",
-        "firstname":"Tomek",
-        "ftp_login":"MTOA",
-        "ftp_pass":"xxxxx",
-        "lastname":"M.",
-        "msg":"Welcome",
-        "permissions":1,
-        "phone":"",
-        "share":0.0,
-        "status":true,
-        "user_id":3
-    }
-    """
+        if user is None:
+            return {'status': False, 'msg': 'Username not provided'}
+        if md5pass is None:
+            return {'status': False, 'msg': 'Password not provided'}
 
-    if not request.is_json:
-        # The input is totally messed up.
-        return {'status': False, 'msg': 'Need JSON input'}
+        query = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
+                aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"""
 
-    user = get_param(request, 'username')
-    md5pass = get_param(request, 'password')
+        cnx = db.connect()
+        db_resp = db.run_query(cnx, query)
+        cnx.close()
 
-    if user is None:
-        return {'status': False, 'msg': 'Username not provided'}
-    if md5pass is None:
-        return {'status': False, 'msg': 'Password not provided'}
+        if db_resp is None or not len(db_resp):
+            print(f"Login: No such username ({user}")
+            return {'status': False, 'msg': 'Invalid credentials'}
 
-    query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
+        query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
             aavso_id, ftp_login, ftp_pass FROM users WHERE login=%s"""
-    params = [user]
+        params = [user]
 
-    cnx = db.connect()
-    db_resp = db.run_query(cnx, query, params)
-    cnx.close()
+        cnx = db.connect()
+        db_resp = db.run_query(cnx, query, params)
+        cnx.close()
 
-    if db_resp is None or not len(db_resp):
-        print(f"Login: No such username ({user}")
-        return {'status': False, 'msg': 'Invalid credentials'}
+        user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id, \
+            ftp_login, ftp_pass = db_resp[0]
 
-    user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id, \
-        ftp_login, ftp_pass = db_resp[0]
+        if md5pass.lower() != pass_db.lower():
+            print(f"Login ({user} exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
+            # Password's MD5 did not match
+            return {'status': False, 'msg': 'Invalid credentials'}
 
-    if md5pass.lower() != pass_db.lower():
-        print(f"Login ({user} exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
-        # Password's MD5 did not match
-        return {'status': False, 'msg': 'Invalid credentials'}
+        print(f"User {user} provided valid password, logged in.")
+        return {'status': True,
+                'user_id': user_id,
+                'firstname': firstname,
+                'lastname': lastname,
+                'share': share,
+                'phone': phone,
+                'email': email,
+                'permissions': permissions,
+                'aavso_id': aavso_id,
+                'ftp_login': ftp_login,
+                'ftp_pass': ftp_pass,
+                'msg': 'Welcome'}
 
-    print(f"User {user} provided valid password, logged in.")
-    return {'status': True,
-            'user_id': user_id,
-            'firstname': firstname,
-            'lastname': lastname,
-            'share': share,
-            'phone': phone,
-            'email': email,
-            'permissions': permissions,
-            'aavso_id': aavso_id,
-            'ftp_login': ftp_login,
-            'ftp_pass': ftp_pass,
-            'msg': 'Welcome'}
+# Register blueprint
+api.register_blueprint(blp)
