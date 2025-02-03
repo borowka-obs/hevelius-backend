@@ -1,0 +1,58 @@
+openapi: 3.0.2
+info:
+  title: Hevelius API
+  version: v1
+paths:
+  /api/login:
+    post:
+      summary: Login endpoint
+      description: Returns user information if credentials are valid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: Username
+                password:
+                  type: string
+                  description: Password MD5 hash
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: Login response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  user_id:
+                    type: integer
+                  firstname:
+                    type: string
+                  lastname:
+                    type: string
+                  share:
+                    type: number
+                    format: float
+                  phone:
+                    type: string
+                  email:
+                    type: string
+                  permissions:
+                    type: integer
+                  aavso_id:
+                    type: string
+                  ftp_login:
+                    type: string
+                  ftp_pass:
+                    type: string
+                  msg:
+                    type: string
