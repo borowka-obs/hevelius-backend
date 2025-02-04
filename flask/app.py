@@ -165,7 +165,7 @@ class LoginResource(MethodView):
         cnx.close()
 
         if db_resp is None or not len(db_resp):
-            print(f"Login: No such username ({user}")
+            print(f"Login: No such username ({user})")
             return {'status': False, 'msg': 'Invalid credentials'}
 
         query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
@@ -180,11 +180,11 @@ class LoginResource(MethodView):
             ftp_login, ftp_pass = db_resp[0]
 
         if md5pass.lower() != pass_db.lower():
-            print(f"Login ({user} exists, invalid pwd: expected {pass_db.lower()}, got {md5pass.lower()}")
+            print(f"Login: Invalid password for user ({user})")
             # Password's MD5 did not match
             return {'status': False, 'msg': 'Invalid credentials'}
 
-        print(f"User {user} provided valid password, logged in.")
+        print(f"User {user} logged in successfully.")
         return {'status': True,
                 'user_id': user_id,
                 'firstname': firstname,
