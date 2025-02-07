@@ -56,3 +56,118 @@ paths:
                     type: string
                   msg:
                     type: string
+  /api/task-add:
+    post:
+      summary: Add new astronomical observation task
+      description: Creates a new observation task with the specified parameters
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - user_id
+                - scope_id
+                - ra
+                - decl
+              properties:
+                user_id:
+                  type: integer
+                  description: User ID
+                scope_id:
+                  type: integer
+                  description: Scope ID
+                object:
+                  type: string
+                  maxLength: 64
+                  description: Object name
+                ra:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 24
+                  description: Right Ascension (0-24)
+                decl:
+                  type: number
+                  format: float
+                  minimum: -90
+                  maximum: 90
+                  description: Declination (-90 to 90)
+                exposure:
+                  type: number
+                  format: float
+                  description: Exposure time (s)
+                descr:
+                  type: string
+                  maxLength: 1024
+                  description: Description (optional)
+                filter:
+                  type: string
+                  maxLength: 16
+                  description: Filter type
+                binning:
+                  type: integer
+                  description: Binning value (1 - 1x1, 2 - 2x2, 3 - 3x3, 4 - 4x4)
+                guiding:
+                  type: boolean
+                  default: true
+                  description: Enable guiding
+                dither:
+                  type: boolean
+                  default: false
+                  description: Enable dithering
+                calibrate:
+                  type: boolean
+                  description: Enable calibration
+                solve:
+                  type: boolean
+                  description: Enable plate solving
+                other_cmd:
+                  type: string
+                  maxLength: 512
+                  description: Additional commands
+                min_alt:
+                  type: number
+                  format: float
+                  description: Minimum altitude
+                moon_distance:
+                  type: number
+                  format: float
+                  description: Minimum moon distance
+                skip_before:
+                  type: string
+                  format: date-time
+                  default: "2000-01-01T00:00:00"
+                  description: Skip before date
+                skip_after:
+                  type: string
+                  format: date-time
+                  default: "3000-01-01T00:00:00"
+                  description: Skip after date
+                min_interval:
+                  type: integer
+                  description: Minimum interval
+                comment:
+                  type: string
+                  description: Comment
+                max_moon_phase:
+                  type: integer
+                  description: Maximum moon phase
+                max_sun_alt:
+                  type: integer
+                  description: Maximum sun altitude
+      responses:
+        '200':
+          description: Task creation response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  task_id:
+                    type: integer
+                  msg:
+                    type: string
