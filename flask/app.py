@@ -8,8 +8,9 @@ from flask_smorest import Api, Blueprint
 import yaml
 import json
 import plotly
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, ValidationError, validate
 from flask.views import MethodView
+from datetime import datetime  # Add this import at the top
 
 from hevelius import cmd_stats, db
 
@@ -41,8 +42,14 @@ blp = Blueprint("api", __name__, url_prefix="/api")
 
 # Define schemas for request/response validation
 class LoginRequestSchema(Schema):
-    username = fields.String(required=True, description="Username")
-    password = fields.String(required=True, description="Password MD5 hash")
+    username = fields.String(
+        required=True,
+        metadata={"description": "Username"}
+    )
+    password = fields.String(
+        required=True,
+        metadata={"description": "Password MD5 hash"}
+    )
 
 class LoginResponseSchema(Schema):
     status = fields.Boolean()
@@ -57,6 +64,106 @@ class LoginResponseSchema(Schema):
     ftp_login = fields.String()
     ftp_pass = fields.String()
     msg = fields.String()
+
+class TaskAddRequestSchema(Schema):
+    user_id = fields.Integer(
+        required=True,
+        metadata={"description": "User ID"}
+    )
+    scope_id = fields.Integer(
+        required=True,
+        metadata={"description": "Scope ID"}
+    )
+    object = fields.String(
+        validate=validate.Length(min=1, max=64, error="Object name must be 64 characters or less"),
+        metadata={"description": "Object name"}
+    )
+    ra = fields.Float(
+        required=True,
+        validate=validate.Range(min=0.0, max=24.0, error="RA must be between 0 and 24"),
+        metadata={"description": "Right Ascension (0-24)"}
+    )
+    decl = fields.Float(
+        required=True,
+        validate= validate.Range(min=-90.0, max=90.0, error="Declination must be between -90 and 90"),
+        metadata={"description": "Declination (-90 to 90)"}
+    )
+    exposure = fields.Float(
+        metadata={"description": "Exposure time"}
+    )
+    descr = fields.String(
+        validate= validate.Length(max=1024, error="Description must be 1024 characters or less"),
+        metadata={"description": "Description"}
+    )
+    filter = fields.String(
+        validate= validate.Length(max=16, error="Filter must be 16 characters or less"),
+        metadata={"description": "Filter type"}
+    )
+    binning = fields.Integer(
+        metadata={"description": "Binning value (1 - 1x1, 2 - 2x2, 3 - 3x3, 4 - 4x4)"}
+    )
+    guiding = fields.Boolean(
+        load_default=True,
+        metadata={"description": "Enable guiding"}
+    )
+    dither = fields.Boolean(
+        load_default=False,
+        metadata={"description": "Enable dithering"}
+    )
+    defocus = fields.Boolean(
+        metadata={"description": "Enable defocus"}
+    )
+    calibrate = fields.Boolean(
+        metadata={"description": "Enable calibration"}
+    )
+    solve = fields.Boolean(
+        metadata={"description": "Enable plate solving"}
+    )
+    vphot = fields.Boolean(
+        metadata={"description": "Enable VPHOT"}
+    )
+    other_cmd = fields.String(
+        validate=lambda x: len(x) <= 512 or ValidationError("Additional commands must be 512 characters or less"),
+        metadata={"description": "Additional commands"}
+    )
+    min_alt = fields.Float(
+        metadata={"description": "Minimum altitude"}
+    )
+    moon_distance = fields.Float(
+        metadata={"description": "Minimum moon distance"}
+    )
+    skip_before = fields.DateTime(
+        missing=datetime(2000, 1, 1),
+        metadata={"description": "Skip before date"}
+    )
+    skip_after = fields.DateTime(
+        missing=datetime(3000, 1, 1),
+        metadata={"description": "Skip after date"}
+    )
+    min_interval = fields.Integer(
+        metadata={"description": "Minimum interval"}
+    )
+    comment = fields.String(
+        metadata={"description": "Comment"}
+    )
+    max_moon_phase = fields.Integer(
+        metadata={"description": "Maximum moon phase"}
+    )
+    max_sun_alt = fields.Integer(
+        metadata={"description": "Maximum sun altitude"}
+    )
+
+class TaskAddResponseSchema(Schema):
+    status = fields.Boolean(
+        required=True,
+        metadata={"description": "Operation status"}
+    )
+    task_id = fields.Integer(
+        metadata={"description": "Created task ID"}
+    )
+    msg = fields.String(
+        metadata={"description": "Status message"}
+    )
 
 @app.route('/')
 def root():
@@ -197,6 +304,54 @@ class LoginResource(MethodView):
                 'ftp_login': ftp_login,
                 'ftp_pass': ftp_pass,
                 'msg': 'Welcome'}
+
+@blp.route("/task-add")
+class TaskAddResource(MethodView):
+    @blp.arguments(TaskAddRequestSchema)
+    @blp.response(200, TaskAddResponseSchema)
+    def post(self, task_data):
+        """Add new astronomical observation task"""
+        # Prepare fields for SQL query
+        fields = []
+        values = []
+        for key, value in task_data.items():
+            if value is not None:
+                fields.append(key)
+                values.append(value)
+
+        # Create SQL query
+        # Create SQL query
+        fields_str = ", ".join(fields)
+        placeholders = ", ".join(["%s"] * len(values))  # Use SQL placeholders
+        query = f"""INSERT INTO tasks ({fields_str}, state)
+                   VALUES ({placeholders}, 0) RETURNING task_id"""
+
+        print(f"#### Query: {query}")
+
+        try:
+            cnx = db.connect()
+            result = db.run_query(cnx, query, values)
+            print(f"#### Result: {result}")
+            cnx.close()
+
+            if result and isinstance(result, int):
+                return {
+                    'status': True,
+                    'task_id': result,
+                    'msg': 'Task created successfully'
+                }
+
+            return {
+                'status': False,
+                'msg': 'Failed to create task'
+            }
+
+        except Exception as e:
+            print(f"#### Exception: {e}")
+            return {
+                'status': False,
+                'msg': f'Error creating task: {str(e)}'
+            }
 
 # Register blueprint
 api.register_blueprint(blp)

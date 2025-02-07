@@ -51,11 +51,11 @@ def connect(cfg={}):
     return backend.connect(cfg)
 
 
-def run_query(conn, query):
+def run_query(conn, query, values=None):
     """
     Runs specified SQL query
     """
-    return backend.run_query(conn, query)
+    return backend.run_query(conn, query, values)
 
 
 def version_get(conn) -> int:
