@@ -1,0 +1,3 @@
+ALTER TABLE TASKS DROP COLUMN vphot, DROP COLUMN defocus;
+
+UPDATE schema_version SET version = 12;
