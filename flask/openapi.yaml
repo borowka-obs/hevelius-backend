@@ -41,6 +41,119 @@ components:
           type: string
         msg:
           type: string
+    Task:
+      type: object
+      properties:
+        task_id:
+          type: integer
+          description: Task ID
+        user_id:
+          type: integer
+          description: User ID
+        aavso_id:
+          type: string
+          description: AAVSO identifier
+        object:
+          type: string
+          description: Object name
+        ra:
+          type: number
+          format: float
+          description: Right Ascension
+        decl:
+          type: number
+          format: float
+          description: Declination
+        exposure:
+          type: number
+          format: float
+          description: Exposure time
+        descr:
+          type: string
+          description: Description
+        filter:
+          type: string
+          description: Filter type
+        binning:
+          type: integer
+          description: Binning value
+        guiding:
+          type: boolean
+          description: Guiding enabled
+        dither:
+          type: boolean
+          description: Dithering enabled
+        calibrate:
+          type: boolean
+          description: Calibration enabled
+        solve:
+          type: boolean
+          description: Plate solving enabled
+        other_cmd:
+          type: string
+          description: Additional commands
+        min_alt:
+          type: number
+          format: float
+          description: Minimum altitude
+        moon_distance:
+          type: number
+          format: float
+          description: Moon distance
+        skip_before:
+          type: string
+          format: date-time
+          description: Skip before date
+        skip_after:
+          type: string
+          format: date-time
+          description: Skip after date
+        min_interval:
+          type: integer
+          description: Minimum interval
+        comment:
+          type: string
+          description: Comment
+        state:
+          type: integer
+          description: Task state
+        imagename:
+          type: string
+          description: Image filename
+        created:
+          type: string
+          format: date-time
+          description: Creation timestamp
+        activated:
+          type: string
+          format: date-time
+          description: Activation timestamp
+        performed:
+          type: string
+          format: date-time
+          description: Execution timestamp
+        max_moon_phase:
+          type: integer
+          description: Maximum moon phase
+        max_sun_alt:
+          type: integer
+          description: Maximum sun altitude
+        auto_center:
+          type: boolean
+          description: Auto centering enabled
+        calibrated:
+          type: boolean
+          description: Calibration status
+        solved:
+          type: boolean
+          description: Plate solving status
+        sent:
+          type: boolean
+          description: Sent status
+    TasksList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Task'
 paths:
   /api/login:
     post:
@@ -184,5 +297,57 @@ paths:
                     type: integer
                   msg:
                     type: string
+      security:
+        - bearerAuth: []
+  /api/tasks:
+    get:
+      summary: Get list of tasks
+      description: Returns a list of astronomical observation tasks, optionally filtered by user_id
+      parameters:
+        - name: user_id
+          in: query
+          description: Filter tasks by user ID
+          required: false
+          schema:
+            type: integer
+        - name: limit
+          in: query
+          description: Maximum number of tasks to return
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasksList'
+      security:
+        - bearerAuth: []
+
+    post:
+      summary: Get list of tasks
+      description: Returns a list of astronomical observation tasks, optionally filtered by user_id
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                user_id:
+                  type: integer
+                  description: Filter tasks by user ID
+                limit:
+                  type: integer
+                  description: Maximum number of tasks to return
+      responses:
+        '200':
+          description: List of tasks
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasksList'
       security:
         - bearerAuth: []
