@@ -142,11 +142,11 @@ class TaskAddRequestSchema(Schema):
         metadata={"description": "Minimum moon distance"}
     )
     skip_before = fields.DateTime(
-        missing=datetime(2000, 1, 1),
+        load_default=datetime(2000, 1, 1),
         metadata={"description": "Skip before date"}
     )
     skip_after = fields.DateTime(
-        missing=datetime(3000, 1, 1),
+        load_default=datetime(3000, 1, 1),
         metadata={"description": "Skip after date"}
     )
     min_interval = fields.Integer(
@@ -185,43 +185,40 @@ class TasksRequestSchema(Schema):
     )
 
 class Task(Schema):
-    task_id = fields.Integer(required=True, description="Task ID")
-    user_id = fields.Integer(required=True, description="User ID")
-    aavso_id = fields.String(description="AAVSO identifier")
-    object = fields.String(description="Object name")
-    ra = fields.Float(description="Right Ascension")
-    decl = fields.Float(description="Declination")
-    exposure = fields.Float(description="Exposure time")
-    descr = fields.String(description="Description")
-    filter = fields.String(description="Filter type")
-    binning = fields.Integer(description="Binning value")
-    guiding = fields.Boolean(description="Guiding enabled")
-    dither = fields.Boolean(description="Dithering enabled")
-    calibrate = fields.Boolean(description="Calibration enabled")
-    solve = fields.Boolean(description="Plate solving enabled")
-    other_cmd = fields.String(description="Additional commands")
-    min_alt = fields.Float(description="Minimum altitude")
-    moon_distance = fields.Float(description="Moon distance")
-    skip_before = fields.DateTime(description="Skip before date")
-    skip_after = fields.DateTime(description="Skip after date")
-    min_interval = fields.Integer(description="Minimum interval")
-    comment = fields.String(description="Comment")
-    state = fields.Integer(description="Task state")
-    imagename = fields.String(description="Image filename")
-    created = fields.DateTime(description="Creation timestamp")
-    activated = fields.DateTime(description="Activation timestamp")
-    performed = fields.DateTime(description="Execution timestamp")
-    max_moon_phase = fields.Integer(description="Maximum moon phase")
-    max_sun_alt = fields.Integer(description="Maximum sun altitude")
-    auto_center = fields.Boolean(description="Auto centering enabled")
-    calibrated = fields.Boolean(description="Calibration status")
-    solved = fields.Boolean(description="Plate solving status")
-    sent = fields.Boolean(description="Sent status")
+    task_id = fields.Integer(required=True, metadata={"description": "Task ID"})
+    user_id = fields.Integer(required=True, metadata={"description": "User ID"})
+    aavso_id = fields.String(metadata={"description": "AAVSO identifier"})
+    object = fields.String(metadata={"description": "Object name"})
+    ra = fields.Float(metadata={"description": "Right Ascension"})
+    decl = fields.Float(metadata={"description": "Declination"})
+    exposure = fields.Float(metadata={"description": "Exposure time"})
+    descr = fields.String(metadata={"description": "Description"})
+    filter = fields.String(metadata={"description": "Filter type"})
+    binning = fields.Integer(metadata={"description": "Binning value"})
+    guiding = fields.Boolean(metadata={"description": "Guiding enabled"})
+    dither = fields.Boolean(metadata={"description": "Dithering enabled"})
+    calibrate = fields.Boolean(metadata={"description": "Calibration enabled"})
+    solve = fields.Boolean(metadata={"description": "Plate solving enabled"})
+    other_cmd = fields.String(metadata={"description": "Additional commands"})
+    min_alt = fields.Float(metadata={"description": "Minimum altitude"})
+    moon_distance = fields.Float(metadata={"description": "Moon distance"})
+    skip_before = fields.DateTime(metadata={"description": "Skip before date"})
+    skip_after = fields.DateTime(metadata={"description": "Skip after date"})
+    min_interval = fields.Integer(metadata={"description": "Minimum interval"})
+    comment = fields.String(metadata={"description": "Comment"})
+    state = fields.Integer(metadata={"description": "Task state"})
+    imagename = fields.String(metadata={"description": "Image filename"})
+    created = fields.DateTime(metadata={"description": "Creation timestamp"})
+    activated = fields.DateTime(metadata={"description": "Activation timestamp"})
+    performed = fields.DateTime(metadata={"description": "Execution timestamp"})
+    max_moon_phase = fields.Integer(metadata={"description": "Maximum moon phase"})
+    max_sun_alt = fields.Integer(metadata={"description": "Maximum sun altitude"})
+    auto_center = fields.Boolean(metadata={"description": "Auto centering enabled"})
+    calibrated = fields.Boolean(metadata={"description": "Calibration status"})
+    solved = fields.Boolean(metadata={"description": "Plate solving status"})
+    sent = fields.Boolean(metadata={"description": "Sent status"})
 
 class TasksList(Schema):
-    class Meta:
-        unknown = EXCLUDE  # Ignore unknown fields
-
     tasks = fields.List(fields.Nested(Task))
 
 @app.route('/')
