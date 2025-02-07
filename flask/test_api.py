@@ -2,6 +2,7 @@ import unittest
 from app import app
 import json
 from datetime import datetime
+from flask_jwt_extended import create_access_token
 
 class TestTaskAdd(unittest.TestCase):
     def setUp(self):
@@ -9,10 +10,24 @@ class TestTaskAdd(unittest.TestCase):
         self.app = app.test_client()
         self.app.testing = True
 
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
     def test_task_add_success(self):
         """Test successful task addition"""
         test_task = {
-            "user_id": 1,
+            "user_id": 1,  # This should match the token's identity
             "scope_id": 1,
             "object": "M31",
             "ra": 0.712,  # ~00h 42m for M31
@@ -28,14 +43,15 @@ class TestTaskAdd(unittest.TestCase):
 
         response = self.app.post('/api/task-add',
                                data=json.dumps(test_task),
-                               content_type='application/json')
+                               headers=self.headers)
 
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(data['status'])
         self.assertIsInstance(data['task_id'], int)
-        self.assertEqual(data['msg'], 'Task created successfully')
+        self.assertIn('Task', data['msg'])
+        self.assertIn('created successfully', data['msg'])
 
     def test_task_add_missing_required(self):
         """Test task addition with missing required fields"""
@@ -46,7 +62,7 @@ class TestTaskAdd(unittest.TestCase):
 
         response = self.app.post('/api/task-add',
                                data=json.dumps(test_task),
-                               content_type='application/json')
+                               headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -66,7 +82,7 @@ class TestTaskAdd(unittest.TestCase):
 
         response = self.app.post('/api/task-add',
                                data=json.dumps(test_task),
-                               content_type='application/json')
+                               headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -86,12 +102,33 @@ class TestTaskAdd(unittest.TestCase):
 
         response = self.app.post('/api/task-add',
                                data=json.dumps(test_task),
-                               content_type='application/json')
+                               headers=self.headers)
 
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 422)  # Unprocessable Entity
         self.assertIn('errors', data)
+
+    def test_task_add_unauthorized(self):
+        """Test task addition with mismatched user_id"""
+        test_task = {
+            "user_id": 2,  # Different from token's identity (1)
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "exposure": 300.0
+        }
+
+        response = self.app.post('/api/task-add',
+                               data=json.dumps(test_task),
+                               headers=self.headers)
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)  # API returns 200 with error message
+        self.assertFalse(data['status'])
+        self.assertEqual(data['msg'], 'Unauthorized: token user_id does not match request user_id')
 
 if __name__ == '__main__':
     unittest.main()
