@@ -9,7 +9,7 @@ from flask_smorest import Api, Blueprint
 import yaml
 import json
 import plotly
-from marshmallow import Schema, fields, ValidationError, validate
+from marshmallow import Schema, fields, ValidationError, validate, EXCLUDE
 from flask.views import MethodView
 from datetime import datetime, timedelta
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -52,6 +52,7 @@ api = Api(app)
 
 # Create blueprint
 blp = Blueprint("api", __name__, url_prefix="/api")
+
 
 # Define schemas for request/response validation
 class LoginRequestSchema(Schema):
@@ -173,6 +174,56 @@ class TaskAddResponseSchema(Schema):
         metadata={"description": "Status message"}
     )
 
+class TasksRequestSchema(Schema):
+    user_id = fields.Integer(
+        required=False,
+        metadata={"description": "Filter tasks by user ID"}
+    )
+    limit = fields.Integer(
+        required=False,
+        metadata={"description": "Maximum number of tasks to return"}
+    )
+
+class Task(Schema):
+    task_id = fields.Integer(required=True, description="Task ID")
+    user_id = fields.Integer(required=True, description="User ID")
+    aavso_id = fields.String(description="AAVSO identifier")
+    object = fields.String(description="Object name")
+    ra = fields.Float(description="Right Ascension")
+    decl = fields.Float(description="Declination")
+    exposure = fields.Float(description="Exposure time")
+    descr = fields.String(description="Description")
+    filter = fields.String(description="Filter type")
+    binning = fields.Integer(description="Binning value")
+    guiding = fields.Boolean(description="Guiding enabled")
+    dither = fields.Boolean(description="Dithering enabled")
+    calibrate = fields.Boolean(description="Calibration enabled")
+    solve = fields.Boolean(description="Plate solving enabled")
+    other_cmd = fields.String(description="Additional commands")
+    min_alt = fields.Float(description="Minimum altitude")
+    moon_distance = fields.Float(description="Moon distance")
+    skip_before = fields.DateTime(description="Skip before date")
+    skip_after = fields.DateTime(description="Skip after date")
+    min_interval = fields.Integer(description="Minimum interval")
+    comment = fields.String(description="Comment")
+    state = fields.Integer(description="Task state")
+    imagename = fields.String(description="Image filename")
+    created = fields.DateTime(description="Creation timestamp")
+    activated = fields.DateTime(description="Activation timestamp")
+    performed = fields.DateTime(description="Execution timestamp")
+    max_moon_phase = fields.Integer(description="Maximum moon phase")
+    max_sun_alt = fields.Integer(description="Maximum sun altitude")
+    auto_center = fields.Boolean(description="Auto centering enabled")
+    calibrated = fields.Boolean(description="Calibration status")
+    solved = fields.Boolean(description="Plate solving status")
+    sent = fields.Boolean(description="Sent status")
+
+class TasksList(Schema):
+    class Meta:
+        unknown = EXCLUDE  # Ignore unknown fields
+
+    tasks = fields.List(fields.Nested(Task))
+
 @app.route('/')
 def root():
     """Just a stub API homepage."""
@@ -183,15 +234,6 @@ def root():
 def histogram():
     """Generates 2D diagram of observation density. Returns a HTML page with
     embedded plotly image."""
-
-    # example data input
-    # df = pd.DataFrame({
-    #     'Fruit': ['Apples', 'Oranges', 'Bananas', 'Apples', 'Oranges',
-    #               'Bananas'],
-    #     'Amount': [4, 1, 2, 2, 4, 5],
-    #     'City': ['SF', 'SF', 'SF', 'Montreal', 'Montreal', 'Montreal']
-    # })
-    # fig = px.bar(df, x='Fruit', y='Amount', color='City', barmode='group')
 
     fig = cmd_stats.histogram_figure_get({})
 
@@ -379,6 +421,101 @@ class TaskAddResource(MethodView):
                 'status': False,
                 'msg': f'Error creating task: {str(e)}'
             }
+
+@blp.route("/tasks")
+class TasksResource(MethodView):
+    @jwt_required()
+    @blp.arguments(TasksRequestSchema)
+    @blp.response(200, TasksList)
+    def get(self):
+        """Get list of tasks
+        Returns a list of astronomical observation tasks, optionally filtered by user_id
+        """
+        # Get parameters from query string for GET request
+        user_id = request.args.get('user_id', type=int)
+        limit = request.args.get('limit', type=int)
+
+        tasks = self._get_tasks(user_id, limit)
+        return {"tasks": tasks}
+
+    @jwt_required()
+    @blp.arguments(TasksRequestSchema)
+    @blp.response(200, TasksList)
+    def post(self, task_data):
+        """Get list of tasks
+        Returns a list of astronomical observation tasks, optionally filtered by user_id
+        """
+        # Get parameters from request body for POST request
+        user_id = task_data.get('user_id')
+        limit = task_data.get('limit')
+
+        tasks = self._get_tasks(user_id, limit)
+
+        return {"tasks": tasks}
+
+    def _get_tasks(self, user_id=None, limit=None):
+        """Helper method to get tasks based on filters"""
+        query = """SELECT task_id, tasks.user_id, aavso_id, object, ra, decl,
+            exposure, descr, filter, binning, guiding, dither,
+            calibrate, solve, other_cmd,
+            min_alt, moon_distance, skip_before, skip_after,
+            min_interval, comment, state, imagename,
+            created, activated, performed, max_moon_phase,
+            max_sun_alt, auto_center, calibrated, solved,
+            sent FROM tasks, users WHERE tasks.user_id = users.user_id"""
+
+        if user_id is not None:
+            query = query + f" AND tasks.user_id={user_id}"
+
+        query = query + " ORDER by task_id DESC"
+
+        if limit is not None:
+            query = query + f" LIMIT {limit}"
+
+        cnx = db.connect()
+        tasks_list = db.run_query(cnx, query)
+        cnx.close()
+
+        # Convert the raw database results to a list of task dictionaries
+        formatted_tasks = []
+        for task in tasks_list:
+            task_dict = {
+                'task_id': task[0],
+                'user_id': task[1],
+                'aavso_id': task[2],
+                'object': task[3],
+                'ra': task[4],
+                'decl': task[5],
+                'exposure': task[6],
+                'descr': task[7],
+                'filter': task[8],
+                'binning': task[9],
+                'guiding': bool(task[10]),
+                'dither': bool(task[11]),
+                'calibrate': bool(task[12]),
+                'solve': bool(task[13]),
+                'other_cmd': task[14],
+                'min_alt': task[15],
+                'moon_distance': task[16],
+                'skip_before': task[17],
+                'skip_after': task[18],
+                'min_interval': task[19],
+                'comment': task[20],
+                'state': task[21],
+                'imagename': task[22],
+                'created': task[23],
+                'activated': task[24],
+                'performed': task[25],
+                'max_moon_phase': task[26],
+                'max_sun_alt': task[27],
+                'auto_center': bool(task[28]),
+                'calibrated': bool(task[29]),
+                'solved': bool(task[30]),
+                'sent': bool(task[31])
+            }
+            formatted_tasks.append(task_dict)
+
+        return formatted_tasks
 
 # Register blueprint
 api.register_blueprint(blp)
