@@ -13,9 +13,9 @@ def connect(config):
     return conn
 
 
-def run_query(conn, query):
+def run_query(conn, query, values=None):
     cursor = conn.cursor()  # cursor(dictionary=True) or cursor(named_tuple=True)
-    cursor.execute(query)
+    cursor.execute(query, values)
     result = None
 
     if (query.strip().lower().startswith("select")):
@@ -23,6 +23,8 @@ def run_query(conn, query):
             result = cursor.fetchall()
         except BaseException as err:
             print(f"ERROR: Query {query} went wrong: {type(err)} {err}")
+    elif (query.strip().lower().startswith("insert")):
+        result = cursor.fetchone()[0]
     else:
         conn.commit()
 

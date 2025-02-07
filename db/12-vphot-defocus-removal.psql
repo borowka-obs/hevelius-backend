@@ -1,3 +1,5 @@
 ALTER TABLE TASKS DROP COLUMN vphot, DROP COLUMN defocus;
 
+SELECT setval('tasks_task_id_seq', (SELECT max(task_id)+1 from tasks), true);
+
 UPDATE schema_version SET version = 12;
