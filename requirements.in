@@ -7,3 +7,5 @@ flask
 flask-cors
 flask-smorest
 flask-jwt-extended
+
+PyJWT==2.9.0

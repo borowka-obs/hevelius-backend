@@ -60,8 +60,10 @@ psycopg2-binary==2.9.10
     # via -r requirements.in
 pyerfa==2.0.1.5
     # via astropy
-pyjwt==2.10.1
-    # via flask-jwt-extended
+pyjwt==2.9.0
+    # via
+    #   -r requirements.in
+    #   flask-jwt-extended
 python-dateutil==2.9.0.post0
     # via pandas
 pytz==2024.2
