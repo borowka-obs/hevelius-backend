@@ -2,6 +2,45 @@ openapi: 3.0.2
 info:
   title: Hevelius API
   version: v1
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Enter JWT token
+  schemas:
+    LoginResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        token:
+          type: string
+          description: JWT access token
+        user_id:
+          type: integer
+        firstname:
+          type: string
+        lastname:
+          type: string
+        share:
+          type: number
+          format: float
+        phone:
+          type: string
+        email:
+          type: string
+        permissions:
+          type: integer
+        aavso_id:
+          type: string
+        ftp_login:
+          type: string
+        ftp_pass:
+          type: string
+        msg:
+          type: string
 paths:
   /api/login:
     post:
@@ -29,33 +68,7 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  status:
-                    type: boolean
-                  user_id:
-                    type: integer
-                  firstname:
-                    type: string
-                  lastname:
-                    type: string
-                  share:
-                    type: number
-                    format: float
-                  phone:
-                    type: string
-                  email:
-                    type: string
-                  permissions:
-                    type: integer
-                  aavso_id:
-                    type: string
-                  ftp_login:
-                    type: string
-                  ftp_pass:
-                    type: string
-                  msg:
-                    type: string
+                $ref: '#/components/schemas/LoginResponse'
   /api/task-add:
     post:
       summary: Add new astronomical observation task
@@ -171,3 +184,5 @@ paths:
                     type: integer
                   msg:
                     type: string
+      security:
+        - bearerAuth: []

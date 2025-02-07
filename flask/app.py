@@ -2,6 +2,7 @@
 Flask application that provides a REST API to the Hevelius backend.
 """
 
+import os
 from flask import Flask, render_template, request
 from flask_cors import CORS
 from flask_smorest import Api, Blueprint
@@ -10,7 +11,8 @@ import json
 import plotly
 from marshmallow import Schema, fields, ValidationError, validate
 from flask.views import MethodView
-from datetime import datetime  # Add this import at the top
+from datetime import datetime, timedelta
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
 from hevelius import cmd_stats, db
 
@@ -34,6 +36,17 @@ app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
 app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
 app.config["API_SPEC_OPTIONS"] = {"spec": spec}
 
+# Add JWT configuration to your Flask app
+JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+
+if JWT_SECRET_KEY is None or JWT_SECRET_KEY == "":
+    print("JWT_SECRET_KEY variable is not set")
+    exit(1)
+
+app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)  # Token expiration time
+jwt = JWTManager(app)
+
 # Initialize API
 api = Api(app)
 
@@ -53,6 +66,7 @@ class LoginRequestSchema(Schema):
 
 class LoginResponseSchema(Schema):
     status = fields.Boolean()
+    token = fields.String()
     user_id = fields.Integer()
     firstname = fields.String()
     lastname = fields.String()
@@ -185,6 +199,7 @@ def histogram():
     return render_template('histogram.html', graphJSON=graph_json)
 
 
+
 @app.route('/api/tasks', methods=['POST', 'GET'])
 def tasks():
     """
@@ -247,8 +262,7 @@ class LoginResource(MethodView):
     @blp.response(200, LoginResponseSchema)
     def post(self, login_data):
         """Login endpoint
-
-        Returns user information if credentials are valid
+        Returns user information and JWT token if credentials are valid
         """
         user = login_data.get('username')
         md5pass = login_data.get('password')
@@ -285,26 +299,49 @@ class LoginResource(MethodView):
             # Password's MD5 did not match
             return {'status': False, 'msg': 'Invalid credentials'}
 
-        print(f"User {user} logged in successfully.")
-        return {'status': True,
-                'user_id': user_id,
-                'firstname': firstname,
-                'lastname': lastname,
-                'share': share,
-                'phone': phone,
-                'email': email,
+        # Create JWT access token
+        access_token = create_access_token(
+            identity=user_id,
+            additional_claims={
                 'permissions': permissions,
-                'aavso_id': aavso_id,
-                'ftp_login': ftp_login,
-                'ftp_pass': ftp_pass,
-                'msg': 'Welcome'}
+                'username': user
+            }
+        )
+
+        print(f"User {user} logged in successfully, generated JWT token.")
+        return {
+            'status': True,
+            'token': access_token,  # Add JWT token to response
+            'user_id': user_id,
+            'firstname': firstname,
+            'lastname': lastname,
+            'share': share,
+            'phone': phone,
+            'email': email,
+            'permissions': permissions,
+            'aavso_id': aavso_id,
+            'ftp_login': ftp_login,
+            'ftp_pass': ftp_pass,
+            'msg': 'Welcome'
+        }
 
 @blp.route("/task-add")
 class TaskAddResource(MethodView):
+    @jwt_required()  # Add this decorator to protect the endpoint
     @blp.arguments(TaskAddRequestSchema)
     @blp.response(200, TaskAddResponseSchema)
     def post(self, task_data):
         """Add new astronomical observation task"""
+        # Get user ID from JWT token
+        current_user_id = get_jwt_identity()
+
+        # Optional: verify that the user_id in the request matches the token
+        if task_data['user_id'] != current_user_id:
+            return {
+                'status': False,
+                'msg': 'Unauthorized: token user_id does not match request user_id'
+            }
+
         # Prepare fields for SQL query
         fields = []
         values = []
@@ -314,13 +351,9 @@ class TaskAddResource(MethodView):
                 values.append(value)
 
         # Create SQL query
-        # Create SQL query
         fields_str = ", ".join(fields)
         placeholders = ", ".join(["%s"] * len(values))  # Use SQL placeholders
-        query = f"""INSERT INTO tasks ({fields_str}, state)
-                   VALUES ({placeholders}, 0) RETURNING task_id"""
-
-        print(f"#### Query: {query}")
+        query = f"""INSERT INTO tasks ({fields_str}, state) VALUES ({placeholders}, 0) RETURNING task_id"""
 
         try:
             cnx = db.connect()
@@ -332,7 +365,7 @@ class TaskAddResource(MethodView):
                 return {
                     'status': True,
                     'task_id': result,
-                    'msg': 'Task created successfully'
+                    'msg': f'Task {result} created successfully'
                 }
 
             return {

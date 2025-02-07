@@ -5,3 +5,5 @@ numpy
 plotly
 flask
 flask-cors
+flask-smorest
+flask-jwt-extended
