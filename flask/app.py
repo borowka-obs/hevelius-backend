@@ -110,17 +110,11 @@ class TaskAddRequestSchema(Schema):
         load_default=False,
         metadata={"description": "Enable dithering"}
     )
-    defocus = fields.Boolean(
-        metadata={"description": "Enable defocus"}
-    )
     calibrate = fields.Boolean(
         metadata={"description": "Enable calibration"}
     )
     solve = fields.Boolean(
         metadata={"description": "Enable plate solving"}
-    )
-    vphot = fields.Boolean(
-        metadata={"description": "Enable VPHOT"}
     )
     other_cmd = fields.String(
         validate=lambda x: len(x) <= 512 or ValidationError("Additional commands must be 512 characters or less"),
@@ -202,7 +196,7 @@ def tasks():
 
     query = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
         "exposure, descr, filter, binning, guiding, dither, " \
-        "defocus, calibrate, solve, vphot, other_cmd, " \
+        "calibrate, solve, other_cmd, " \
         "min_alt, moon_distance, skip_before, skip_after, " \
         "min_interval, comment, state, imagename, " \
         "created, activated, performed, max_moon_phase, " \
