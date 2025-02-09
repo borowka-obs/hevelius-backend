@@ -9,7 +9,7 @@ from flask_smorest import Api, Blueprint
 import yaml
 import json
 import plotly
-from marshmallow import Schema, fields, ValidationError, validate, EXCLUDE
+from marshmallow import Schema, fields, ValidationError, validate
 from flask.views import MethodView
 from datetime import datetime, timedelta
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
@@ -65,6 +65,7 @@ class LoginRequestSchema(Schema):
         metadata={"description": "Password MD5 hash"}
     )
 
+
 class LoginResponseSchema(Schema):
     status = fields.Boolean()
     token = fields.String()
@@ -79,6 +80,7 @@ class LoginResponseSchema(Schema):
     ftp_login = fields.String()
     ftp_pass = fields.String()
     msg = fields.String()
+
 
 class TaskAddRequestSchema(Schema):
     user_id = fields.Integer(
@@ -100,18 +102,18 @@ class TaskAddRequestSchema(Schema):
     )
     decl = fields.Float(
         required=True,
-        validate= validate.Range(min=-90.0, max=90.0, error="Declination must be between -90 and 90"),
+        validate=validate.Range(min=-90.0, max=90.0, error="Declination must be between -90 and 90"),
         metadata={"description": "Declination (-90 to 90)"}
     )
     exposure = fields.Float(
         metadata={"description": "Exposure time"}
     )
     descr = fields.String(
-        validate= validate.Length(max=1024, error="Description must be 1024 characters or less"),
+        validate=validate.Length(max=1024, error="Description must be 1024 characters or less"),
         metadata={"description": "Description"}
     )
     filter = fields.String(
-        validate= validate.Length(max=16, error="Filter must be 16 characters or less"),
+        validate=validate.Length(max=16, error="Filter must be 16 characters or less"),
         metadata={"description": "Filter type"}
     )
     binning = fields.Integer(
@@ -162,6 +164,7 @@ class TaskAddRequestSchema(Schema):
         metadata={"description": "Maximum sun altitude"}
     )
 
+
 class TaskAddResponseSchema(Schema):
     status = fields.Boolean(
         required=True,
@@ -174,6 +177,7 @@ class TaskAddResponseSchema(Schema):
         metadata={"description": "Status message"}
     )
 
+
 class TasksRequestSchema(Schema):
     user_id = fields.Integer(
         required=False,
@@ -183,6 +187,7 @@ class TasksRequestSchema(Schema):
         required=False,
         metadata={"description": "Maximum number of tasks to return"}
     )
+
 
 class Task(Schema):
     task_id = fields.Integer(required=True, metadata={"description": "Task ID"})
@@ -218,8 +223,10 @@ class Task(Schema):
     solved = fields.Boolean(metadata={"description": "Plate solving status"})
     sent = fields.Boolean(metadata={"description": "Sent status"})
 
+
 class TasksList(Schema):
     tasks = fields.List(fields.Nested(Task))
+
 
 @app.route('/')
 def root():
@@ -364,6 +371,7 @@ class LoginResource(MethodView):
             'msg': 'Welcome'
         }
 
+
 @blp.route("/task-add")
 class TaskAddResource(MethodView):
     @jwt_required()  # Add this decorator to protect the endpoint
@@ -418,6 +426,7 @@ class TaskAddResource(MethodView):
                 'status': False,
                 'msg': f'Error creating task: {str(e)}'
             }
+
 
 @blp.route("/tasks")
 class TasksResource(MethodView):
@@ -513,6 +522,7 @@ class TasksResource(MethodView):
             formatted_tasks.append(task_dict)
 
         return formatted_tasks
+
 
 # Register blueprint
 api.register_blueprint(blp)
