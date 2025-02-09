@@ -1,8 +1,8 @@
 import unittest
 from app import app
 import json
-from datetime import datetime
 from flask_jwt_extended import create_access_token
+
 
 class TestTaskAdd(unittest.TestCase):
     def setUp(self):
@@ -42,8 +42,8 @@ class TestTaskAdd(unittest.TestCase):
         }
 
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -61,8 +61,8 @@ class TestTaskAdd(unittest.TestCase):
         }
 
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -81,8 +81,8 @@ class TestTaskAdd(unittest.TestCase):
         }
 
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -101,8 +101,8 @@ class TestTaskAdd(unittest.TestCase):
         }
 
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
 
         data = json.loads(response.data)
 
@@ -121,14 +121,15 @@ class TestTaskAdd(unittest.TestCase):
         }
 
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
 
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)  # API returns 200 with error message
         self.assertFalse(data['status'])
         self.assertEqual(data['msg'], 'Unauthorized: token user_id does not match request user_id')
+
 
 if __name__ == '__main__':
     unittest.main()
