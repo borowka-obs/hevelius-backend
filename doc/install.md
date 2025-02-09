@@ -32,3 +32,19 @@ The configuration is currently very basic. Please copy
 `hevelius/config.py-example` to `hevelius/config.py` and edit its content.
 You will need to set up things like DB credentials, repository path (where your
 image frames are kept on disk) and others.
+
+
+# Running Hevelius (command-line)
+
+```
+source venv/bin/activate
+$ python bin/hevelius
+```
+
+# Running Hevelius (REST API)
+```
+source venv/bin/activate
+export PYTHONPATH=.:..
+cd flask/
+python3 -m flask run
+```

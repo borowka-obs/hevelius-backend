@@ -4,14 +4,14 @@ This is a backend interface for Hevelius, an astronomy processing software and
 observatory management system. It's in the early stages of development, but some
 of the features are usable already.
 
-## Current capabilities
+## Current capabilities (command-line)
 
-Status as of Jan 2025:
+Status as of Feb 2025:
 
 - **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
   characteristics.
-- **Full sky histogram**: Generate full sky distribution of found frames with 1 degree resolution. The data is presented as 
+- **Full sky histogram**: Generate full sky distribution of found frames with 1 degree resolution. The data is presented as
   interactive RA/DEC chart.
 - **Points of interest**: Generate a list of the most commonly photographed coordinates in the sky.
 - **Objects and frames search**: Ability to find catalog objects and frames based on specified RA/DEC coordinates and radius.
@@ -21,6 +21,13 @@ Status as of Jan 2025:
 - **Command line iterface**: Currently Hevelius has a command line interface written in `python`. A Rest API and gui front-end
   is planned, but currently not a priority.
 - **Ability to search based on distance**. Implemented proper Haversine formula.
+
+## Current capabilities (REST API)
+
+- Log in users
+- List tasks
+- Add new task
+- Display heat map of the sky (sky map colored with number of photos taken in each square degree)
 
 ## Documentation
 

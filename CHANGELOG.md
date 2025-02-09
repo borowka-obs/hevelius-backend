@@ -6,10 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## 0.1.0 - Unreleased
 
 - ChangeLog added
+- Implemented REST API
 - Implemented Haversine formula for calculating proper spherical distance calculation (#10)
 - Added missing dependency: astropy (#34)
 - Schema version updated to 12 (removed vphot, defocus columns in tasks table)
 - JWT authentication implemented
+- Implemented /api/task-add call that adds new observation task
 
 ## 0.0.3 - release date unspecified
 
