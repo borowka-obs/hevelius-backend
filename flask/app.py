@@ -24,7 +24,9 @@ app = Flask(__name__)
 CORS(app, support_credentials=True)
 
 # Load OpenAPI spec from YAML
-with open('openapi.yaml') as f:
+dir_path = os.path.dirname(os.path.realpath(__file__))
+
+with open(os.path.join(dir_path, 'openapi.yaml')) as f:
     spec = yaml.safe_load(f)
 
 # Configure API documentation
