@@ -1,5 +1,3 @@
-# These are the credentials used during github actions.
-
 DATABASE:
   TYPE: pgsql
   USER: postgres

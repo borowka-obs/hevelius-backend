@@ -32,7 +32,6 @@ def load_config():
     # Try loading from config files
     config_paths = [
         Path(__file__).parent / 'hevelius.yaml',
-        Path(__file__).parent / 'hevelius.yaml.example'
     ]
 
     for config_path in config_paths:
