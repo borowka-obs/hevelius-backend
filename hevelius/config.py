@@ -37,11 +37,14 @@ def load_config():
 
     for config_path in config_paths:
         if config_path.exists():
+            print(f"####: {config_path} found")
             with open(config_path) as f:
                 file_config = yaml.safe_load(f)
                 if file_config:
                     config_dict.update(file_config)
             break
+        else:
+            print(f"####: {config_path} not found")
 
     # Environment variables override file config
     env_mapping = {
