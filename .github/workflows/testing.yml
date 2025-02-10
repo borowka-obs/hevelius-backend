@@ -56,6 +56,6 @@ jobs:
 
       - name: Run tests with pytest
         run: |
-          cp tests/hevelius.yaml.github hevelius/hevelius.yaml
+          cp tests/hevelius.yaml.github hevelius.yaml
           set
           PGPASSWORD=postgres JWT_SECRET_KEY=foo PYTHONPATH=.:./flask python -m pytest -s -v
