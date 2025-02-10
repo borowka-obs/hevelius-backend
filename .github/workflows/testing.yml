@@ -58,4 +58,4 @@ jobs:
         run: |
           cp tests/config.py.github hevelius/config.py
           set
-          PGPASSWORD=postgres JWT_SECRET_KEY=foo python -m pytest -s -v
+          PGPASSWORD=postgres JWT_SECRET_KEY=foo PYTHONPATH=.:./flask python -m pytest -s -v
