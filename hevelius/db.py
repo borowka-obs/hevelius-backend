@@ -1,52 +1,35 @@
 """
 An abstract interface to databases (PostgreSQL or MySQL).
-Depending on the hevelius.config content, it imports either
+Depending on the configuration, it imports either
 hevelius.db_pgsql or hevelius.db_mysql.
 """
 
 from typing import List
-
+import os
 import sys
+import yaml
+from pathlib import Path
+import hevelius.config as hevelius_config
 
-try:
-    from hevelius import config
-except ImportError:
-    print("ERROR: Make sure you have config.py filled in. Please copy config.py-example to config.py and fill it in.")
-    sys.exit(-1)
 
-if config.TYPE == "pgsql":
+# Load configuration
+config = hevelius_config.load_config()
+
+# Configure database backend
+if config['DATABASE']['TYPE'] == "pgsql":
     import hevelius.db_pgsql as backend
-elif config.TYPE == "mysql":
+elif config['DATABASE']['TYPE'] == "mysql":
     import hevelius.db_mysql as backend
 else:
-    print(
-        f"ERROR: Invalid database type specified in config.py: {config.TYPE}")
+    print(f"ERROR: Invalid database type specified: {config['DATABASE']['TYPE']}")
     sys.exit(-1)
-
-
-def config_get(cfg={}):
-    """
-    Returns a dictionary with database connection parameters, with defaults filled in.
-    """
-    if 'database' not in cfg:
-        cfg['database'] = config.DBNAME
-    if 'user' not in cfg:
-        cfg['user'] = config.USER
-    if 'password' not in cfg:
-        cfg['password'] = config.PASSWORD
-    if 'host' not in cfg:
-        cfg['host'] = config.HOST
-    if 'port' not in cfg:
-        cfg['port'] = config.PORT
-    return cfg
-
 
 def connect(cfg={}):
     """
     Opens connection to a database, returns DB connection object.
     """
 
-    cfg = config_get(cfg)
+    cfg = hevelius_config.config_get(cfg)
 
     return backend.connect(cfg)
 
