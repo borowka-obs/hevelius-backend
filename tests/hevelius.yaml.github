@@ -1,0 +1,16 @@
+# These are the credentials used during github actions.
+
+DATABASE:
+  TYPE: pgsql
+  USER: postgres
+  DBNAME: postgres
+  HOST: localhost
+  PORT: 5432
+  PASSWORD: postgres
+
+PATHS:
+  REPO_PATH: /mnt/volume1/astro
+  BACKUP_PATH: /mnt/volume1/astro/backup
+
+JWT:
+  SECRET_KEY: your-secret-key-here  # Change this in production!

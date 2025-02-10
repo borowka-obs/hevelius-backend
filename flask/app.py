@@ -38,14 +38,15 @@ app.config["OPENAPI_SWAGGER_UI_PATH"] = "/swagger-ui"
 app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
 app.config["API_SPEC_OPTIONS"] = {"spec": spec}
 
-# Add JWT configuration to your Flask app
-JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY')
+# Load JWT configuration from the config system
+config = db.config  # Reuse the configuration from db.py
+jwt_secret = config.get('JWT', {}).get('SECRET_KEY') or os.getenv('JWT_SECRET_KEY')
 
-if JWT_SECRET_KEY is None or JWT_SECRET_KEY == "":
-    print("JWT_SECRET_KEY variable is not set")
+if not jwt_secret:
+    print("JWT_SECRET_KEY not found in config or environment variables")
     exit(1)
 
-app.config["JWT_SECRET_KEY"] = JWT_SECRET_KEY
+app.config["JWT_SECRET_KEY"] = jwt_secret
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)  # Token expiration time
 jwt = JWTManager(app)
 

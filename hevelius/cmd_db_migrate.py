@@ -36,7 +36,7 @@ def migrate_mysql(args, cfg={}):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = db.config_get(cfg)
+    cfg = config.config_get(cfg)
 
     dir = "db"
     files = sorted([f for f in listdir(dir) if (
@@ -81,7 +81,7 @@ def run_file(cfg, filename):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = db.config_get(cfg)
+    cfg = config.config_get(cfg)
 
     conn = db.connect(cfg)
 
@@ -100,7 +100,7 @@ def migrate_pgsql(args, cfg={}):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = db.config_get(cfg)
+    cfg = config.config_get(cfg)
 
     dry_run = args.get('dry_run') if isinstance(args, dict) else args.dry_run
 
