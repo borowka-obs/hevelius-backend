@@ -2,6 +2,7 @@ import unittest
 from app import app
 import json
 from flask_jwt_extended import create_access_token
+from tests.dbtest import use_repository
 
 
 class TestTaskAdd(unittest.TestCase):
@@ -24,7 +25,8 @@ class TestTaskAdd(unittest.TestCase):
                 'Content-Type': 'application/json'
             }
 
-    def test_task_add_success(self):
+    @use_repository
+    def test_task_add_success(self, config):
         """Test successful task addition"""
         test_task = {
             "user_id": 1,  # This should match the token's identity
