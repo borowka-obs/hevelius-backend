@@ -130,7 +130,7 @@ dmypy.json
 
 
 .vscode/
-hevelius/config.py
+
 
 # Migration stuff
 db-iteleskop
