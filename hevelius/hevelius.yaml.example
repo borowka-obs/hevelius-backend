@@ -1,0 +1,14 @@
+DATABASE:
+  TYPE: pgsql
+  USER: hevelius
+  DBNAME: hevelius
+  HOST: localhost
+  PORT: 5432
+  PASSWORD: secret1
+
+PATHS:
+  REPO_PATH: /mnt/volume1/astro
+  BACKUP_PATH: /mnt/volume1/astro/backup
+
+JWT:
+  SECRET_KEY: your-secret-key-here  # Change this in production!

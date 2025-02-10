@@ -5,7 +5,7 @@ from contextlib import contextmanager
 import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
-from hevelius import config
+from hevelius import config as hevelius_config
 from hevelius.cmd_db_migrate import migrate_pgsql, run_file
 
 # The relative path to the root directory.
@@ -20,18 +20,20 @@ def _read_configuration():
     2. test DB (the DB to be created)
     '''
 
+    config = hevelius_config.load_config()
+
     return ({
-        "database": config.DBNAME,
-        "user": config.USER,
-        "host": config.HOST,
-        "port": config.PORT,
-        "password": config.PASSWORD
+        "database": config['DATABASE']['DBNAME'],
+        "user": config['DATABASE']['USER'],
+        "host": config['DATABASE']['HOST'],
+        "port": config['DATABASE']['PORT'],
+        "password": config['DATABASE']['PASSWORD']
     }, {
-        "database": config.DBNAME + "_test",
-        "user": config.USER,
-        "password": config.PASSWORD,
-        "host": config.HOST,
-        "port": config.PORT
+        "database": config['DATABASE']['DBNAME'] + "_test",
+        "user": config['DATABASE']['USER'],
+        "password": config['DATABASE']['PASSWORD'],
+        "host": config['DATABASE']['HOST'],
+        "port": config['DATABASE']['PORT']
     })
 
 
