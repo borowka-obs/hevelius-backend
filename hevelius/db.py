@@ -30,6 +30,7 @@ def connect(cfg={}):
     """
 
     cfg = hevelius_config.config_get(cfg)
+    print(f"#### db.connect({cfg})")
 
     return backend.connect(cfg)
 
