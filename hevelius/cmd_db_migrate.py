@@ -141,7 +141,7 @@ def migrate_pgsql(args, cfg={}):
             # this returns std output, (something else)
             _, _ = psql.communicate()
 
-            cnx = db.connect()
+            cnx = db.connect(cfg)
             current_ver = db.version_get(cnx)
             cnx.close()
 
