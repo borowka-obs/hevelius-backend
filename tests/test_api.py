@@ -1,4 +1,5 @@
 import unittest
+import os
 from app import app
 import json
 from flask_jwt_extended import create_access_token
@@ -43,9 +44,14 @@ class TestTaskAdd(unittest.TestCase):
             "calibrate": True
         }
 
+        print(f"#### test_task_add_success() config={config}")
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
         response = self.app.post('/api/task-add',
                                  data=json.dumps(test_task),
                                  headers=self.headers)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
 
         data = json.loads(response.data)
 

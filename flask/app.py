@@ -14,7 +14,7 @@ from flask.views import MethodView
 from datetime import datetime, timedelta
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
-from hevelius import cmd_stats, db
+from hevelius import cmd_stats, db, config as hevelius_config
 
 # By default, Flask searches for templates in the templates/ dir.
 # Other params: debug=True, port=8080
@@ -406,7 +406,11 @@ class TaskAddResource(MethodView):
         query = f"""INSERT INTO tasks ({fields_str}, state) VALUES ({placeholders}, 0) RETURNING task_id"""
 
         try:
-            cnx = db.connect()
+            cfg = hevelius_config.config_get()
+
+            print(f"#### task-addcfg: {cfg}")
+
+            cnx = db.connect(cfg)
             result = db.run_query(cnx, query, values)
             cnx.close()
 
