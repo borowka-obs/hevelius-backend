@@ -1,24 +1,25 @@
-
 import os
 import yaml
 from pathlib import Path
 
+loaded_config = None
+
 # Default configuration
 DEFAULT_CONFIG = {
-    'DATABASE': {
-        'TYPE': 'pgsql',
-        'USER': 'hevelius',
-        'DBNAME': 'hevelius',
-        'HOST': 'localhost',
-        'PORT': 5432,
-        'PASSWORD': '',
+    'database': {
+        'type': 'pgsql',
+        'user': 'hevelius',
+        'dbname': 'hevelius',
+        'host': 'localhost',
+        'port': 5432,
+        'password': '',
     },
-    'PATHS': {
-        'REPO_PATH': '/mnt/volume1/astro',
-        'BACKUP_PATH': '/mnt/volume1/astro/backup',
+    'paths': {
+        'repo-path': '/mnt/volume1/astro',
+        'backup-path': '/mnt/volume1/astro/backup',
     },
-    'JWT': {
-        'SECRET_KEY': None,
+    'jwt': {
+        'secret-key': None,
     }
 }
 
@@ -27,6 +28,10 @@ def load_config():
     Load configuration from environment variables with fallback to config files.
     Priority: env vars > config.yml > config.yml.example > defaults
     """
+    global loaded_config
+    if loaded_config:
+        return loaded_config
+
     config_dict = DEFAULT_CONFIG.copy()
 
     # Try loading from config files
@@ -47,15 +52,15 @@ def load_config():
 
     # Environment variables override file config
     env_mapping = {
-        'HEVELIUS_DB_TYPE': ('DATABASE', 'TYPE'),
-        'HEVELIUS_DB_USER': ('DATABASE', 'USER'),
-        'HEVELIUS_DB_NAME': ('DATABASE', 'DBNAME'),
-        'HEVELIUS_DB_HOST': ('DATABASE', 'HOST'),
-        'HEVELIUS_DB_PORT': ('DATABASE', 'PORT'),
-        'HEVELIUS_DB_PASSWORD': ('DATABASE', 'PASSWORD'),
-        'HEVELIUS_REPO_PATH': ('PATHS', 'REPO_PATH'),
-        'HEVELIUS_BACKUP_PATH': ('PATHS', 'BACKUP_PATH'),
-        'JWT_SECRET_KEY': ('JWT', 'SECRET_KEY'),
+        'HEVELIUS_DB_TYPE': ('database', 'type'),
+        'HEVELIUS_DB_USER': ('database', 'user'),
+        'HEVELIUS_DB_NAME': ('database', 'dbname'),
+        'HEVELIUS_DB_HOST': ('database', 'host'),
+        'HEVELIUS_DB_PORT': ('database', 'port'),
+        'HEVELIUS_DB_PASSWORD': ('database', 'password'),
+        'HEVELIUS_REPO_PATH': ('paths', 'repo-path'),
+        'HEVELIUS_BACKUP_PATH': ('paths', 'backup-path'),
+        'JWT_SECRET_KEY': ('jwt', 'secret-key'),
     }
 
     for env_var, (section, key) in env_mapping.items():
@@ -64,21 +69,25 @@ def load_config():
                 config_dict[section] = {}
             config_dict[section][key] = os.getenv(env_var)
 
+    loaded_config = config_dict
+
     return config_dict
 
 def config_get(cfg={}):
     """
     Returns a dictionary with database connection parameters, with defaults filled in.
     """
-    result = cfg.copy()
-    if 'database' not in result:
-        result['database'] = DEFAULT_CONFIG['DATABASE']['DBNAME']
-    if 'user' not in result:
-        result['user'] = DEFAULT_CONFIG['DATABASE']['USER']
-    if 'password' not in result:
-        result['password'] = DEFAULT_CONFIG['DATABASE']['PASSWORD']
-    if 'host' not in result:
-        result['host'] = DEFAULT_CONFIG['DATABASE']['HOST']
-    if 'port' not in result:
-        result['port'] = DEFAULT_CONFIG['DATABASE']['PORT']
+
+    loaded_config = load_config()
+    if loaded_config is None or 'database' not in loaded_config:
+        raise Exception("Database configuration not found")
+
+    result = load_config()['database']
+
+    # Overwrite whatever is in the override config
+    for key, value in cfg.items():
+        result[key] = value
+
+    result['type'] = None
+
     return result
