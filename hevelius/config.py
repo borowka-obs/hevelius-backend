@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     }
 }
 
+
 def load_config():
     """
     Load configuration from environment variables with fallback to config files.
@@ -69,6 +70,7 @@ def load_config():
     # loaded_config = config_dict
 
     return config_dict.copy()
+
 
 def config_get(cfg={}):
     """

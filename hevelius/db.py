@@ -5,10 +5,7 @@ hevelius.db_pgsql or hevelius.db_mysql.
 """
 
 from typing import List
-import os
 import sys
-import yaml
-from pathlib import Path
 import hevelius.config as hevelius_config
 
 
@@ -23,6 +20,7 @@ elif config['database']['type'] == "mysql":
 else:
     print(f"ERROR: Invalid database type specified: {config['database']['type']}")
     sys.exit(-1)
+
 
 def connect(cfg={}):
     """

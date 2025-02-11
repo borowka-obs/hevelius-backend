@@ -56,10 +56,10 @@ def setup_database_test_case():
 
     # If previous run failed and didn't cease the database, drop it.
     drop_db_query = f"DROP DATABASE IF EXISTS {test_config['database']};"
-    result1 = maintenance_cursor.execute(drop_db_query)
+    maintenance_cursor.execute(drop_db_query)
 
     create_database_query = f"CREATE DATABASE {test_config['database']} OWNER {test_config['user']};"
-    result2 = maintenance_cursor.execute(create_database_query)
+    maintenance_cursor.execute(create_database_query)
 
     maintenance_cursor.close()
     maintenance_connection.close()
