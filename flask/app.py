@@ -408,7 +408,6 @@ class TaskAddResource(MethodView):
         try:
             cnx = db.connect()
             result = db.run_query(cnx, query, values)
-            print(f"#### Result: {result}")
             cnx.close()
 
             if result and isinstance(result, int):

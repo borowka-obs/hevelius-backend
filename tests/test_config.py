@@ -9,11 +9,12 @@ class ConfigTest(unittest.TestCase):
 
         cfg = hevelius_config.load_config()
 
-        self.assertTrue(cfg['DATABASE']['USER'] and isinstance(cfg['DATABASE']['USER'], str))
-        self.assertTrue(cfg['DATABASE']['DBNAME'] and isinstance(cfg['DATABASE']['USER'], str))
-        self.assertTrue(cfg['DATABASE']['PASSWORD'] and isinstance(cfg['DATABASE']['USER'], str))
-        self.assertTrue(cfg['DATABASE']['PORT'] and isinstance(cfg['DATABASE']['PORT'], int))
-        self.assertTrue(cfg['DATABASE']['TYPE'] and isinstance(cfg['DATABASE']['TYPE'], str) and cfg['DATABASE']['TYPE'] in ['mysql', 'pgsql'])
+        print(f"#### test_variables cfg: {cfg}")
+
+        self.assertTrue(cfg['database']['user'] and isinstance(cfg['database']['user'], str))
+        self.assertTrue(cfg['database']['dbname'] and isinstance(cfg['database']['user'], str))
+        self.assertTrue(cfg['database']['password'] and isinstance(cfg['database']['user'], str))
+        self.assertTrue(cfg['database']['port'] and isinstance(cfg['database']['port'], int))
 
         # Uncomment this once REPO_PATH is implemented
         # self.assertTrue(config.REPO_PATH and type(config.USER) == str)

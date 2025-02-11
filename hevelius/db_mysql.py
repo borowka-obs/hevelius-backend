@@ -6,7 +6,7 @@ def connect(config):
         # supported parameters: user, password, database, host, port
         cnx = mysql.connector.connect(**config)
     except BaseException as e:
-        print(f"ERROR: Failed to connect to DB: user={config['user']}, database={config['database']}, host={config['host']}, port={config['port']}: {e}")
+        print(f"ERROR: Failed to connect to DB: user={config['user']}, database={config['dbname']}, host={config['host']}, port={config['port']}: {e}")
         raise
     return cnx
 
