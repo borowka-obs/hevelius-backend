@@ -16,12 +16,12 @@ import hevelius.config as hevelius_config
 config = hevelius_config.load_config()
 
 # Configure database backend
-if config['DATABASE']['TYPE'] == "pgsql":
+if config['database']['type'] == "pgsql":
     import hevelius.db_pgsql as backend
-elif config['DATABASE']['TYPE'] == "mysql":
+elif config['database']['type'] == "mysql":
     import hevelius.db_mysql as backend
 else:
-    print(f"ERROR: Invalid database type specified: {config['DATABASE']['TYPE']}")
+    print(f"ERROR: Invalid database type specified: {config['database']['type']}")
     sys.exit(-1)
 
 def connect(cfg={}):

@@ -59,7 +59,7 @@ def migrate_mysql(args, cfg={}):
                 mysql = subprocess.Popen(["mysql", "-u", cfg['user'], "-h", cfg['host'],
                                           "-p" +
                                           cfg['password'], "-P", str(cfg['port']),
-                                          cfg['database'], "-B"], stdin=schema.stdout)
+                                          cfg['dbname'], "-B"], stdin=schema.stdout)
             else:
                 print("Skipping (--dry-run).")
 
@@ -126,7 +126,7 @@ def migrate_pgsql(args, cfg={}):
             if not dry_run:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
-                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f])
+                                        str(cfg['port']), cfg['dbname'], "-f", DIR + "/" + f])
             else:
                 print("Skipping (--dry-run).")
 
