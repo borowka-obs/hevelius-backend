@@ -88,6 +88,6 @@ def config_get(cfg={}):
     for key, value in cfg.items():
         result[key] = value
 
-    result['type'] = None
+    result.pop('type', None)
 
     return result
