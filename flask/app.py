@@ -58,16 +58,19 @@ def tasks():
         "created, activated, performed, max_moon_phase, " \
         "max_sun_alt, auto_center, calibrated, solved, " \
         "sent FROM tasks, users WHERE tasks.user_id = users.user_id"
+    params = []
     if user_id is not None:
-        query = query + f" AND tasks.user_id={user_id}"
+        query = query + " AND tasks.user_id=%s"
+        params.append(user_id)
 
     query = query + " ORDER by task_id DESC"
 
     if limit is not None:
-        query = query + f" LIMIT {limit}"
+        query = query + " LIMIT %s"
+        params.append(limit)
 
     cnx = db.connect()
-    tasks_list = db.run_query(cnx, query)
+    tasks_list = db.run_query(cnx, query, params)
     cnx.close()
 
     return tasks_list
