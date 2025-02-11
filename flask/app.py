@@ -248,7 +248,6 @@ def histogram():
     return render_template('histogram.html', graphJSON=graph_json)
 
 
-
 @app.route('/api/tasks', methods=['POST', 'GET'])
 def tasks():
     """
