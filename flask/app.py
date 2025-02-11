@@ -133,11 +133,12 @@ def login():
     if md5pass is None:
         return {'status': False, 'msg': 'Password not provided'}
 
-    query = f"""SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
-            aavso_id, ftp_login, ftp_pass FROM users WHERE login='{user}'"""
+    query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
+            aavso_id, ftp_login, ftp_pass FROM users WHERE login=%s"""
+    params = [user]
 
     cnx = db.connect()
-    db_resp = db.run_query(cnx, query)
+    db_resp = db.run_query(cnx, query, params)
     cnx.close()
 
     if db_resp is None or not len(db_resp):
