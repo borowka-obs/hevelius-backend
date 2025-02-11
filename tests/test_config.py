@@ -9,11 +9,9 @@ class ConfigTest(unittest.TestCase):
 
         cfg = hevelius_config.load_config()
 
-        print(f"#### test_variables cfg: {cfg}")
-
         self.assertTrue(cfg['database']['user'] and isinstance(cfg['database']['user'], str))
-        self.assertTrue(cfg['database']['dbname'] and isinstance(cfg['database']['user'], str))
-        self.assertTrue(cfg['database']['password'] and isinstance(cfg['database']['user'], str))
+        self.assertTrue(cfg['database']['database'] and isinstance(cfg['database']['database'], str))
+        self.assertTrue(cfg['database']['password'] and isinstance(cfg['database']['password'], str))
         self.assertTrue(cfg['database']['port'] and isinstance(cfg['database']['port'], int))
 
         # Uncomment this once REPO_PATH is implemented

@@ -423,7 +423,7 @@ class TaskAddResource(MethodView):
             }
 
         except Exception as e:
-            print(f"#### Exception: {e}")
+            print(f"ERROR: Exception while handling /task-add call: {e}")
             return {
                 'status': False,
                 'msg': f'Error creating task: {str(e)}'

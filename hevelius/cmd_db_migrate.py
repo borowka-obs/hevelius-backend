@@ -126,7 +126,7 @@ def migrate_pgsql(args, cfg={}):
             if not dry_run:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
-                                        str(cfg['port']), cfg['dbname'], "-f", DIR + "/" + f])
+                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f])
             else:
                 print("Skipping (--dry-run).")
 
