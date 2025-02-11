@@ -408,8 +408,6 @@ class TaskAddResource(MethodView):
         try:
             cfg = hevelius_config.config_get()
 
-            print(f"#### task-addcfg: {cfg}")
-
             cnx = db.connect(cfg)
             result = db.run_query(cnx, query, values)
             cnx.close()
