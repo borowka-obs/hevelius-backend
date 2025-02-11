@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Schema version updated to 12 (removed vphot, defocus columns in tasks table)
 - JWT authentication implemented
 - Implemented /api/task-add call that adds new observation task
+- First config file support (hevelius.yaml)
 
 ## 0.0.3 - release date unspecified
 
