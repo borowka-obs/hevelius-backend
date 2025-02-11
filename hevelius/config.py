@@ -71,7 +71,7 @@ def load_config():
 
     loaded_config = config_dict
 
-    return config_dict
+    return config_dict.copy()
 
 def config_get(cfg={}):
     """
