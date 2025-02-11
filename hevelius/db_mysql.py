@@ -11,9 +11,9 @@ def connect(config):
     return cnx
 
 
-def run_query(cnx, query):
+def run_query(cnx, query, params=None):
     cursor = cnx.cursor()  # cursor(dictionary=True) or cursor(named_tuple=True)
-    cursor.execute(query)
+    cursor.execute(query, params)
     try:
         result = cursor.fetchall()
     except mysql.connector.Error as err:
