@@ -126,7 +126,15 @@ def migrate_pgsql(args, cfg={}):
             if not dry_run:
                 # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
-                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f])
+                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f],
+                                        stdout=subprocess.PIPE)
+                output = ""
+                for line in iter(psql.stdout.readline, b''):
+                    output += line.decode('utf-8').rstrip()
+
+                # TODO: make sure the output is printable, if a variable is set
+                # print(output)
+
             else:
                 print("Skipping (--dry-run).")
 
