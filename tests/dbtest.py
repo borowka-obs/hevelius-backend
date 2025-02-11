@@ -23,13 +23,13 @@ def _read_configuration():
     config = hevelius_config.load_config()
 
     return ({
-        "dbname": config['database']['dbname'],
+        "database": config['database']['database'],
         "user": config['database']['user'],
         "host": config['database']['host'],
         "port": config['database']['port'],
         "password": config['database']['password']
     }, {
-        "dbname": config['database']['dbname'] + "_test",
+        "database": config['database']['database'] + "_test",
         "user": config['database']['user'],
         "password": config['database']['password'],
         "host": config['database']['host'],
@@ -55,13 +55,11 @@ def setup_database_test_case():
     maintenance_cursor = maintenance_connection.cursor()
 
     # If previous run failed and didn't cease the database, drop it.
-    drop_db_query = f"DROP DATABASE IF EXISTS {test_config['dbname']};"
+    drop_db_query = f"DROP DATABASE IF EXISTS {test_config['database']};"
     result1 = maintenance_cursor.execute(drop_db_query)
-    print(f"#### drop_db_query result: {result1}")
 
-    create_database_query = f"CREATE DATABASE {test_config['dbname']} OWNER {test_config['user']};"
+    create_database_query = f"CREATE DATABASE {test_config['database']} OWNER {test_config['user']};"
     result2 = maintenance_cursor.execute(create_database_query)
-    print(f"#### create_database_query result: {result2}")
 
     maintenance_cursor.close()
     maintenance_connection.close()
@@ -76,10 +74,10 @@ def setup_database_test_case():
         maintenance_cursor = maintenance_connection.cursor()
 
         if os.environ.get("HEVELIUS_DEBUG"):
-            print(f"HEVELIUS_DEBUG is set, not dropping the test database ({test_config['dbname']}).")
+            print(f"HEVELIUS_DEBUG is set, not dropping the test database ({test_config['database']}).")
         else:
-            drop_database_query = f"DROP DATABASE {test_config['dbname']};"
-            print(f"HEVELIUS_DEBUG not set, dropping the test database ({test_config['dbname']}).")
+            drop_database_query = f"DROP DATABASE {test_config['database']};"
+            print(f"HEVELIUS_DEBUG not set, dropping the test database ({test_config['database']}).")
             maintenance_cursor.execute(drop_database_query)
 
         maintenance_cursor.close()
