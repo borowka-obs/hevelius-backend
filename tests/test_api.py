@@ -44,7 +44,6 @@ class TestTaskAdd(unittest.TestCase):
             "calibrate": True
         }
 
-        print(f"#### test_task_add_success() config={config}")
         os.environ['HEVELIUS_DB_NAME'] = config['database']
 
         response = self.app.post('/api/task-add',
