@@ -26,12 +26,28 @@ CREATE USER hevelius WITH PASSWORD 'secret'; -- use an actual password here
 GRANT ALL PRIVILEGES ON DATABASE hevelius TO hevelius;
 ```
 
+If you're on Postgres 15 or later, you likely want to also do this:
+
+```
+ALTER DATABASE hevelius OWNER to hevelius;
+```
+Otherwise you might get ` permission denied for schema public` when trying to initalize the db.
+
 ## Configure Hevelius-backend
 
 The configuration is currently very basic. Please copy
 `hevelius/hevelius.yaml.example` to `hevelius/hevelius.yaml` and edit its content.
 You will need to set up things like DB credentials, repository path (where your
 image frames are kept on disk) and others.
+
+## Initialize the database
+
+To initialize the schema, use the following command:
+
+```
+ bin/hevelius db migrate
+ bin/hevelius db version
+```
 
 ## Running Hevelius (command-line)
 
