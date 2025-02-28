@@ -40,7 +40,11 @@ app.config["API_SPEC_OPTIONS"] = {"spec": spec}
 
 # Load JWT configuration from the config system
 config = db.config  # Reuse the configuration from db.py
-jwt_secret = config.get('JWT', {}).get('SECRET_KEY') or os.getenv('JWT_SECRET_KEY')
+
+if config.get('jwt') and config.get('jwt').get('secret-key'):
+    jwt_secret = config.get('jwt').get('secret-key')
+else:
+    jwt_secret = os.getenv('JWT_SECRET_KEY')
 
 if not jwt_secret:
     print("JWT_SECRET_KEY not found in config or environment variables")
