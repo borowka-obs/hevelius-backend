@@ -3,7 +3,8 @@ Code handling several basic commands (stats, version, config)
 """
 
 from importlib.metadata import version as importlib_version
-from hevelius import db, config
+from hevelius import db
+from hevelius.config import load_config
 import datetime
 import subprocess
 import pathlib
@@ -47,18 +48,20 @@ def config_show():
     :param args: arguments parsed by argparse
     """
 
+    config = load_config()
+
     print("DB credentials:")
-    print(f"DB type:  {config.TYPE}")
-    print(f"User:     {config.USER}")
-    print(f"Password: {config.PASSWORD}")
-    print(f"Database: {config.DBNAME}")
-    print(f"Host:     {config.HOST}")
-    print(f"Port:     {config.PORT}")
+    print(f"Type:     {config['database']['type']}")
+    print(f"User:     {config['database']['user']}")
+    print(f"Password: {config['database']['password']}")
+    print(f"Database: {config['database']['database']}")
+    print(f"Host:     {config['database']['host']}")
+    print(f"Port:     {config['database']['port']}")
 
     print()
 
-    print(f"Files repository path: {config.REPO_PATH}")
-    print(f"Backup storage path:   {config.BACKUP_PATH}")
+    print(f"Files repository path: {config['paths']['repo-path']}")
+    print(f"Backup storage path:   {config['paths']['backup-path']}")
 
 
 def backup(args):
