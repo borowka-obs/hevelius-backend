@@ -15,7 +15,7 @@ amateur astronomical observatory. In particular: \
 
 setup(
     name='hevelius',
-    version='0.0.3',
+    version='0.1.0',
     author='Tomek Mrugalski',
     author_email='thomson@klub.com.pl',
     url='https://github.com/tomaszmrugalski/hevelius-backend',
