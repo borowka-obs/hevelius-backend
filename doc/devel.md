@@ -4,8 +4,8 @@ To run backend locally, run:
 
 ```shell
 export PYTHONPATH=.:..
-cd flask/
-python3 -m flask run
+cd havelius/
+python3 -m flask --app 'heveliusbackend.app:app' run
 ```
 
 ## Useful developer tasks
@@ -16,7 +16,17 @@ python3 -m flask run
 
 3. Fix trivial esthetics in the code: `autopep8 --in-place --max-line-length 160 --aggressive --aggressive $(git ls-files '*.py')`
 
-4. Run Flask app: `python -m flask --app flask/app.py run`
+4. Run Flask app: `python -m flask --app heveliusbackend/app.py run`
+
+5. Retrieve the list of tasks:
+
+curl -X POST http://127.0.0.1:5000/api/tasks -H 'Content-type: application/json' -d '{  limit: 10, user_id: 3, password: "digest-here" }'
+
+## Running in gunicorn
+
+```shell
+gunicorn -w 1 -b 0.0.0.0:5000 'heveliusbackend.app:app'
+```
 
 ## Running tests
 
