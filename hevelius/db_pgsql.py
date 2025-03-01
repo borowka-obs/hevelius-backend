@@ -5,10 +5,12 @@ def connect(config):
 
     try:
         # supported parameters: user, password, database, host, port
-        conn = psycopg2.connect(**config)
+        cfg = config.copy()
+        cfg.pop('type', None)
+        conn = psycopg2.connect(**cfg)
     except BaseException as e:
         print(
-            f"ERROR: Failed to connect to DB: user={config['user']}, database={config['dbname']}, host={config['host']}, port={config['port']}: {e}")
+            f"ERROR: Failed to connect to DB: user={config['user']}, database={config['database']}, host={config['host']}, port={config['port']}: {e}")
         raise
     return conn
 
