@@ -252,45 +252,6 @@ def histogram():
     return render_template('histogram.html', graphJSON=graph_json)
 
 
-@app.route('/api/tasks', methods=['POST', 'GET'])
-def tasks():
-    """
-    Returns a list of astronomical observation tasks, optionally filtered by user_id.
-
-    This method is used when a list of tasks is required. When this data structure
-    is being changed, one needs to modify Task structure in the
-    src/app/models/taks.ts in the github.com/tomaszmrugalski/hevelius-web
-    """
-
-    user_id = get_param(request, 'user_id')
-    limit = get_param(request, 'limit')
-
-    query = "SELECT task_id, tasks.user_id, aavso_id, object, ra, decl, " \
-        "exposure, descr, filter, binning, guiding, dither, " \
-        "calibrate, solve, other_cmd, " \
-        "min_alt, moon_distance, skip_before, skip_after, " \
-        "min_interval, comment, state, imagename, " \
-        "created, activated, performed, max_moon_phase, " \
-        "max_sun_alt, auto_center, calibrated, solved, " \
-        "sent FROM tasks, users WHERE tasks.user_id = users.user_id"
-    params = []
-    if user_id is not None:
-        query = query + " AND tasks.user_id=%s"
-        params.append(user_id)
-
-    query = query + " ORDER by task_id DESC"
-
-    if limit is not None:
-        query = query + " LIMIT %s"
-        params.append(limit)
-
-    cnx = db.connect()
-    tasks_list = db.run_query(cnx, query, params)
-    cnx.close()
-
-    return tasks_list
-
-
 def sanitize(txt: str) -> str:
     """
     Sanitizes x input (removes backslashes)
