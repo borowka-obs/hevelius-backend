@@ -255,7 +255,11 @@ def histogram():
 @app.route('/api/tasks', methods=['POST', 'GET'])
 def tasks():
     """
-    Flask method used when a list of tasks is required.
+    Returns a list of astronomical observation tasks, optionally filtered by user_id.
+
+    This method is used when a list of tasks is required. When this data structure
+    is being changed, one needs to modify Task structure in the
+    src/app/models/taks.ts in the github.com/tomaszmrugalski/hevelius-web
     """
 
     user_id = get_param(request, 'user_id')
