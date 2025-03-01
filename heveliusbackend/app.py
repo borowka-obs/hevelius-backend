@@ -409,7 +409,7 @@ class TaskAddResource(MethodView):
         query = f"""INSERT INTO tasks ({fields_str}, state) VALUES ({placeholders}, 0) RETURNING task_id"""
 
         try:
-            cfg = hevelius_config.config_get()
+            cfg = hevelius_config.config_db_get()
 
             cnx = db.connect(cfg)
             result = db.run_query(cnx, query, values)

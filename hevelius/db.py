@@ -27,7 +27,7 @@ def connect(cfg={}):
     Opens connection to a database, returns DB connection object.
     """
 
-    cfg = hevelius_config.config_get(cfg)
+    cfg = hevelius_config.config_db_get(cfg)
 
     return backend.connect(cfg)
 

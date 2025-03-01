@@ -72,7 +72,7 @@ def load_config():
     return config_dict.copy()
 
 
-def config_get(cfg={}):
+def config_db_get(cfg={}):
     """
     Returns a dictionary with database connection parameters, with defaults filled in.
     """
@@ -92,6 +92,5 @@ def config_get(cfg={}):
         result['database'] = result['dbname']
 
     result.pop('dbname', None)
-    result.pop('type', None)
 
     return result
