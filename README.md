@@ -25,6 +25,8 @@ Status as of Mar 2025:
 - **Command line iterface**: Currently Hevelius has a command line interface written in `python`. A Rest API and gui front-end
   is planned, but currently not a priority.
 - **Ability to search based on distance**. Implemented proper Haversine formula.
+- **Database management**: Schema versioning and upgrades, backup, etc.
+- **Configuration**: Config file support and some limited environment variables.
 
 ## Current capabilities (REST API)
 
