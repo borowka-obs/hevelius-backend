@@ -10,7 +10,8 @@ from os.path import isfile, join
 import subprocess
 import sys
 from hevelius import db
-from hevelius.config import config_db_get, load_config
+from hevelius.config import config_db_get
+
 
 def migrate(args):
     """
@@ -20,7 +21,6 @@ def migrate(args):
     """
 
     config = config_db_get()
-
 
     if config['type'] == "pgsql":
         migrate_pgsql(args)
@@ -40,7 +40,7 @@ def migrate_mysql(args, cfg={}):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = config.config_db_get(cfg)
+    cfg = config_db_get(cfg)
 
     dir = "db"
     files = sorted([f for f in listdir(dir) if (
@@ -85,7 +85,7 @@ def run_file(cfg, filename):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = config.config_db_get(cfg)
+    cfg = config_db_get(cfg)
 
     conn = db.connect(cfg)
 
@@ -133,7 +133,7 @@ def migrate_pgsql(args, cfg={}):
 
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
                                         str(cfg['port']), cfg['database'], "-f", DIR + "/" + f],
-                                        stdout=subprocess.PIPE, env=my_env  )
+                                        stdout=subprocess.PIPE, env=my_env)
                 output = ""
                 for line in iter(psql.stdout.readline, b''):
                     output += line.decode('utf-8').rstrip()
