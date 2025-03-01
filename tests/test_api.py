@@ -1,6 +1,6 @@
 import unittest
 import os
-from app import app
+from heveliusbackend.app import app
 import json
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
