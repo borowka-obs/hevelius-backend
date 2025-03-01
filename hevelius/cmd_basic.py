@@ -8,7 +8,7 @@ from hevelius.config import load_config
 import datetime
 import subprocess
 import pathlib
-from os import path
+from os import path, environ
 
 
 def db_version():
@@ -71,12 +71,17 @@ def backup(args):
 
     backup_name = datetime.datetime.now().strftime("hevelius-backup-%Y-%m-%d-%H-%M-%S.psql")
 
-    full_path = path.join(config.BACKUP_PATH, backup_name)
+    config = load_config()
 
-    pathlib.Path(config.BACKUP_PATH).mkdir(parents=True, exist_ok=True)
+    full_path = path.join(config['paths']['backup-path'], backup_name)
 
-    psql = subprocess.Popen(["pg_dump", "-U", config.USER, "-h", config.HOST, "-p",
-                            str(config.PORT), config.DBNAME, "-f", full_path])
+    pathlib.Path(config['paths']['backup-path']).mkdir(parents=True, exist_ok=True)
+
+    my_env = environ.copy()
+    my_env['PGPASSWORD'] = config['database']['password']
+
+    psql = subprocess.Popen(["pg_dump", "-U", config['database']['user'], "-h", config['database']['host'], "-p",
+                            str(config['database']['port']), config['database']['database'], "-f", full_path], env=my_env)
     # this returns std output, (something else)
     output, _ = psql.communicate()
 
