@@ -5,12 +5,12 @@ Historically, the system was using MySQL, not migrated to Postgres now.
 The last schema version using MySQL was 6. 7 and later are Postgres based.
 """
 
-from os import listdir
+from os import listdir, environ
 from os.path import isfile, join
 import subprocess
 import sys
-from hevelius import config, db
-
+from hevelius import db
+from hevelius.config import config_db_get, load_config
 
 def migrate(args):
     """
@@ -18,9 +18,13 @@ def migrate(args):
 
     :param args: arguments parsed by argparse
     """
-    if config.TYPE == "pgsql":
+
+    config = config_db_get()
+
+
+    if config['type'] == "pgsql":
         migrate_pgsql(args)
-    elif config.TYPE == "mysql":
+    elif config['type'] == "mysql":
         migrate_mysql(args)
     else:
         print(
@@ -36,7 +40,7 @@ def migrate_mysql(args, cfg={}):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = config.config_get(cfg)
+    cfg = config.config_db_get(cfg)
 
     dir = "db"
     files = sorted([f for f in listdir(dir) if (
@@ -81,7 +85,7 @@ def run_file(cfg, filename):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = config.config_get(cfg)
+    cfg = config.config_db_get(cfg)
 
     conn = db.connect(cfg)
 
@@ -100,7 +104,7 @@ def migrate_pgsql(args, cfg={}):
     """
 
     # Fill in the defaults of DB connection, if not specified
-    cfg = config.config_get(cfg)
+    cfg = config_db_get(cfg)
 
     dry_run = args.get('dry_run') if isinstance(args, dict) else args.dry_run
 
@@ -124,10 +128,12 @@ def migrate_pgsql(args, cfg={}):
                 f"Migrating from {current_ver} to {mig_ver}, using script {f}")
 
             if not dry_run:
-                # TODO: pass password in PGPASSWORD variable (from config.PASSWORD)
+                my_env = environ.copy()
+                my_env['PGPASSWORD'] = cfg['password']
+
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
                                         str(cfg['port']), cfg['database'], "-f", DIR + "/" + f],
-                                        stdout=subprocess.PIPE)
+                                        stdout=subprocess.PIPE, env=my_env  )
                 output = ""
                 for line in iter(psql.stdout.readline, b''):
                     output += line.decode('utf-8').rstrip()
