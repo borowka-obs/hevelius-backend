@@ -10,7 +10,7 @@ of the features are usable already.
 
 ## Current capabilities (command-line)
 
-Status as of Feb 2025:
+Status as of Mar 2025:
 
 - **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
