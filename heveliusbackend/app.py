@@ -533,3 +533,7 @@ class TasksResource(MethodView):
 
 # Register blueprint
 api.register_blueprint(blp)
+
+
+if __name__ == '__main__':
+    app.run()
