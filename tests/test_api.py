@@ -1,9 +1,20 @@
+
+# This is a workaround to suppress the specific marshmallow warning
+# that happens when running the tests. This warning is not relevant
+# and it's caused by one of our dependencies.
+
 import unittest
 import os
 from heveliusbackend.app import app
 import json
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
+
+
+import warnings
+from marshmallow import warnings as marshmallow_warnings
+# Suppress the specific marshmallow warning
+warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
 
 
 class TestTaskAdd(unittest.TestCase):
@@ -59,6 +70,8 @@ class TestTaskAdd(unittest.TestCase):
         self.assertIsInstance(data['task_id'], int)
         self.assertIn('Task', data['msg'])
         self.assertIn('created successfully', data['msg'])
+
+        # TODO: check that the task was really added to the database
 
     def test_task_add_missing_required(self):
         """Test task addition with missing required fields"""
@@ -154,6 +167,94 @@ class TestVersion(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('version', data)
         self.assertEqual(data['version'], VERSION)
+
+
+class TestTaskGet(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        self.app.testing = True
+
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_task_get_success(self, config):
+        """Test successful task retrieval"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # First create a task
+        test_task = {
+            "user_id": 1,
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "exposure": 300.0,
+            "filter": "L",
+            "binning": 1,
+            "guiding": True,
+            "dither": False,
+            "solve": True,
+            "calibrate": True
+        }
+
+        # Add the task
+        response = self.app.post('/api/task-add',
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
+
+        data = json.loads(response.data)
+        task_id = data['task_id']
+
+        # Now try to get the task
+        response = self.app.get(f'/api/task-get?task_id={task_id}',
+                                headers=self.headers)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIsNotNone(data['task'])
+        self.assertEqual(data['task']['object'], 'M31')
+        self.assertEqual(data['task']['ra'], 0.712)
+        self.assertEqual(data['task']['decl'], 41.27)
+
+    def test_task_get_not_found(self):
+        """Test task retrieval with non-existent task ID"""
+        response = self.app.get('/api/task-get?task_id=999999',
+                                headers=self.headers)
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('not found', data['msg'].lower())
+        self.assertIsNone(data['task'])
+
+    def test_task_get_no_auth(self):
+        """Test task retrieval without authentication"""
+        response = self.app.get('/api/task-get?task_id=1')
+        self.assertEqual(response.status_code, 401)  # Unauthorized
+
+    def test_task_get_missing_id(self):
+        """Test task retrieval without task_id parameter"""
+        response = self.app.get('/api/task-get',
+                                headers=self.headers)
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
 
 
 if __name__ == '__main__':
