@@ -154,7 +154,24 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Task'
+    VersionResponse:
+      type: object
+      properties:
+        version:
+          type: string
+          description: Hevelius version number
 paths:
+  /api/version:
+    get:
+      summary: Get Hevelius version
+      description: Returns the current version of the Hevelius software
+      responses:
+        '200':
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VersionResponse'
   /api/login:
     post:
       summary: Login endpoint

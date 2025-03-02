@@ -138,5 +138,23 @@ class TestTaskAdd(unittest.TestCase):
         self.assertEqual(data['msg'], 'Unauthorized: token user_id does not match request user_id')
 
 
+class TestVersion(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        self.app.testing = True
+
+    def test_version_endpoint(self):
+        """Test version endpoint returns correct version"""
+        from hevelius.version import VERSION
+
+        response = self.app.get('/api/version')
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('version', data)
+        self.assertEqual(data['version'], VERSION)
+
+
 if __name__ == '__main__':
     unittest.main()
