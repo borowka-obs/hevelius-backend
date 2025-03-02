@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 
 from hevelius import cmd_stats, db, config as hevelius_config
+from hevelius.version import VERSION
 
 # By default, Flask searches for templates in the templates/ dir.
 # Other params: debug=True, port=8080
@@ -233,6 +234,10 @@ class Task(Schema):
 
 class TasksList(Schema):
     tasks = fields.List(fields.Nested(Task))
+
+
+class VersionResponseSchema(Schema):
+    version = fields.String(required=True, metadata={"description": "Hevelius version"})
 
 
 @app.route('/')
@@ -473,6 +478,16 @@ class TasksResource(MethodView):
             formatted_tasks.append(task_dict)
 
         return formatted_tasks
+
+
+@blp.route("/version")
+class VersionResource(MethodView):
+    @blp.response(200, VersionResponseSchema)
+    def get(self):
+        """Version endpoint
+        Returns the current version of Hevelius
+        """
+        return {"version": VERSION}
 
 
 # Register blueprint
