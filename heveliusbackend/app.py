@@ -506,7 +506,6 @@ class TaskGetResource(MethodView):
         Returns details of a specific astronomical observation task
         """
         task_id = args['task_id']
-        current_user_id = get_jwt_identity()
 
         query = """SELECT task_id, tasks.user_id, aavso_id, object, ra, decl,
             exposure, descr, filter, binning, guiding, dither,
