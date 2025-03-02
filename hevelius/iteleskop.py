@@ -50,4 +50,5 @@ def parse_iteleskop_filename(fname: str) -> dict:
             "calibrated": calibrated
         }
     else:
+        print(f"WARNING:Failed to parse filename {fname}")
         return {}

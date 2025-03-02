@@ -32,6 +32,13 @@ gunicorn -w 1 -b 0.0.0.0:5000 'heveliusbackend.app:app'
 
 `python -m pytest -s -v`
 
+If you get an error about insufficient permissions to create a database, you
+can do the following:
+
+```SQL
+ALTER USER hevelius CREATEDB;
+```
+
 If you want keep the database after test, set HEVELIUS_DEBUG env variable, e.g.:
 
 `HEVELIUS_DEBUG=1 python -m pytest -s -v`
