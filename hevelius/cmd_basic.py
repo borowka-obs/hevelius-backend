@@ -32,6 +32,12 @@ def hevelius_version() -> str:
     :return: string representing version (or empty string)
     """
     try:
+        from hevelius.version import VERSION
+        return VERSION
+    except ModuleNotFoundError:
+        pass
+
+    try:
         return importlib_version('hevelius')
     except ModuleNotFoundError:
         # Oh well, hevelius is not installed. We're running from source tree
