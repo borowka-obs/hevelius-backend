@@ -238,7 +238,7 @@ class TasksList(Schema):
 @app.route('/')
 def root():
     """Just a stub API homepage."""
-    return "Home🏠 EE"
+    return "Nothing to see here. Move along."
 
 
 @app.route('/histo')
@@ -250,27 +250,6 @@ def histogram():
 
     graph_json = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
     return render_template('histogram.html', graphJSON=graph_json)
-
-
-def sanitize(txt: str) -> str:
-    """
-    Sanitizes x input (removes backslashes)
-    """
-    txt = str(txt).replace('\'', '')  # apostrophes are bad
-    txt = txt.replace(';', '')  # commas also
-    txt = txt.replace('\\', '')  # and backslashes
-    return txt
-
-
-def get_param(req, field) -> str:
-    """
-    Attempts to retrieve parameter passed in JSON
-    """
-    json_html_request = req.get_json()
-    param = json_html_request.get(field)
-    if param:
-        return sanitize(param)
-    return param
 
 
 @blp.route("/login")
