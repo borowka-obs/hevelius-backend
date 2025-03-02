@@ -240,6 +240,12 @@ class VersionResponseSchema(Schema):
     version = fields.String(required=True, metadata={"description": "Hevelius version"})
 
 
+class TaskGetResponseSchema(Schema):
+    task = fields.Nested(Task)
+    status = fields.Boolean(required=True)
+    msg = fields.String()
+
+
 @app.route('/')
 def root():
     """Just a stub API homepage."""
@@ -488,6 +494,83 @@ class VersionResource(MethodView):
         Returns the current version of Hevelius
         """
         return {"version": VERSION}
+
+
+@blp.route("/task-get")
+class TaskGetResource(MethodView):
+    @jwt_required()
+    @blp.arguments(Schema.from_dict({"task_id": fields.Integer(required=True)}), location="query")
+    @blp.response(200, TaskGetResponseSchema)
+    def get(self, args):
+        """Get single task details
+        Returns details of a specific astronomical observation task
+        """
+        task_id = args['task_id']
+        current_user_id = get_jwt_identity()
+
+        query = """SELECT task_id, tasks.user_id, aavso_id, object, ra, decl,
+            exposure, descr, filter, binning, guiding, dither,
+            calibrate, solve, other_cmd,
+            min_alt, moon_distance, skip_before, skip_after,
+            min_interval, comment, state, imagename,
+            created, activated, performed, max_moon_phase,
+            max_sun_alt, auto_center, calibrated, solved,
+            sent FROM tasks, users WHERE task_id = %s"""
+
+        cnx = db.connect()
+        task = db.run_query(cnx, query, (task_id,))
+        cnx.close()
+
+        if not task:
+            return {
+                'status': False,
+                'msg': f'Task {task_id} not found',
+                'task': None
+            }
+
+        task = task[0]  # Get first (and should be only) result
+
+        # Format the task data
+        task_dict = {
+            'task_id': task[0],
+            'user_id': task[1],
+            'aavso_id': task[2],
+            'object': task[3],
+            'ra': task[4],
+            'decl': task[5],
+            'exposure': task[6],
+            'descr': task[7],
+            'filter': task[8],
+            'binning': task[9],
+            'guiding': bool(task[10]),
+            'dither': bool(task[11]),
+            'calibrate': bool(task[12]),
+            'solve': bool(task[13]),
+            'other_cmd': task[14],
+            'min_alt': task[15],
+            'moon_distance': task[16],
+            'skip_before': task[17],
+            'skip_after': task[18],
+            'min_interval': task[19],
+            'comment': task[20],
+            'state': task[21],
+            'imagename': task[22],
+            'created': task[23],
+            'activated': task[24],
+            'performed': task[25],
+            'max_moon_phase': task[26],
+            'max_sun_alt': task[27],
+            'auto_center': bool(task[28]),
+            'calibrated': bool(task[29]),
+            'solved': bool(task[30]),
+            'sent': bool(task[31])
+        }
+
+        return {
+            'status': True,
+            'msg': 'Task found',
+            'task': task_dict
+        }
 
 
 # Register blueprint

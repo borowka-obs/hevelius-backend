@@ -54,6 +54,9 @@ def setup_database_test_case():
     maintenance_connection.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
     maintenance_cursor = maintenance_connection.cursor()
 
+    if os.environ.get("HEVELIUS_DEBUG"):
+        maintenance_connection.autocommit = True
+
     # If previous run failed and didn't cease the database, drop it.
     try:
         drop_db_query = f"DROP DATABASE IF EXISTS {test_config['database']};"

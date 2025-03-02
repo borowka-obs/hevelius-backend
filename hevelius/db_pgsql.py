@@ -8,6 +8,7 @@ def connect(config):
         cfg = config.copy()
         cfg.pop('type', None)
         conn = psycopg2.connect(**cfg)
+        conn.autocommit = True
     except BaseException as e:
         print(
             f"ERROR: Failed to connect to DB: user={config['user']}, database={config['database']}, host={config['host']}, port={config['port']}: {e}")

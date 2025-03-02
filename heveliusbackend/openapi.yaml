@@ -154,6 +154,17 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Task'
+    TaskGetResponse:
+      type: object
+      properties:
+        task:
+          $ref: '#/components/schemas/Task'
+        status:
+          type: boolean
+          description: Operation status
+        msg:
+          type: string
+          description: Status message
     VersionResponse:
       type: object
       properties:
@@ -366,5 +377,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TasksList'
+      security:
+        - bearerAuth: []
+
+  /api/task-get:
+    get:
+      summary: Get single task details
+      description: Returns details of a specific astronomical observation task
+      parameters:
+        - name: task_id
+          in: query
+          description: Task ID to retrieve
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskGetResponse'
       security:
         - bearerAuth: []
