@@ -171,6 +171,15 @@ components:
         version:
           type: string
           description: Hevelius version number
+    TaskUpdateResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+          description: Operation status
+        msg:
+          type: string
+          description: Status message
 paths:
   /api/version:
     get:
@@ -400,3 +409,110 @@ paths:
                 $ref: '#/components/schemas/TaskGetResponse'
       security:
         - bearerAuth: []
+
+  /api/task-update:
+    post:
+      summary: Update existing astronomical observation task
+      description: Updates an existing task with the specified parameters. Only provided fields will be updated.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - task_id
+              properties:
+                task_id:
+                  type: integer
+                  description: Task ID to update
+                user_id:
+                  type: integer
+                  description: User ID
+                scope_id:
+                  type: integer
+                  description: Scope ID
+                object:
+                  type: string
+                  maxLength: 64
+                  description: Object name
+                ra:
+                  type: number
+                  format: float
+                  minimum: 0
+                  maximum: 24
+                  description: Right Ascension (0-24)
+                decl:
+                  type: number
+                  format: float
+                  minimum: -90
+                  maximum: 90
+                  description: Declination (-90 to 90)
+                exposure:
+                  type: number
+                  format: float
+                  description: Exposure time
+                descr:
+                  type: string
+                  maxLength: 1024
+                  description: Description
+                filter:
+                  type: string
+                  maxLength: 16
+                  description: Filter type
+                binning:
+                  type: integer
+                  description: Binning value
+                guiding:
+                  type: boolean
+                  description: Enable guiding
+                dither:
+                  type: boolean
+                  description: Enable dithering
+                calibrate:
+                  type: boolean
+                  description: Enable calibration
+                solve:
+                  type: boolean
+                  description: Enable plate solving
+                other_cmd:
+                  type: string
+                  maxLength: 512
+                  description: Additional commands
+                min_alt:
+                  type: number
+                  format: float
+                  description: Minimum altitude
+                moon_distance:
+                  type: number
+                  format: float
+                  description: Minimum moon distance
+                skip_before:
+                  type: string
+                  format: date-time
+                  description: Skip before date
+                skip_after:
+                  type: string
+                  format: date-time
+                  description: Skip after date
+                min_interval:
+                  type: integer
+                  description: Minimum interval
+                comment:
+                  type: string
+                  description: Comment
+                max_moon_phase:
+                  type: integer
+                  description: Maximum moon phase
+                max_sun_alt:
+                  type: integer
+                  description: Maximum sun altitude
+      responses:
+        '200':
+          description: Task update response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskUpdateResponse'
