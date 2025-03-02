@@ -1,20 +1,18 @@
-
 # This is a workaround to suppress the specific marshmallow warning
 # that happens when running the tests. This warning is not relevant
 # and it's caused by one of our dependencies.
 
 import unittest
 import os
-from heveliusbackend.app import app
+import warnings
 import json
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
-
-
-import warnings
 from marshmallow import warnings as marshmallow_warnings
 # Suppress the specific marshmallow warning
 warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
+
+from heveliusbackend.app import app  # noqa: E402
 
 
 class TestTaskAdd(unittest.TestCase):
@@ -261,6 +259,180 @@ class TestTaskGet(unittest.TestCase):
         response = self.app.get('/api/task-get',
                                 headers=self.headers)
         self.assertEqual(response.status_code, 422)  # Unprocessable Entity
+
+
+class TestTaskUpdate(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        self.app.testing = True
+
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_task_update_success(self, config):
+        """Test successful task update"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # First create a task
+        test_task = {
+            "user_id": 1,
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "exposure": 300.0,
+            "filter": "L",
+            "binning": 1,
+            "guiding": True,
+            "dither": False,
+            "solve": True,
+            "calibrate": True
+        }
+
+        # Add the task
+        response = self.app.post('/api/task-add',
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
+        data = json.loads(response.data)
+        task_id = data['task_id']
+
+        # Update the task
+        update_data = {
+            "task_id": task_id,
+            "object": "M33",
+            "exposure": 600.0
+        }
+
+        response = self.app.post('/api/task-update',
+                                 data=json.dumps(update_data),
+                                 headers=self.headers)
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIn('updated successfully', data['msg'])
+
+        # Verify the update
+        response = self.app.get(f'/api/task-get?task_id={task_id}',
+                                headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(data['task']['object'], 'M33')
+        self.assertEqual(data['task']['exposure'], 600.0)
+        # Original fields should remain unchanged
+        self.assertEqual(data['task']['ra'], 0.712)
+        self.assertEqual(data['task']['decl'], 41.27)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_task_update_not_found(self, config):
+        """Test updating non-existent task"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        update_data = {
+            "task_id": 999999,
+            "object": "M33"
+        }
+
+        response = self.app.post('/api/task-update',
+                                 data=json.dumps(update_data),
+                                 headers=self.headers)
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('not found', data['msg'].lower())
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    def test_task_update_no_auth(self):
+        """Test task update without authentication"""
+        update_data = {
+            "task_id": 1,
+            "object": "M33"
+        }
+
+        response = self.app.post('/api/task-update',
+                                 data=json.dumps(update_data))
+        self.assertEqual(response.status_code, 401)  # Unauthorized
+
+    def test_task_update_missing_task_id(self):
+        """Test task update without task_id"""
+        update_data = {
+            "object": "M33"
+        }
+
+        response = self.app.post('/api/task-update',
+                                 data=json.dumps(update_data),
+                                 headers=self.headers)
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
+
+    @use_repository
+    def test_task_update_unauthorized_user(self, config):
+        """Test updating task owned by different user"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # First create a task as user 1
+        test_task = {
+            "user_id": 1,
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27
+        }
+
+        response = self.app.post('/api/task-add',
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+
+        # Create token for different user
+        with app.app_context():
+            other_token = create_access_token(
+                identity=2,  # Different user_id
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'other_user'
+                }
+            )
+            other_headers = {
+                'Authorization': f'Bearer {other_token}',
+                'Content-Type': 'application/json'
+            }
+
+        # Try to update the task as different user
+        update_data = {
+            "task_id": task_id,
+            "object": "M33"
+        }
+
+        response = self.app.post('/api/task-update',
+                                 data=json.dumps(update_data),
+                                 headers=other_headers)
+
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('unauthorized', data['msg'].lower())
+
+        os.environ.pop('HEVELIUS_DB_NAME')
 
 
 if __name__ == '__main__':

@@ -246,6 +246,56 @@ class TaskGetResponseSchema(Schema):
     msg = fields.String()
 
 
+class TaskUpdateRequestSchema(Schema):
+    task_id = fields.Integer(required=True, metadata={"description": "Task ID to update"})
+    # All other fields are optional
+    user_id = fields.Integer(metadata={"description": "User ID"})
+    scope_id = fields.Integer(metadata={"description": "Scope ID"})
+    object = fields.String(
+        validate=validate.Length(max=64, error="Object name must be 64 characters or less"),
+        metadata={"description": "Object name"}
+    )
+    ra = fields.Float(
+        validate=validate.Range(min=0.0, max=24.0, error="RA must be between 0 and 24"),
+        metadata={"description": "Right Ascension (0-24)"}
+    )
+    decl = fields.Float(
+        validate=validate.Range(min=-90.0, max=90.0, error="Declination must be between -90 and 90"),
+        metadata={"description": "Declination (-90 to 90)"}
+    )
+    exposure = fields.Float(metadata={"description": "Exposure time"})
+    descr = fields.String(
+        validate=validate.Length(max=1024, error="Description must be 1024 characters or less"),
+        metadata={"description": "Description"}
+    )
+    filter = fields.String(
+        validate=validate.Length(max=16, error="Filter must be 16 characters or less"),
+        metadata={"description": "Filter type"}
+    )
+    binning = fields.Integer(metadata={"description": "Binning value"})
+    guiding = fields.Boolean(metadata={"description": "Enable guiding"})
+    dither = fields.Boolean(metadata={"description": "Enable dithering"})
+    calibrate = fields.Boolean(metadata={"description": "Enable calibration"})
+    solve = fields.Boolean(metadata={"description": "Enable plate solving"})
+    other_cmd = fields.String(
+        validate=lambda x: len(x) <= 512 or ValidationError("Additional commands must be 512 characters or less"),
+        metadata={"description": "Additional commands"}
+    )
+    min_alt = fields.Float(metadata={"description": "Minimum altitude"})
+    moon_distance = fields.Float(metadata={"description": "Minimum moon distance"})
+    skip_before = fields.DateTime(metadata={"description": "Skip before date"})
+    skip_after = fields.DateTime(metadata={"description": "Skip after date"})
+    min_interval = fields.Integer(metadata={"description": "Minimum interval"})
+    comment = fields.String(metadata={"description": "Comment"})
+    max_moon_phase = fields.Integer(metadata={"description": "Maximum moon phase"})
+    max_sun_alt = fields.Integer(metadata={"description": "Maximum sun altitude"})
+
+
+class TaskUpdateResponseSchema(Schema):
+    status = fields.Boolean(required=True, metadata={"description": "Operation status"})
+    msg = fields.String(metadata={"description": "Status message"})
+
+
 @app.route('/')
 def root():
     """Just a stub API homepage."""
@@ -570,6 +620,83 @@ class TaskGetResource(MethodView):
             'msg': 'Task found',
             'task': task_dict
         }
+
+
+@blp.route("/task-update")
+class TaskUpdateResource(MethodView):
+    @jwt_required()
+    @blp.arguments(TaskUpdateRequestSchema)
+    @blp.response(200, TaskUpdateResponseSchema)
+    def post(self, task_data):
+        """Update existing astronomical observation task"""
+        current_user_id = get_jwt_identity()
+        task_id = task_data.pop('task_id')  # Remove task_id from update fields
+
+        # First check if the task exists and get its user_id
+        query = "SELECT user_id FROM tasks WHERE task_id = %s"
+
+        cnx = db.connect()
+        result = db.run_query(cnx, query, (task_id,))
+        cnx.close()
+
+        if not result:
+            return {
+                'status': False,
+                'msg': f'Task {task_id} not found'
+            }
+
+        task_user_id = result[0][0]
+
+        # Check if the current user owns the task
+        if task_user_id != current_user_id:
+            return {
+                'status': False,
+                'msg': 'Unauthorized: you can only update your own tasks'
+            }
+
+        # Prepare fields for SQL query
+        update_parts = []
+        values = []
+        for key, value in task_data.items():
+            if value is not None:
+                update_parts.append(f"{key} = %s")
+                values.append(value)
+
+        if not update_parts:
+            return {
+                'status': False,
+                'msg': 'No fields to update'
+            }
+
+        # Add task_id as the last parameter
+        values.append(task_id)
+
+        # Create SQL query
+        query = f"""UPDATE tasks SET {", ".join(update_parts)} WHERE task_id = %s"""
+
+        try:
+            cfg = hevelius_config.config_db_get()
+
+            cnx = db.connect(cfg)
+            result = db.run_query(cnx, query, values)
+            cnx.close()
+
+            if result:
+                return {
+                    'status': True,
+                    'msg': f'Task {task_id} updated successfully'
+                }
+            return {
+                'status': True,
+                'msg': f'Task {task_id} updated successfully'
+            }
+
+        except Exception as e:
+            print(f"ERROR: Exception while handling /task-update call: {e}")
+            return {
+                'status': False,
+                'msg': f'Error updating task: {str(e)}'
+            }
 
 
 # Register blueprint
