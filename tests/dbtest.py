@@ -55,14 +55,17 @@ def setup_database_test_case():
     maintenance_cursor = maintenance_connection.cursor()
 
     # If previous run failed and didn't cease the database, drop it.
-    drop_db_query = f"DROP DATABASE IF EXISTS {test_config['database']};"
-    maintenance_cursor.execute(drop_db_query)
+    try:
+        drop_db_query = f"DROP DATABASE IF EXISTS {test_config['database']};"
+        maintenance_cursor.execute(drop_db_query)
 
-    create_database_query = f"CREATE DATABASE {test_config['database']} OWNER {test_config['user']};"
-    maintenance_cursor.execute(create_database_query)
+        create_database_query = f"CREATE DATABASE {test_config['database']} OWNER {test_config['user']};"
+        maintenance_cursor.execute(create_database_query)
 
-    maintenance_cursor.close()
-    maintenance_connection.close()
+        maintenance_cursor.close()
+        maintenance_connection.close()
+    except Exception as e:
+        print(f"Failed to create DB. You might want to do (ALTER USER hevelius CREATEDB) and run again. Exception: {e}")
 
     _standard_seed_db(test_config)
 
