@@ -74,7 +74,8 @@ class TestTaskAdd(unittest.TestCase):
         # TODO: check that the task was really added to the database
 
     def test_task_add_missing_required(self):
-        """Test task addition with missing required fields"""
+        """Test task addition with missing requi    @use_repository
+red fields"""
         test_task = {
             "object": "M31",
             "exposure": 300.0
@@ -233,10 +234,15 @@ class TestTaskGet(unittest.TestCase):
         self.assertEqual(data['task']['ra'], 0.712)
         self.assertEqual(data['task']['decl'], 41.27)
 
-    def test_task_get_not_found(self):
+    @use_repository
+    def test_task_get_not_found(self, config):
         """Test task retrieval with non-existent task ID"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
         response = self.app.get('/api/task-get?task_id=999999',
                                 headers=self.headers)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
 
         data = json.loads(response.data)
 
