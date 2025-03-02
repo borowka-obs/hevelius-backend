@@ -94,6 +94,7 @@ def run():
         return version()
     return parser.print_help()
 
+
 def version():
     """
     Prints the version of the Hevelius project.
