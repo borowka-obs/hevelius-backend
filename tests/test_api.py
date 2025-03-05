@@ -13,6 +13,7 @@ from marshmallow import warnings as marshmallow_warnings
 warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
 
 from heveliusbackend.app import app  # noqa: E402
+from hevelius import db
 
 
 class TestTaskAdd(unittest.TestCase):
@@ -59,8 +60,6 @@ class TestTaskAdd(unittest.TestCase):
                                  data=json.dumps(test_task),
                                  headers=self.headers)
 
-        os.environ.pop('HEVELIUS_DB_NAME')
-
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
@@ -69,11 +68,38 @@ class TestTaskAdd(unittest.TestCase):
         self.assertIn('Task', data['msg'])
         self.assertIn('created successfully', data['msg'])
 
-        # TODO: check that the task was really added to the database
+        # Verify the task was actually added to the database
+        task_id = data['task_id']
+        cnx = db.connect()
+        query = """SELECT task_id, user_id, object, ra, decl, exposure,
+                         filter, binning, guiding, dither, solve, calibrate, state
+                  FROM tasks WHERE task_id = %s"""
+        result = db.run_query(cnx, query, (task_id,))
+        cnx.close()
+
+        self.assertIsNotNone(result, "Task not found in database")
+        self.assertEqual(len(result), 1, "Expected exactly one task")
+
+        task = result[0]
+        # Verify all fields match what we sent
+        self.assertEqual(task[0], task_id)  # task_id
+        self.assertEqual(task[1], test_task['user_id'])  # user_id
+        self.assertEqual(task[2], test_task['object'])  # object
+        self.assertEqual(float(task[3]), test_task['ra'])  # ra
+        self.assertEqual(float(task[4]), test_task['decl'])  # decl
+        self.assertEqual(float(task[5]), test_task['exposure'])  # exposure
+        self.assertEqual(task[6], test_task['filter'])  # filter
+        self.assertEqual(task[7], test_task['binning'])  # binning
+        self.assertEqual(bool(task[8]), test_task['guiding'])  # guiding
+        self.assertEqual(bool(task[9]), test_task['dither'])  # dither
+        self.assertEqual(bool(task[10]), test_task['solve'])  # solve
+        self.assertEqual(bool(task[11]), test_task['calibrate'])  # calibrate
+        self.assertEqual(task[12], 1)  # state should be 1 for new tasks
+
+        os.environ.pop('HEVELIUS_DB_NAME')
 
     def test_task_add_missing_required(self):
-        """Test task addition with missing requi    @use_repository
-red fields"""
+        """Test task addition with missing required fields"""
         test_task = {
             "object": "M31",
             "exposure": 300.0
