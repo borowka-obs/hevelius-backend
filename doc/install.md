@@ -60,7 +60,5 @@ $ python bin/hevelius
 
 ```shell
 source venv/bin/activate
-export PYTHONPATH=.:..
-cd flask/
-python3 -m flask run
+python -m flask --app heveliusbackend/app.py run
 ```
