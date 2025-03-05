@@ -9,11 +9,12 @@ import json
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from marshmallow import warnings as marshmallow_warnings
+from hevelius import db
+
 # Suppress the specific marshmallow warning
 warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
 
 from heveliusbackend.app import app  # noqa: E402
-from hevelius import db
 
 
 class TestTaskAdd(unittest.TestCase):
