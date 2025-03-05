@@ -411,7 +411,8 @@ class TaskAddResource(MethodView):
         # Create SQL query
         fields_str = ", ".join(fields)
         placeholders = ", ".join(["%s"] * len(values))  # Use SQL placeholders
-        query = f"""INSERT INTO tasks ({fields_str}, state) VALUES ({placeholders}, 0) RETURNING task_id"""
+        # The default state is 1 (new)
+        query = f"""INSERT INTO tasks ({fields_str}, state) VALUES ({placeholders}, 1) RETURNING task_id"""
 
         try:
             cfg = hevelius_config.config_db_get()
