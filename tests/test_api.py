@@ -470,5 +470,204 @@ class TestTaskUpdate(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestNightPlan(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        app.testing = True  # Set testing flag on the actual app instance
+
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    def tearDown(self):
+        """Clean up after each test"""
+        app.testing = False  # Reset testing flag
+
+    @use_repository
+    def test_night_plan_success(self, config):
+        """Test successful night plan retrieval"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # First create test users
+        cnx = db.connect(config)
+        db.run_query(cnx, """
+            INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions)
+            VALUES
+            (100, 'test_user', 'test_pass', 'Test', 'User', 1.0, '123456789', 'test@test.com', 1),
+            (101, 'other_user', 'test_pass', 'Other', 'User', 1.0, '987654321', 'other@test.com', 1)
+            RETURNING user_id""")  # Add RETURNING clause to make it return results
+        cnx.close()
+
+        # Now create test tasks
+        test_tasks = [
+            {
+                "user_id": 100,
+                "scope_id": 1,
+                "object": "M31",
+                "ra": 0.712,
+                "decl": 41.27,
+                "exposure": 300.0,
+                "state": 1  # New task
+            },
+            {
+                "user_id": 100,
+                "scope_id": 1,
+                "object": "M33",
+                "ra": 1.5,
+                "decl": 30.0,
+                "exposure": 300.0,
+                "state": 1  # Should NOT be included (Template task)
+            },
+            {
+                "user_id": 101, # Different user
+                "scope_id": 1,
+                "object": "M51",
+                "ra": 13.5,
+                "decl": 47.0,
+                "exposure": 300.0,
+                "state": 1  # Should be included when not filtering by user
+            },
+            {
+                "user_id": 100,
+                "scope_id": 2,  # Different scope
+                "object": "M45",
+                "ra": 3.75,
+                "decl": 24.1,
+                "exposure": 300.0,
+                "state": 1  # Should not be included due to scope_id
+            }
+        ]
+
+        # Add test tasks
+        task_ids = []
+        for task in test_tasks:
+            response = self.app.post('/api/task-add',
+                                   data=json.dumps(task),
+                                   headers=self.headers)
+            data = json.loads(response.data)
+            self.assertTrue(data['status'])
+            task_ids.append(data['task_id'])
+
+        # Test night plan without user_id filter
+        response = self.app.get('/api/night-plan?scope_id=1',
+                              headers=self.headers)
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('tasks', data)
+        tasks = data['tasks']
+
+        # Should find 3 tasks (all tasks for scope_id=1)
+        self.assertEqual(len(tasks), 3)
+        task_objects = [task['object'] for task in tasks]
+        self.assertIn('M31', task_objects)
+        self.assertIn('M51', task_objects)
+
+        # Test night plan with user_id filter
+        response = self.app.get('/api/night-plan?scope_id=1&user_id=100',
+                              headers=self.headers)
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('tasks', data)
+        tasks = data['tasks']
+
+        # Should find 2 tasks (only user_id=100 tasks for scope_id=1)
+        self.assertEqual(len(tasks), 2)
+        task_objects = [task['object'] for task in tasks]
+        self.assertIn('M31', task_objects)
+        self.assertNotIn('M51', task_objects)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    def test_night_plan_no_auth(self):
+        """Test night plan retrieval without authentication"""
+        response = self.app.get('/api/night-plan?scope_id=1')
+        self.assertEqual(response.status_code, 401)  # Unauthorized
+
+    def test_night_plan_missing_scope(self):
+        """Test night plan retrieval without scope_id"""
+        response = self.app.get('/api/night-plan',
+                              headers=self.headers)
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
+
+    @use_repository
+    def test_night_plan_with_date_filters(self, config):
+        """Test night plan with skip_before and skip_after dates"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        from datetime import datetime, timedelta
+        now = datetime.utcnow()
+        future = now + timedelta(days=1)
+        past = now - timedelta(days=1)
+
+        # Create test tasks with different date constraints
+        test_tasks = [
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "M31",
+                "ra": 0.712,
+                "decl": 41.27,
+                "exposure": 300.0,
+                "skip_before": past.isoformat(),
+                "skip_after": future.isoformat(),
+                "state": 1  # Should be included
+            },
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "M33",
+                "ra": 1.5,
+                "decl": 30.0,
+                "exposure": 300.0,
+                "skip_before": future.isoformat(),  # Future date
+                "state": 1  # Should not be included
+            },
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "M51",
+                "ra": 13.5,
+                "decl": 47.0,
+                "exposure": 300.0,
+                "skip_after": past.isoformat(),  # Past date
+                "state": 1  # Should not be included
+            }
+        ]
+
+        # Add test tasks
+        for task in test_tasks:
+            self.app.post('/api/task-add',
+                         data=json.dumps(task),
+                         headers=self.headers)
+
+        # Test night plan
+        response = self.app.get('/api/night-plan?scope_id=1&user_id=1',
+                              headers=self.headers)
+
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('tasks', data)
+        tasks = data['tasks']
+
+        # Should find only 1 task (M31, which is within the date range)
+        self.assertEqual(len(tasks), 1)
+        self.assertEqual(tasks[0]['object'], 'M31')
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 if __name__ == '__main__':
     unittest.main()
