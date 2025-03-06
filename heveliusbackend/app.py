@@ -200,6 +200,7 @@ class TasksRequestSchema(Schema):
 class Task(Schema):
     task_id = fields.Integer(required=True, metadata={"description": "Task ID"})
     user_id = fields.Integer(required=True, metadata={"description": "User ID"})
+    scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
     aavso_id = fields.String(metadata={"description": "AAVSO identifier"})
     object = fields.String(metadata={"description": "Object name"})
     ra = fields.Float(metadata={"description": "Right Ascension"})
@@ -474,7 +475,7 @@ class TasksResource(MethodView):
 
     def _get_tasks(self, user_id=None, limit=None):
         """Helper method to get tasks based on filters"""
-        query = """SELECT task_id, tasks.user_id, aavso_id, object, ra, decl,
+        query = """SELECT task_id, tasks.user_id, scope_id, aavso_id, object, ra, decl,
             exposure, descr, filter, binning, guiding, dither,
             calibrate, solve, other_cmd,
             min_alt, moon_distance, skip_before, skip_after,
@@ -501,36 +502,37 @@ class TasksResource(MethodView):
             task_dict = {
                 'task_id': task[0],
                 'user_id': task[1],
-                'aavso_id': task[2],
-                'object': task[3],
-                'ra': task[4],
-                'decl': task[5],
-                'exposure': task[6],
-                'descr': task[7],
-                'filter': task[8],
-                'binning': task[9],
-                'guiding': bool(task[10]),
-                'dither': bool(task[11]),
-                'calibrate': bool(task[12]),
-                'solve': bool(task[13]),
-                'other_cmd': task[14],
-                'min_alt': task[15],
-                'moon_distance': task[16],
-                'skip_before': task[17],
-                'skip_after': task[18],
-                'min_interval': task[19],
-                'comment': task[20],
-                'state': task[21],
-                'imagename': task[22],
-                'created': task[23],
-                'activated': task[24],
-                'performed': task[25],
-                'max_moon_phase': task[26],
-                'max_sun_alt': task[27],
-                'auto_center': bool(task[28]),
-                'calibrated': bool(task[29]),
-                'solved': bool(task[30]),
-                'sent': bool(task[31])
+                'scope_id': task[2],
+                'aavso_id': task[3],
+                'object': task[4],
+                'ra': task[5],
+                'decl': task[6],
+                'exposure': task[7],
+                'descr': task[8],
+                'filter': task[9],
+                'binning': task[10],
+                'guiding': bool(task[11]),
+                'dither': bool(task[12]),
+                'calibrate': bool(task[13]),
+                'solve': bool(task[14]),
+                'other_cmd': task[15],
+                'min_alt': task[16],
+                'moon_distance': task[17],
+                'skip_before': task[18],
+                'skip_after': task[19],
+                'min_interval': task[20],
+                'comment': task[21],
+                'state': task[22],
+                'imagename': task[23],
+                'created': task[24],
+                'activated': task[25],
+                'performed': task[26],
+                'max_moon_phase': task[27],
+                'max_sun_alt': task[28],
+                'auto_center': bool(task[29]),
+                'calibrated': bool(task[30]),
+                'solved': bool(task[31]),
+                'sent': bool(task[32])
             }
             formatted_tasks.append(task_dict)
 
@@ -565,7 +567,7 @@ class TaskGetResource(MethodView):
             min_interval, comment, state, imagename,
             created, activated, performed, max_moon_phase,
             max_sun_alt, auto_center, calibrated, solved,
-            sent FROM tasks, users WHERE task_id = %s"""
+            sent, scope_id FROM tasks, users WHERE task_id = %s"""
 
         cnx = db.connect()
         task = db.run_query(cnx, query, (task_id,))
@@ -613,7 +615,8 @@ class TaskGetResource(MethodView):
             'auto_center': bool(task[28]),
             'calibrated': bool(task[29]),
             'solved': bool(task[30]),
-            'sent': bool(task[31])
+            'sent': bool(task[31]),
+            'scope_id': task[32]
         }
 
         return {
