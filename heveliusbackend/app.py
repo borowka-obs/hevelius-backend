@@ -727,6 +727,18 @@ class NightPlanResource(MethodView):
         """Get list of tasks available for execution tonight
         Returns a list of astronomical observation tasks that can be executed during the current night
         """
+        return self._get_night_plan(args)
+
+    @jwt_required()
+    @blp.arguments(NightPlanRequestSchema)
+    @blp.response(200, TasksList)
+    def post(self, args):
+        """Get list of tasks available for execution tonight
+        Returns a list of astronomical observation tasks that can be executed during the current night
+        """
+        return self._get_night_plan(args)
+
+    def _get_night_plan(self, args):
         scope_id = args['scope_id']
         user_id = args.get('user_id')  # Optional parameter
 
