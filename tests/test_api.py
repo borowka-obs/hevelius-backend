@@ -42,7 +42,7 @@ class TestTaskAdd(unittest.TestCase):
         """Test successful task addition"""
         test_task = {
             "user_id": 1,  # This should match the token's identity
-            "scope_id": 1,
+            "scope_id": 1,  # Required telescope ID
             "object": "M31",
             "ra": 0.712,  # ~00h 42m for M31
             "decl": 41.27,  # ~41° 16' for M31
@@ -72,7 +72,7 @@ class TestTaskAdd(unittest.TestCase):
         # Verify the task was actually added to the database
         task_id = data['task_id']
         cnx = db.connect()
-        query = """SELECT task_id, user_id, object, ra, decl, exposure,
+        query = """SELECT task_id, user_id, scope_id, object, ra, decl, exposure,
                          filter, binning, guiding, dither, solve, calibrate, state
                   FROM tasks WHERE task_id = %s"""
         result = db.run_query(cnx, query, (task_id,))
@@ -85,17 +85,18 @@ class TestTaskAdd(unittest.TestCase):
         # Verify all fields match what we sent
         self.assertEqual(task[0], task_id)  # task_id
         self.assertEqual(task[1], test_task['user_id'])  # user_id
-        self.assertEqual(task[2], test_task['object'])  # object
-        self.assertEqual(float(task[3]), test_task['ra'])  # ra
-        self.assertEqual(float(task[4]), test_task['decl'])  # decl
-        self.assertEqual(float(task[5]), test_task['exposure'])  # exposure
-        self.assertEqual(task[6], test_task['filter'])  # filter
-        self.assertEqual(task[7], test_task['binning'])  # binning
-        self.assertEqual(bool(task[8]), test_task['guiding'])  # guiding
-        self.assertEqual(bool(task[9]), test_task['dither'])  # dither
-        self.assertEqual(bool(task[10]), test_task['solve'])  # solve
-        self.assertEqual(bool(task[11]), test_task['calibrate'])  # calibrate
-        self.assertEqual(task[12], 1)  # state should be 1 for new tasks
+        self.assertEqual(task[2], test_task['scope_id'])  # scope_id
+        self.assertEqual(task[3], test_task['object'])  # object
+        self.assertEqual(float(task[4]), test_task['ra'])  # ra
+        self.assertEqual(float(task[5]), test_task['decl'])  # decl
+        self.assertEqual(float(task[6]), test_task['exposure'])  # exposure
+        self.assertEqual(task[7], test_task['filter'])  # filter
+        self.assertEqual(task[8], test_task['binning'])  # binning
+        self.assertEqual(bool(task[9]), test_task['guiding'])  # guiding
+        self.assertEqual(bool(task[10]), test_task['dither'])  # dither
+        self.assertEqual(bool(task[11]), test_task['solve'])  # solve
+        self.assertEqual(bool(task[12]), test_task['calibrate'])  # calibrate
+        self.assertEqual(task[13], 1)  # state should be 1 for new tasks
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
@@ -104,6 +105,7 @@ class TestTaskAdd(unittest.TestCase):
         test_task = {
             "object": "M31",
             "exposure": 300.0
+            # Missing required fields: user_id and scope_id
         }
 
         response = self.app.post('/api/task-add',
@@ -223,7 +225,7 @@ class TestTaskGet(unittest.TestCase):
         # First create a task
         test_task = {
             "user_id": 1,
-            "scope_id": 1,
+            "scope_id": 1,  # Required telescope ID
             "object": "M31",
             "ra": 0.712,
             "decl": 41.27,
@@ -258,6 +260,9 @@ class TestTaskGet(unittest.TestCase):
         self.assertEqual(data['task']['object'], 'M31')
         self.assertEqual(data['task']['ra'], 0.712)
         self.assertEqual(data['task']['decl'], 41.27)
+        self.assertTrue(data['task']['scope_id'])
+        self.assertTrue(test_task['scope_id'])
+        self.assertEqual(data['task']['scope_id'], test_task['scope_id'])
 
     @use_repository
     def test_task_get_not_found(self, config):
@@ -316,7 +321,7 @@ class TestTaskUpdate(unittest.TestCase):
         # First create a task
         test_task = {
             "user_id": 1,
-            "scope_id": 1,
+            "scope_id": 1,  # Required telescope ID
             "object": "M31",
             "ra": 0.712,
             "decl": 41.27,
@@ -339,6 +344,7 @@ class TestTaskUpdate(unittest.TestCase):
         # Update the task
         update_data = {
             "task_id": task_id,
+            "scope_id": 2,  # Test updating scope_id
             "object": "M33",
             "exposure": 600.0
         }
@@ -363,6 +369,7 @@ class TestTaskUpdate(unittest.TestCase):
         # Original fields should remain unchanged
         self.assertEqual(data['task']['ra'], 0.712)
         self.assertEqual(data['task']['decl'], 41.27)
+        self.assertEqual(data['task']['scope_id'], 2)  # Verify scope_id was updated
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
@@ -395,8 +402,9 @@ class TestTaskUpdate(unittest.TestCase):
             "object": "M33"
         }
 
+        # Send request without headers (no authentication)
         response = self.app.post('/api/task-update',
-                                 data=json.dumps(update_data))
+                               data=json.dumps(update_data))
         self.assertEqual(response.status_code, 401)  # Unauthorized
 
     def test_task_update_missing_task_id(self):
