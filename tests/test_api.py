@@ -607,8 +607,8 @@ class TestNightPlan(unittest.TestCase):
         """Test night plan with skip_before and skip_after dates"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
 
-        from datetime import datetime, timedelta
-        now = datetime.utcnow()
+        from datetime import datetime, timedelta, timezone
+        now = datetime.now(timezone.utc)
         future = now + timedelta(days=1)
         past = now - timedelta(days=1)
 
