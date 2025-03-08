@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added /api/task-get endpoint (for getting task details)
 - Added /api/task-update endpoint (for updating task state)
 - Corrected new tasks to be in state 1 (new), not e (template)
+- Added /api/night-plan endpoint (generates observation plan for the night)
 
 ## 0.1.0 - 2025-03-02
 
