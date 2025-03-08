@@ -404,7 +404,7 @@ class TestTaskUpdate(unittest.TestCase):
 
         # Send request without headers (no authentication)
         response = self.app.post('/api/task-update',
-                               data=json.dumps(update_data))
+                                 data=json.dumps(update_data))
         self.assertEqual(response.status_code, 401)  # Unauthorized
 
     def test_task_update_missing_task_id(self):
@@ -530,7 +530,7 @@ class TestNightPlan(unittest.TestCase):
                 "state": 1  # Should NOT be included (Template task)
             },
             {
-                "user_id": 101, # Different user
+                "user_id": 101,  # Different user
                 "scope_id": 1,
                 "object": "M51",
                 "ra": 13.5,
@@ -553,15 +553,15 @@ class TestNightPlan(unittest.TestCase):
         task_ids = []
         for task in test_tasks:
             response = self.app.post('/api/task-add',
-                                   data=json.dumps(task),
-                                   headers=self.headers)
+                                     data=json.dumps(task),
+                                     headers=self.headers)
             data = json.loads(response.data)
             self.assertTrue(data['status'])
             task_ids.append(data['task_id'])
 
         # Test night plan without user_id filter
         response = self.app.get('/api/night-plan?scope_id=1',
-                              headers=self.headers)
+                                headers=self.headers)
 
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
@@ -576,7 +576,7 @@ class TestNightPlan(unittest.TestCase):
 
         # Test night plan with user_id filter
         response = self.app.get('/api/night-plan?scope_id=1&user_id=100',
-                              headers=self.headers)
+                                headers=self.headers)
 
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
@@ -599,7 +599,7 @@ class TestNightPlan(unittest.TestCase):
     def test_night_plan_missing_scope(self):
         """Test night plan retrieval without scope_id"""
         response = self.app.get('/api/night-plan',
-                              headers=self.headers)
+                                headers=self.headers)
         self.assertEqual(response.status_code, 422)  # Unprocessable Entity
 
     @use_repository
@@ -650,12 +650,12 @@ class TestNightPlan(unittest.TestCase):
         # Add test tasks
         for task in test_tasks:
             self.app.post('/api/task-add',
-                         data=json.dumps(task),
-                         headers=self.headers)
+                          data=json.dumps(task),
+                          headers=self.headers)
 
         # Test night plan
         response = self.app.get('/api/night-plan?scope_id=1&user_id=1',
-                              headers=self.headers)
+                                headers=self.headers)
 
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
