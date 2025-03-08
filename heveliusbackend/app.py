@@ -407,7 +407,7 @@ class TaskAddResource(MethodView):
 
         # Optional: verify that the user_id in the request matches the token
         # Allow adding for other users in testing mode
-        if (task_data['user_id'] != current_user_id) and (app.testing == False):
+        if (task_data['user_id'] != current_user_id) and not app.testing:
             return {
                 'status': False,
                 'msg': 'Unauthorized: token user_id does not match request user_id'
