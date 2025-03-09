@@ -6,6 +6,7 @@ import unittest
 import os
 import warnings
 import json
+from datetime import datetime
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from marshmallow import warnings as marshmallow_warnings
@@ -604,13 +605,12 @@ class TestNightPlan(unittest.TestCase):
 
     @use_repository
     def test_night_plan_with_date_filters(self, config):
-        """Test night plan with skip_before and skip_after dates"""
+        """Test night plan with date parameter and skip_before/skip_after dates"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
 
-        from datetime import datetime, timedelta, timezone
-        now = datetime.now(timezone.utc)
-        future = now + timedelta(days=1)
-        past = now - timedelta(days=1)
+        test_date = datetime(2024, 3, 15).date()  # Specific test date
+        before_date = datetime(2024, 3, 14).date()
+        after_date = datetime(2024, 3, 16).date()
 
         # Create test tasks with different date constraints
         test_tasks = [
@@ -621,8 +621,8 @@ class TestNightPlan(unittest.TestCase):
                 "ra": 0.712,
                 "decl": 41.27,
                 "exposure": 300.0,
-                "skip_before": past.isoformat(),
-                "skip_after": future.isoformat(),
+                "skip_before": datetime(2024, 3, 14).isoformat(),  # Before test date
+                "skip_after": datetime(2024, 3, 16).isoformat(),   # After test date
                 "state": 1  # Should be included
             },
             {
@@ -632,7 +632,7 @@ class TestNightPlan(unittest.TestCase):
                 "ra": 1.5,
                 "decl": 30.0,
                 "exposure": 300.0,
-                "skip_before": future.isoformat(),  # Future date
+                "skip_before": datetime(2024, 3, 16).isoformat(),  # After test date
                 "state": 1  # Should not be included
             },
             {
@@ -642,29 +642,82 @@ class TestNightPlan(unittest.TestCase):
                 "ra": 13.5,
                 "decl": 47.0,
                 "exposure": 300.0,
-                "skip_after": past.isoformat(),  # Past date
+                "skip_after": datetime(2024, 3, 14).isoformat(),   # Before test date
                 "state": 1  # Should not be included
+            },
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "M42",
+                "ra": 5.5,
+                "decl": -5.4,
+                "exposure": 300.0,
+                # No date constraints
+                "state": 1  # Should be included
             }
         ]
 
         # Add test tasks
         for task in test_tasks:
-            self.app.post('/api/task-add',
-                          data=json.dumps(task),
-                          headers=self.headers)
+            response = self.app.post('/api/task-add',
+                                     data=json.dumps(task),
+                                     headers=self.headers)
+            self.assertTrue(json.loads(response.data)['status'])
 
-        # Test night plan
-        response = self.app.get('/api/night-plan?scope_id=1&user_id=1',
-                                headers=self.headers)
+        # Test 1: Get night plan for specific date
+        response = self.app.get(
+            f'/api/night-plan?scope_id=1&user_id=1&date={test_date.isoformat()}',
+            headers=self.headers
+        )
 
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
         self.assertIn('tasks', data)
         tasks = data['tasks']
 
-        # Should find only 1 task (M31, which is within the date range)
-        self.assertEqual(len(tasks), 1)
-        self.assertEqual(tasks[0]['object'], 'M31')
+        # Should find 2 tasks (M31 which is within range and M42 which has no constraints)
+        self.assertEqual(len(tasks), 2)
+        task_objects = set(task['object'] for task in tasks)
+        self.assertEqual(task_objects, {'M31', 'M42'})
+
+        # Test 2: Get night plan for date before skip_before
+        response = self.app.get(
+            f'/api/night-plan?scope_id=1&user_id=1&date={before_date.isoformat()}',
+            headers=self.headers
+        )
+
+        data = json.loads(response.data)
+        tasks = data['tasks']
+        task_objects = set(task['object'] for task in tasks)
+        # Should only find M42 (no date constraints)
+        self.assertEqual(task_objects, {'M42'})
+
+        # Test 3: Get night plan for date after skip_after
+        response = self.app.get(
+            f'/api/night-plan?scope_id=1&user_id=1&date={after_date.isoformat()}',
+            headers=self.headers
+        )
+
+        data = json.loads(response.data)
+        tasks = data['tasks']
+        task_objects = set(task['object'] for task in tasks)
+        # Should only find M42 (no date constraints)
+        self.assertEqual(task_objects, {'M42'})
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_night_plan_invalid_date_format(self, config):
+        """Test night plan with invalid date format"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # Test with invalid date format
+        response = self.app.get(
+            '/api/night-plan?scope_id=1&user_id=1&date=invalid-date',
+            headers=self.headers
+        )
+
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
