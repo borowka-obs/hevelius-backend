@@ -306,6 +306,7 @@ class TaskUpdateResponseSchema(Schema):
 class NightPlanRequestSchema(Schema):
     scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
     user_id = fields.Integer(metadata={"description": "Optional User ID filter"})
+    date = fields.Date(required=False, metadata={"description": "Date in YYYY-MM-DD format"})
 
 
 @app.route('/')
@@ -741,6 +742,7 @@ class NightPlanResource(MethodView):
     def _get_night_plan(self, args):
         scope_id = args['scope_id']
         user_id = args.get('user_id')  # Optional parameter
+        date = args.get('date')  # Optional parameter
 
         query = """SELECT task_id, tasks.user_id, scope_id, aavso_id, object, ra, decl,
             exposure, descr, filter, binning, guiding, dither,
@@ -752,11 +754,18 @@ class NightPlanResource(MethodView):
             sent FROM tasks, users
             WHERE tasks.user_id = users.user_id
             AND scope_id = %s
-            AND state IN (1, 2, 3)
-            AND (skip_before IS NULL OR skip_before < NOW())
-            AND (skip_after IS NULL OR skip_after > NOW())"""
+            AND state IN (1, 2, 3)"""
 
         values = [scope_id]
+
+        if date is not None:
+            query += " AND (skip_before IS NULL OR skip_before < %s) AND (skip_after IS NULL OR skip_after > %s)"
+            values.append(date)
+            values.append(date)
+        else:
+            query += """
+            AND (skip_before IS NULL OR skip_before < NOW())
+            AND (skip_after IS NULL OR skip_after > NOW())"""
 
         if user_id is not None:
             query += " AND tasks.user_id = %s"
