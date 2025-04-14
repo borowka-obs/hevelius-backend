@@ -191,15 +191,44 @@ class TaskAddResponseSchema(Schema):
     )
 
 
+# Add new schema for sorting and filtering parameters
+class TaskSortField(fields.String):
+    def _validate(self, value):
+        allowed_fields = [
+            'task_id', 'state', 'object', 'exposure',
+            'skip_before', 'skip_after', 'ra', 'decl',
+            'created', 'performed', 'user_id'
+        ]
+        if value not in allowed_fields:
+            raise ValidationError(f"Invalid sort field. Must be one of: {', '.join(allowed_fields)}")
+
+
 class TasksRequestSchema(Schema):
-    user_id = fields.Integer(
-        required=False,
-        metadata={"description": "Filter tasks by user ID"}
-    )
-    limit = fields.Integer(
-        required=False,
-        metadata={"description": "Maximum number of tasks to return"}
-    )
+    # Paging parameters
+    page = fields.Integer(missing=1, validate=validate.Range(min=1),
+                        metadata={"description": "Page number (starting from 1)"})
+    per_page = fields.Integer(missing=100, validate=validate.Range(min=1, max=1000),
+                            metadata={"description": "Number of items per page"})
+
+    # Sorting parameters
+    sort_by = TaskSortField(missing='task_id',
+                          metadata={"description": "Field to sort by"})
+    sort_order = fields.String(missing='desc', validate=validate.OneOf(['asc', 'desc']),
+                             metadata={"description": "Sort order (asc or desc)"})
+
+    # Filtering parameters
+    user_id = fields.Integer(metadata={"description": "Filter by user ID"})
+    scope_id = fields.Integer(metadata={"description": "Filter by scope ID"})
+    object = fields.String(metadata={"description": "Filter by object name"})
+    ra_min = fields.Float(metadata={"description": "Minimum RA value"})
+    ra_max = fields.Float(metadata={"description": "Maximum RA value"})
+    decl_min = fields.Float(metadata={"description": "Minimum declination value"})
+    decl_max = fields.Float(metadata={"description": "Maximum declination value"})
+    exposure = fields.Float(metadata={"description": "Filter by exposure time"})
+    descr = fields.String(metadata={"description": "Filter by description"})
+    state = fields.Integer(metadata={"description": "Filter by state"})
+    performed_after = fields.DateTime(metadata={"description": "Filter tasks performed after this time"})
+    performed_before = fields.DateTime(metadata={"description": "Filter tasks performed before this time"})
 
 
 class Task(Schema):
@@ -240,6 +269,10 @@ class Task(Schema):
 
 class TasksList(Schema):
     tasks = fields.List(fields.Nested(Task))
+    total = fields.Integer(required=True, metadata={"description": "Total number of tasks"})
+    page = fields.Integer(required=True, metadata={"description": "Current page number"})
+    per_page = fields.Integer(required=True, metadata={"description": "Items per page"})
+    pages = fields.Integer(required=True, metadata={"description": "Total number of pages"})
 
 
 class VersionResponseSchema(Schema):
@@ -461,36 +494,22 @@ class TaskAddResource(MethodView):
 @blp.route("/tasks")
 class TasksResource(MethodView):
     @jwt_required()
-    @blp.arguments(TasksRequestSchema)
+    @blp.arguments(TasksRequestSchema, location="query")
     @blp.response(200, TasksList)
-    def get(self):
-        """Get list of tasks
-        Returns a list of astronomical observation tasks, optionally filtered by user_id
-        """
-        # Get parameters from query string for GET request
-        user_id = request.args.get('user_id', type=int)
-        limit = request.args.get('limit', type=int)
-
-        tasks = self._get_tasks(user_id, limit)
-        return {"tasks": tasks}
+    def get(self, args):
+        """Get list of tasks with paging, sorting, and filtering"""
+        return self._get_tasks(args)
 
     @jwt_required()
     @blp.arguments(TasksRequestSchema)
     @blp.response(200, TasksList)
-    def post(self, task_data):
-        """Get list of tasks
-        Returns a list of astronomical observation tasks, optionally filtered by user_id
-        """
-        # Get parameters from request body for POST request
-        user_id = task_data.get('user_id')
-        limit = task_data.get('limit')
+    def post(self, args):
+        """Get list of tasks with paging, sorting, and filtering"""
+        return self._get_tasks(args)
 
-        tasks = self._get_tasks(user_id, limit)
-
-        return {"tasks": tasks}
-
-    def _get_tasks(self, user_id=None, limit=None):
-        """Helper method to get tasks based on filters"""
+    def _get_tasks(self, args):
+        """Helper method to get tasks based on filters, sorting, and paging"""
+        # Base query
         query = """SELECT task_id, tasks.user_id, scope_id, aavso_id, object, ra, decl,
             exposure, descr, filter, binning, guiding, dither,
             calibrate, solve, other_cmd,
@@ -500,19 +519,90 @@ class TasksResource(MethodView):
             max_sun_alt, auto_center, calibrated, solved,
             sent FROM tasks, users WHERE tasks.user_id = users.user_id"""
 
-        if user_id is not None:
-            query = query + f" AND tasks.user_id={user_id}"
+        count_query = """SELECT COUNT(*) FROM tasks, users
+            WHERE tasks.user_id = users.user_id"""
 
-        query = query + " ORDER by task_id DESC"
+        # Build where clause and parameters
+        where_clauses = []
+        params = []
 
-        if limit is not None:
-            query = query + f" LIMIT {limit}"
+        # Apply filters
+        if args.get('user_id'):
+            where_clauses.append("tasks.user_id = %s")
+            params.append(args['user_id'])
 
+        if args.get('scope_id'):
+            where_clauses.append("scope_id = %s")
+            params.append(args['scope_id'])
+
+        if args.get('object'):
+            where_clauses.append("object ILIKE %s")
+            params.append(f"%{args['object']}%")
+
+        if args.get('ra_min') is not None:
+            where_clauses.append("ra >= %s")
+            params.append(args['ra_min'])
+
+        if args.get('ra_max') is not None:
+            where_clauses.append("ra <= %s")
+            params.append(args['ra_max'])
+
+        if args.get('decl_min') is not None:
+            where_clauses.append("decl >= %s")
+            params.append(args['decl_min'])
+
+        if args.get('decl_max') is not None:
+            where_clauses.append("decl <= %s")
+            params.append(args['decl_max'])
+
+        if args.get('exposure'):
+            where_clauses.append("exposure = %s")
+            params.append(args['exposure'])
+
+        if args.get('descr'):
+            where_clauses.append("descr ILIKE %s")
+            params.append(f"%{args['descr']}%")
+
+        if args.get('state') is not None:
+            where_clauses.append("state = %s")
+            params.append(args['state'])
+
+        if args.get('performed_after'):
+            where_clauses.append("performed >= %s")
+            params.append(args['performed_after'])
+
+        if args.get('performed_before'):
+            where_clauses.append("performed <= %s")
+            params.append(args['performed_before'])
+
+        # Add where clauses to queries
+        if where_clauses:
+            where_str = " AND " + " AND ".join(where_clauses)
+            query += where_str
+            count_query += where_str
+
+        # Add sorting
+        sort_field = args.get('sort_by', 'task_id')
+        sort_order = args.get('sort_order', 'desc').upper()
+        query += f" ORDER BY {sort_field} {sort_order}"
+
+        # Add pagination
+        page = args.get('page', 1)
+        per_page = args.get('per_page', 100)
+        offset = (page - 1) * per_page
+        query += f" LIMIT {per_page} OFFSET {offset}"
+
+        # Execute queries
         cnx = db.connect()
-        tasks_list = db.run_query(cnx, query)
+
+        # Get total count
+        total_count = db.run_query(cnx, count_query, params)[0][0]
+
+        # Get paginated results
+        tasks_list = db.run_query(cnx, query, params)
         cnx.close()
 
-        # Convert the raw database results to a list of task dictionaries
+        # Format tasks
         formatted_tasks = []
         for task in tasks_list:
             task_dict = {
@@ -552,7 +642,16 @@ class TasksResource(MethodView):
             }
             formatted_tasks.append(task_dict)
 
-        return formatted_tasks
+        # Calculate total pages
+        total_pages = (total_count + per_page - 1) // per_page
+
+        return {
+            "tasks": formatted_tasks,
+            "total": total_count,
+            "page": page,
+            "per_page": per_page,
+            "pages": total_pages
+        }
 
 
 @blp.route("/version")
