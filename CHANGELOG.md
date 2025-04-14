@@ -3,13 +3,20 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## 0.3.0 - Unreleased
+
+- pagination added for tasks
+- sorting added for tasks
+- filtering added for tasks
+
 ## 0.2.0 - 2025-03-09
 
 - Added support for `hevelius version` command
 - Added /api/version endpoint (for getting version information)
 - Added /api/task-get endpoint (for getting task details)
 - Added /api/task-update endpoint (for updating task state)
-- Corrected new tasks to be in state 1 (new), not e (template)
+- Corrected new tasks to be in state 1 (new), not 0 (template)
 - Added /api/night-plan endpoint (generates observation plan for the night)
 
 ## 0.1.0 - 2025-03-02
