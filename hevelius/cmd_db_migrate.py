@@ -151,7 +151,5 @@ def migrate_pgsql(args, cfg={}):
             current_ver = db.version_get(cnx)
             cnx.close()
 
-            print(f"Version after schema upgrade {current_ver}, db is {cfg['database']}")
-
         else:
             print(f"Skipping {f}, schema version is {current_ver}")
