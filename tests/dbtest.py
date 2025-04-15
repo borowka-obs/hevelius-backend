@@ -37,15 +37,19 @@ def _read_configuration():
     })
 
 
-def _standard_seed_db(config):
+def _standard_seed_db(config, load_test_data=True):
     '''Migrate and seed the test database.'''
     migrate_pgsql({"dry_run": False}, cfg=config)
 
-    run_file(config, "db/test-data.psql")
-
+    if load_test_data:
+        print("Loading test data full")
+        run_file(config, "db/test-data.psql")
+    else:
+        print("Loading test data basic")
+        run_file(config, "tests/test-data-basic.psql")
 
 @contextmanager
-def setup_database_test_case():
+def setup_database_test_case(*, load_test_data=True):
     '''Create the test database, migrate it to the latest version, and
     destroy after test case.'''
     mgmt_config, test_config = _read_configuration()
@@ -70,7 +74,7 @@ def setup_database_test_case():
     except Exception as e:
         print(f"Failed to create DB. You might want to do (ALTER USER hevelius CREATEDB) and run again. Exception: {e}")
 
-    _standard_seed_db(test_config)
+    _standard_seed_db(test_config, load_test_data)
 
     try:
         yield test_config
@@ -90,12 +94,23 @@ def setup_database_test_case():
         maintenance_connection.close()
 
 
-def use_repository(f):
+def use_repository(f=None, *, load_test_data=True):
     '''The test case decorator that passes the repository object
     as the first argument. The repository uses the test database.
-    The database is destroyed after the test case.'''
-    @wraps(f)
-    def wrapper(self, *args, **kwargs):
-        with setup_database_test_case() as config:
-            return f(self, config, *args, **kwargs)
-    return wrapper
+    The database is destroyed after the test case.
+
+    Args:
+        f: The function to decorate (when used without parameters)
+        load_test_data: If True (default), loads test data into the database
+    '''
+    def decorator(func):
+        @wraps(func)
+        def wrapper(self, *args, **kwargs):
+            with setup_database_test_case(load_test_data=load_test_data) as config:
+                return func(self, config, *args, **kwargs)
+        return wrapper
+
+    # Handle both @use_repository and @use_repository(load_test_data=False) cases
+    if f is None:
+        return decorator
+    return decorator(f)

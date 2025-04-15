@@ -11,6 +11,8 @@ from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from marshmallow import warnings as marshmallow_warnings
 from hevelius import db
+from hevelius.cmd_db_migrate import run_file
+
 
 # Suppress the specific marshmallow warning
 warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
@@ -720,6 +722,277 @@ class TestNightPlan(unittest.TestCase):
         self.assertEqual(response.status_code, 422)  # Unprocessable Entity
 
         os.environ.pop('HEVELIUS_DB_NAME')
+
+
+class TestTasks(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        app.testing = True  # Set testing flag on the actual app instance
+
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository(load_test_data=False)
+    def test_tasks_pagination(self, config):
+        """Test tasks endpoint pagination"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # Create 150 test tasks
+        test_tasks = []
+        for i in range(150):
+            task = {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": f"Test Object {i}",
+                "ra": 0.712,
+                "decl": 41.27,
+                "exposure": 300.0,
+                "state": 1
+            }
+            test_tasks.append(task)
+
+        # Add all test tasks
+        for task in test_tasks:
+            response = self.app.post('/api/task-add',
+                                   data=json.dumps(task),
+                                   headers=self.headers)
+            self.assertTrue(json.loads(response.data)['status'])
+
+        # Test default pagination (page 1, 100 per page)
+        response = self.app.get('/api/tasks', headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(data['tasks']), 100)  # Default per_page
+        self.assertEqual(data['page'], 1)
+        self.assertEqual(data['per_page'], 100)
+        self.assertEqual(data['total'], 150)
+        self.assertEqual(data['pages'], 2)
+
+        # Test second page
+        response = self.app.get('/api/tasks?page=2', headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(len(data['tasks']), 50)  # Remaining tasks
+        self.assertEqual(data['page'], 2)
+
+        # Test custom per_page
+        response = self.app.get('/api/tasks?per_page=50', headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(len(data['tasks']), 50)
+        self.assertEqual(data['pages'], 3)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository(load_test_data=False)
+    def test_tasks_sorting(self, config):
+        """Test tasks endpoint sorting"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # Create test tasks with different values
+        test_tasks = [
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "A Object",
+                "ra": 1.0,
+                "decl": 0.0,
+                "exposure": 100.0,
+                "state": 1
+            },
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "B Object",
+                "ra": 2.0,
+                "decl": 10.0,
+                "exposure": 200.0,
+                "state": 0
+            }
+        ]
+
+        # Add test tasks
+        for task in test_tasks:
+            response = self.app.post('/api/task-add',
+                                   data=json.dumps(task),
+                                   headers=self.headers)
+            self.assertTrue(json.loads(response.data)['status'])
+
+        # Test sorting by different fields
+        sort_tests = [
+            ('object', 'asc', 'A Object'),
+            ('object', 'desc', 'B Object'),
+            ('ra', 'asc', 1.0),
+            ('ra', 'desc', 2.0),
+            ('exposure', 'asc', 100.0),
+            ('state', 'asc', 0)
+        ]
+
+        # TODO: Sorting by state doesn't seem to work.
+
+        for sort_by, sort_order, expected_first in sort_tests:
+            response = self.app.get(
+                f'/api/tasks?sort_by={sort_by}&sort_order={sort_order}',
+                headers=self.headers
+            )
+            data = json.loads(response.data)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(len(data['tasks']) > 0)
+
+            # Check if sorting worked
+            first_task = data['tasks'][0]
+            self.assertEqual(first_task[sort_by], expected_first)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository(load_test_data=False)
+    def test_tasks_filtering(self, config):
+        """Test tasks endpoint filtering"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # Create test tasks with different values
+        test_tasks = [
+            {
+                "user_id": 1,
+                "scope_id": 1,
+                "object": "M31",
+                "ra": 0.712,
+                "decl": 41.27,
+                "exposure": 300.0,
+                "state": 1,
+                "descr": "Test description 1"
+            },
+            {
+                "user_id": 2,
+                "scope_id": 2,
+                "object": "M33",
+                "ra": 1.5,
+                "decl": 30.0,
+                "exposure": 400.0,
+                "state": 0,
+                "descr": "Test description 2"
+            }
+        ]
+
+        # Add test tasks
+        for task in test_tasks:
+            response = self.app.post('/api/task-add',
+                                   data=json.dumps(task),
+                                   headers=self.headers)
+            self.assertTrue(json.loads(response.data)['status'])
+
+        # Test various filters
+        filter_tests = [
+            ('user_id=1', 1),
+            ('scope_id=2', 1),
+            ('object=M31', 1),
+            ('ra_min=1.0&ra_max=2.0', 1),
+            ('decl_min=35.0&decl_max=45.0', 1),
+            ('exposure=300.0', 1),
+            ('state=0', 1),
+            ('descr=description', 2)  # Should match both tasks
+        ]
+
+        for query_params, expected_count in filter_tests:
+            response = self.app.get(
+                f'/api/tasks?{query_params}',
+                headers=self.headers
+            )
+            data = json.loads(response.data)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(data['tasks']), expected_count)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_tasks_performed_date_range(self, config):
+        """Test tasks endpoint filtering by performed date range"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # Create test tasks with different performed dates
+        # Note: We'll need to update the performed dates directly in the database
+        test_task = {
+            "user_id": 1,
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "exposure": 300.0,
+            "state": 1
+        }
+
+        # Add test task
+        response = self.app.post('/api/task-add',
+                               data=json.dumps(test_task),
+                               headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+
+        # Update performed date in database
+        cnx = db.connect()
+        db.run_query(
+            cnx,
+            "UPDATE tasks SET performed = %s WHERE task_id = %s",
+            (datetime(2024, 1, 1, 12, 0, 0), task_id)
+        )
+        cnx.close()
+
+        # Test date range filtering
+        date_range_tests = [
+            # Should find the task
+            ('2024-01-01T00:00:00', '2024-01-02T00:00:00', 1),
+            # Should not find the task
+            ('2024-01-02T00:00:00', '2024-01-03T00:00:00', 0),
+            # Should find the task
+            ('2023-12-31T00:00:00', '2024-01-02T00:00:00', 1)
+        ]
+
+        for after, before, expected_count in date_range_tests:
+            response = self.app.get(
+                f'/api/tasks?performed_after={after}&performed_before={before}',
+                headers=self.headers
+            )
+            data = json.loads(response.data)
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(len(data['tasks']), expected_count)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    def test_tasks_invalid_sort_field(self):
+        """Test tasks endpoint with invalid sort field"""
+        response = self.app.get(
+            '/api/tasks?sort_by=invalid_field',
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
+
+    def test_tasks_invalid_sort_order(self):
+        """Test tasks endpoint with invalid sort order"""
+        response = self.app.get(
+            '/api/tasks?sort_order=invalid',
+            headers=self.headers
+        )
+        self.assertEqual(response.status_code, 422)  # Unprocessable Entity
+
+    def test_tasks_no_auth(self):
+        """Test tasks endpoint without authentication"""
+        response = self.app.get('/api/tasks')
+        self.assertEqual(response.status_code, 401)  # Unauthorized
 
 
 if __name__ == '__main__':
