@@ -3,7 +3,7 @@ Flask application that provides a REST API to the Hevelius backend.
 """
 
 import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template
 from flask_cors import CORS
 from flask_smorest import Api, Blueprint
 import yaml
@@ -206,15 +206,15 @@ class TaskSortField(fields.String):
 class TasksRequestSchema(Schema):
     # Paging parameters
     page = fields.Integer(missing=1, validate=validate.Range(min=1),
-                        metadata={"description": "Page number (starting from 1)"})
+                          metadata={"description": "Page number (starting from 1)"})
     per_page = fields.Integer(missing=100, validate=validate.Range(min=1, max=1000),
-                            metadata={"description": "Number of items per page"})
+                              metadata={"description": "Number of items per page"})
 
     # Sorting parameters
     sort_by = TaskSortField(missing='task_id',
-                          metadata={"description": "Field to sort by"})
+                            metadata={"description": "Field to sort by"})
     sort_order = fields.String(missing='desc', validate=validate.OneOf(['asc', 'desc']),
-                             metadata={"description": "Sort order (asc or desc)"})
+                               metadata={"description": "Sort order (asc or desc)"})
 
     # Filtering parameters
     user_id = fields.Integer(metadata={"description": "Filter by user ID"})

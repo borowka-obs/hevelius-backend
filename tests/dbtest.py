@@ -48,6 +48,7 @@ def _standard_seed_db(config, load_test_data=True):
         print("Loading test data basic")
         run_file(config, "tests/test-data-basic.psql")
 
+
 @contextmanager
 def setup_database_test_case(*, load_test_data=True):
     '''Create the test database, migrate it to the latest version, and
