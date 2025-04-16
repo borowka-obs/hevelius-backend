@@ -128,7 +128,7 @@ class DbTest(unittest.TestCase):
         """Test that tasks can be retrieved by radius search."""
         conn = db.connect(config)
 
-        # For test data, see db/test-data.psql
+        # For test data, see tests/test-data.psql
 
         # Test cases with RA and Dec in degrees (0-360, -90 to +90)
         cases = [
