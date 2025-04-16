@@ -43,7 +43,7 @@ def _standard_seed_db(config, load_test_data=True):
 
     if load_test_data:
         print("Loading test data full")
-        run_file(config, "db/test-data.psql")
+        run_file(config, "tests/test-data.psql")
     else:
         print("Loading test data basic")
         run_file(config, "tests/test-data-basic.psql")
