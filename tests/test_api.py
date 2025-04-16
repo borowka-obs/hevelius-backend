@@ -11,7 +11,6 @@ from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from marshmallow import warnings as marshmallow_warnings
 from hevelius import db
-from hevelius.cmd_db_migrate import run_file
 
 
 # Suppress the specific marshmallow warning
@@ -766,8 +765,8 @@ class TestTasks(unittest.TestCase):
         # Add all test tasks
         for task in test_tasks:
             response = self.app.post('/api/task-add',
-                                   data=json.dumps(task),
-                                   headers=self.headers)
+                                     data=json.dumps(task),
+                                     headers=self.headers)
             self.assertTrue(json.loads(response.data)['status'])
 
         # Test default pagination (page 1, 100 per page)
@@ -827,8 +826,8 @@ class TestTasks(unittest.TestCase):
         # Add test tasks
         for task in test_tasks:
             response = self.app.post('/api/task-add',
-                                   data=json.dumps(task),
-                                   headers=self.headers)
+                                     data=json.dumps(task),
+                                     headers=self.headers)
             self.assertTrue(json.loads(response.data)['status'])
 
         # Test sorting by different fields
@@ -891,8 +890,8 @@ class TestTasks(unittest.TestCase):
         # Add test tasks
         for task in test_tasks:
             response = self.app.post('/api/task-add',
-                                   data=json.dumps(task),
-                                   headers=self.headers)
+                                     data=json.dumps(task),
+                                     headers=self.headers)
             self.assertTrue(json.loads(response.data)['status'])
 
         # Test various filters
@@ -938,8 +937,8 @@ class TestTasks(unittest.TestCase):
 
         # Add test task
         response = self.app.post('/api/task-add',
-                               data=json.dumps(test_task),
-                               headers=self.headers)
+                                 data=json.dumps(test_task),
+                                 headers=self.headers)
         task_id = json.loads(response.data)['task_id']
 
         # Update performed date in database
