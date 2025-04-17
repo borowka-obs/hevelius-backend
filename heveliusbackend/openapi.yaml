@@ -180,6 +180,89 @@ components:
         msg:
           type: string
           description: Status message
+    Sensor:
+      type: object
+      properties:
+        sensor_id:
+          type: integer
+          description: Sensor ID
+        name:
+          type: string
+          description: Sensor name
+        resx:
+          type: integer
+          description: Resolution in X axis (pixels)
+        resy:
+          type: integer
+          description: Resolution in Y axis (pixels)
+        pixel_x:
+          type: number
+          format: float
+          description: Pixel size in X axis (microns)
+        pixel_y:
+          type: number
+          format: float
+          description: Pixel size in Y axis (microns)
+        bits:
+          type: integer
+          description: Bit depth
+        width:
+          type: number
+          format: float
+          description: Sensor width (mm)
+        height:
+          type: number
+          format: float
+          description: Sensor height (mm)
+    Telescope:
+      type: object
+      properties:
+        scope_id:
+          type: integer
+          description: Telescope ID
+        name:
+          type: string
+          description: Telescope name
+        descr:
+          type: string
+          description: Telescope description
+        min_dec:
+          type: number
+          format: float
+          description: Minimum declination
+        max_dec:
+          type: number
+          format: float
+          description: Maximum declination
+        focal:
+          type: number
+          format: float
+          description: Focal length (mm)
+        aperture:
+          type: number
+          format: float
+          description: Aperture (mm)
+        lon:
+          type: number
+          format: float
+          description: Longitude
+        lat:
+          type: number
+          format: float
+          description: Latitude
+        alt:
+          type: number
+          format: float
+          description: Altitude
+        sensor:
+          $ref: '#/components/schemas/Sensor'
+        active:
+          type: boolean
+          description: Whether the telescope is active
+    TelescopesList:
+      type: array
+      items:
+        $ref: '#/components/schemas/Telescope'
 paths:
   /api/version:
     get:
@@ -516,3 +599,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskUpdateResponse'
+  /api/scopes:
+    get:
+      summary: Get list of telescopes
+      description: Returns a list of telescopes with their associated sensors
+      responses:
+        '200':
+          description: List of telescopes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelescopesList'
+      security:
+        - bearerAuth: []

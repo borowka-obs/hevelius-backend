@@ -342,6 +342,37 @@ class NightPlanRequestSchema(Schema):
     date = fields.Date(required=False, metadata={"description": "Date in YYYY-MM-DD format"})
 
 
+class SensorSchema(Schema):
+    sensor_id = fields.Integer(required=True, metadata={"description": "Sensor ID"})
+    name = fields.String(metadata={"description": "Sensor name"})
+    resx = fields.Integer(metadata={"description": "Resolution in X axis (pixels)"})
+    resy = fields.Integer(metadata={"description": "Resolution in Y axis (pixels)"})
+    pixel_x = fields.Float(metadata={"description": "Pixel size in X axis (microns)"})
+    pixel_y = fields.Float(metadata={"description": "Pixel size in Y axis (microns)"})
+    bits = fields.Integer(metadata={"description": "Bit depth"})
+    width = fields.Float(metadata={"description": "Sensor width (mm)"})
+    height = fields.Float(metadata={"description": "Sensor height (mm)"})
+
+
+class TelescopeSchema(Schema):
+    scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
+    name = fields.String(metadata={"description": "Telescope name"})
+    descr = fields.String(metadata={"description": "Telescope description"})
+    min_dec = fields.Float(metadata={"description": "Minimum declination"})
+    max_dec = fields.Float(metadata={"description": "Maximum declination"})
+    focal = fields.Float(metadata={"description": "Focal length (mm)"})
+    aperture = fields.Float(metadata={"description": "Aperture (mm)"})
+    lon = fields.Float(metadata={"description": "Longitude"})
+    lat = fields.Float(metadata={"description": "Latitude"})
+    alt = fields.Float(metadata={"description": "Altitude"})
+    sensor = fields.Nested(SensorSchema, allow_none=True, metadata={"description": "Associated sensor"})
+    active = fields.Boolean(metadata={"description": "Whether the telescope is active"})
+
+
+class TelescopesListSchema(Schema):
+    telescopes = fields.List(fields.Nested(TelescopeSchema))
+
+
 @app.route('/')
 def root():
     """Just a stub API homepage."""
@@ -917,6 +948,64 @@ class NightPlanResource(MethodView):
             formatted_tasks.append(task_dict)
 
         return {"tasks": formatted_tasks}
+
+
+@blp.route("/scopes")
+class ScopesResource(MethodView):
+    @jwt_required()
+    @blp.response(200, TelescopesListSchema)
+    def get(self):
+        """Get list of telescopes with their associated sensors"""
+        # Query to get telescopes with their sensors
+        query = """
+            SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
+                   t.lon, t.lat, t.alt, t.sensor_id, t.active,
+                   s.sensor_id, s.name, s.resx, s.resy, s.pixel_x, s.pixel_y,
+                   s.bits, s.width, s.height
+            FROM telescopes t
+            LEFT JOIN sensors s ON t.sensor_id = s.sensor_id
+            ORDER BY t.scope_id
+        """
+
+        cnx = db.connect()
+        results = db.run_query(cnx, query)
+        cnx.close()
+
+        telescopes = []
+        for row in results:
+            telescope = {
+                'scope_id': row[0],
+                'name': row[1],
+                'descr': row[2],
+                'min_dec': row[3],
+                'max_dec': row[4],
+                'focal': row[5],
+                'aperture': row[6],
+                'lon': row[7],
+                'lat': row[8],
+                'alt': row[9],
+                'active': row[11]
+            }
+
+            # Add sensor data if available
+            if row[10] is not None:  # if sensor_id is not null
+                telescope['sensor'] = {
+                    'sensor_id': row[12],
+                    'name': row[13],
+                    'resx': row[14],
+                    'resy': row[15],
+                    'pixel_x': row[16],
+                    'pixel_y': row[17],
+                    'bits': row[18],
+                    'width': row[19],
+                    'height': row[20]
+                }
+            else:
+                telescope['sensor'] = None
+
+            telescopes.append(telescope)
+
+        return {"telescopes": telescopes}
 
 
 # Register blueprint

@@ -3,7 +3,8 @@ ALTER TABLE telescopes
     ADD COLUMN aperture float,
     ADD COLUMN lon float,
     ADD COLUMN lat float,
-    ADD COLUMN alt float;
+    ADD COLUMN alt float,
+    ADD COLUMN active boolean DEFAULT true;
 
 ALTER TABLE telescopes ADD COLUMN sensor_id integer;
 
