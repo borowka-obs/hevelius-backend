@@ -37,16 +37,15 @@ def _read_configuration():
     })
 
 
-def _standard_seed_db(config, load_test_data=True):
+def _standard_seed_db(config, load_test_data: str):
     '''Migrate and seed the test database.'''
     migrate_pgsql({"dry_run": False}, cfg=config)
 
-    if load_test_data:
-        print("Loading test data full")
-        run_file(config, "tests/test-data.psql")
+    if load_test_data is not None:
+        print(f"Loading test data from file {load_test_data}")
+        run_file(config, load_test_data)
     else:
-        print("Loading test data basic")
-        run_file(config, "tests/test-data-basic.psql")
+        print("Skipping loading data.")
 
 
 @contextmanager
@@ -95,7 +94,7 @@ def setup_database_test_case(*, load_test_data=True):
         maintenance_connection.close()
 
 
-def use_repository(f=None, *, load_test_data=True):
+def use_repository(f=None, *, load_test_data: str = None):
     '''The test case decorator that passes the repository object
     as the first argument. The repository uses the test database.
     The database is destroyed after the test case.
