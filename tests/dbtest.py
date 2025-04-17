@@ -49,7 +49,7 @@ def _standard_seed_db(config, load_test_data: str):
 
 
 @contextmanager
-def setup_database_test_case(*, load_test_data=True):
+def setup_database_test_case(*, load_test_data : str = None):
     '''Create the test database, migrate it to the latest version, and
     destroy after test case.'''
     mgmt_config, test_config = _read_configuration()
@@ -94,7 +94,7 @@ def setup_database_test_case(*, load_test_data=True):
         maintenance_connection.close()
 
 
-def use_repository(f=None, *, load_test_data: str = None):
+def use_repository(f=None, *, load_test_data = "tests/test-data.psql"):
     '''The test case decorator that passes the repository object
     as the first argument. The repository uses the test database.
     The database is destroyed after the test case.
