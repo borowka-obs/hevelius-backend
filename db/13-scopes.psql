@@ -1,0 +1,12 @@
+ALTER TABLE telescopes
+    ADD COLUMN focal float,
+    ADD COLUMN aperture float,
+    ADD COLUMN lon float,
+    ADD COLUMN lat float,
+    ADD COLUMN alt float;
+
+ALTER TABLE telescopes ADD COLUMN sensor_id integer;
+
+ALTER TABLE telescopes ADD CONSTRAINT fk_sensor FOREIGN KEY(sensor_id) REFERENCES sensors(sensor_id);
+
+UPDATE schema_version SET version = 13;
