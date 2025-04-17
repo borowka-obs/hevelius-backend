@@ -12,7 +12,6 @@ from tests.dbtest import use_repository
 from marshmallow import warnings as marshmallow_warnings
 from hevelius import db
 
-
 # Suppress the specific marshmallow warning
 warnings.filterwarnings("ignore", category=marshmallow_warnings.RemovedInMarshmallow4Warning)
 
@@ -743,7 +742,7 @@ class TestTasks(unittest.TestCase):
                 'Content-Type': 'application/json'
             }
 
-    @use_repository(load_test_data=False)
+    @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_tasks_pagination(self, config):
         """Test tasks endpoint pagination"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
@@ -796,7 +795,7 @@ class TestTasks(unittest.TestCase):
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
-    @use_repository(load_test_data=False)
+    @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_tasks_sorting(self, config):
         """Test tasks endpoint sorting"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
@@ -858,7 +857,7 @@ class TestTasks(unittest.TestCase):
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
-    @use_repository(load_test_data=False)
+    @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_tasks_filtering(self, config):
         """Test tasks endpoint filtering"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
@@ -992,6 +991,128 @@ class TestTasks(unittest.TestCase):
         """Test tasks endpoint without authentication"""
         response = self.app.get('/api/tasks')
         self.assertEqual(response.status_code, 401)  # Unauthorized
+
+
+class TestScopes(unittest.TestCase):
+    def setUp(self):
+        """Set up test client before each test"""
+        self.app = app.test_client()
+        self.app.testing = True
+
+        # Create a test JWT token
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,  # user_id=1
+                additional_claims={
+                    'permissions': 1,
+                    'username': 'test_user'
+                }
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository(load_test_data=None)
+    def test_scopes_success(self, config):
+        """Test successful retrieval of telescopes and their sensors"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        # First create test sensors
+        cnx = db.connect()
+        db.run_query(cnx, """
+            INSERT INTO sensors (sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height)
+            VALUES
+            (1, 'Test Sensor 1', 1024, 1024, 9.0, 9.0, 16, 9.216, 9.216),
+            (2, 'Test Sensor 2', 2048, 2048, 4.5, 4.5, 16, 9.216, 9.216)
+            RETURNING sensor_id""")
+        cnx.close()
+
+        # Create test telescopes
+        cnx = db.connect()
+        db.run_query(cnx, """
+            INSERT INTO telescopes (scope_id, name, descr, min_dec, max_dec, focal, aperture,
+                                  lon, lat, alt, sensor_id, active)
+            VALUES
+            (1, 'Test Scope 1', 'Test Description 1', -90.0, 90.0, 1000.0, 200.0,
+             0.0, 0.0, 0.0, 1, true),
+            (2, 'Test Scope 2', 'Test Description 2', -45.0, 45.0, 2000.0, 400.0,
+             0.0, 0.0, 0.0, 2, true),
+            (3, 'Test Scope 3', 'Test Description 3', -30.0, 30.0, 3000.0, 600.0,
+             0.0, 0.0, 0.0, NULL, false)
+            RETURNING scope_id""")
+        cnx.close()
+
+        # Get scopes
+        response = self.app.get('/api/scopes', headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('telescopes', data)
+        telescopes = data['telescopes']
+
+        # Should find all 3 telescopes
+        self.assertEqual(len(telescopes), 3)
+
+        # Verify first telescope with sensor
+        scope1 = next(t for t in telescopes if t['scope_id'] == 1)
+        self.assertEqual(scope1['name'], 'Test Scope 1')
+        self.assertEqual(scope1['descr'], 'Test Description 1')
+        self.assertEqual(scope1['min_dec'], -90.0)
+        self.assertEqual(scope1['max_dec'], 90.0)
+        self.assertEqual(scope1['focal'], 1000.0)
+        self.assertEqual(scope1['aperture'], 200.0)
+        self.assertEqual(scope1['lon'], 0.0)
+        self.assertEqual(scope1['lat'], 0.0)
+        self.assertEqual(scope1['alt'], 0.0)
+        self.assertTrue(scope1['active'])
+        self.assertIsNotNone(scope1['sensor'])
+        self.assertEqual(scope1['sensor']['sensor_id'], 1)
+        self.assertEqual(scope1['sensor']['name'], 'Test Sensor 1')
+        self.assertEqual(scope1['sensor']['resx'], 1024)
+        self.assertEqual(scope1['sensor']['resy'], 1024)
+        self.assertEqual(scope1['sensor']['pixel_x'], 9.0)
+        self.assertEqual(scope1['sensor']['pixel_y'], 9.0)
+        self.assertEqual(scope1['sensor']['bits'], 16)
+        self.assertEqual(scope1['sensor']['width'], 9.216)
+        self.assertEqual(scope1['sensor']['height'], 9.216)
+
+        # Verify second telescope with different sensor
+        scope2 = next(t for t in telescopes if t['scope_id'] == 2)
+        self.assertEqual(scope2['name'], 'Test Scope 2')
+        self.assertEqual(scope2['sensor']['sensor_id'], 2)
+        self.assertEqual(scope2['sensor']['name'], 'Test Sensor 2')
+        self.assertEqual(scope2['sensor']['resx'], 2048)
+        self.assertEqual(scope2['sensor']['resy'], 2048)
+        self.assertEqual(scope2['sensor']['pixel_x'], 4.5)
+        self.assertEqual(scope2['sensor']['pixel_y'], 4.5)
+
+        # Verify third telescope without sensor
+        scope3 = next(t for t in telescopes if t['scope_id'] == 3)
+        self.assertEqual(scope3['name'], 'Test Scope 3')
+        self.assertIsNone(scope3['sensor'])
+        self.assertFalse(scope3['active'])
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    def test_scopes_no_auth(self):
+        """Test scopes endpoint without authentication"""
+        response = self.app.get('/api/scopes')
+        self.assertEqual(response.status_code, 401)  # Unauthorized
+
+    @use_repository(load_test_data=None)
+    def test_scopes_empty(self, config):
+        """Test scopes endpoint with empty database"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        response = self.app.get('/api/scopes', headers=self.headers)
+        data = json.loads(response.data)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('telescopes', data)
+        self.assertEqual(len(data['telescopes']), 0)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
 
 
 if __name__ == '__main__':
