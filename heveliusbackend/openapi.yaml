@@ -263,6 +263,100 @@ components:
       type: array
       items:
         $ref: '#/components/schemas/Telescope'
+    Catalog:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Catalog name
+        shortname:
+          type: string
+          description: Catalog short name
+        filename:
+          type: string
+          description: Catalog filename
+        descr:
+          type: string
+          description: Catalog description
+        url:
+          type: string
+          description: Catalog URL
+        version:
+          type: string
+          description: Catalog version
+    Object:
+      type: object
+      properties:
+        object_id:
+          type: integer
+          description: Object ID
+        name:
+          type: string
+          description: Object name
+        ra:
+          type: number
+          format: float
+          description: Right Ascension
+        decl:
+          type: number
+          format: float
+          description: Declination
+        descr:
+          type: string
+          description: Description
+        comment:
+          type: string
+          description: Comment
+        type:
+          type: string
+          description: Object type
+        epoch:
+          type: string
+          description: Epoch
+        const:
+          type: string
+          description: Constellation
+        magn:
+          type: number
+          format: float
+          description: Magnitude
+        x:
+          type: number
+          format: float
+          description: X coordinate
+        y:
+          type: number
+          format: float
+          description: Y coordinate
+        altname:
+          type: string
+          description: Alternative name
+        distance:
+          type: number
+          format: float
+          description: Distance
+        catalog:
+          type: string
+          description: Catalog short name
+    ObjectsList:
+      type: object
+      properties:
+        objects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Object'
+        total:
+          type: integer
+          description: Total number of objects
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Items per page
+        pages:
+          type: integer
+          description: Total number of pages
 paths:
   /api/version:
     get:
@@ -610,5 +704,144 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TelescopesList'
+      security:
+        - bearerAuth: []
+  /api/catalogs/search:
+    get:
+      summary: Search for astronomical objects
+      description: Search for astronomical objects by name or alternative name
+      parameters:
+        - name: query
+          in: query
+          description: Search query
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Maximum number of results
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+      responses:
+        '200':
+          description: List of matching objects
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  objects:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Object'
+      security:
+        - bearerAuth: []
+  /api/catalogs/list:
+    get:
+      summary: Get list of astronomical objects
+      description: Returns a paginated list of astronomical objects with sorting and filtering options
+      parameters:
+        - name: page
+          in: query
+          description: Page number (starting from 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [catalog, name, ra, decl]
+            default: name
+        - name: sort_order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: catalog
+          in: query
+          description: Filter by catalog short name
+          required: false
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Filter by object name
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of objects with pagination info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectsList'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Get list of astronomical objects
+      description: Returns a paginated list of astronomical objects with sorting and filtering options
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  description: Page number (starting from 1)
+                  default: 1
+                  minimum: 1
+                per_page:
+                  type: integer
+                  description: Number of items per page
+                  default: 100
+                  minimum: 1
+                  maximum: 1000
+                sort_by:
+                  type: string
+                  description: Field to sort by
+                  enum: [catalog, name, ra, decl]
+                  default: name
+                sort_order:
+                  type: string
+                  description: Sort order
+                  enum: [asc, desc]
+                  default: asc
+                catalog:
+                  type: string
+                  description: Filter by catalog short name
+                name:
+                  type: string
+                  description: Filter by object name
+      responses:
+        '200':
+          description: List of objects with pagination info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectsList'
       security:
         - bearerAuth: []
