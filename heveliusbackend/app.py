@@ -403,15 +403,15 @@ class ObjectSchema(Schema):
 class ObjectSearchRequestSchema(Schema):
     query = fields.String(required=True, metadata={"description": "Search query"})
     limit = fields.Integer(missing=10, validate=validate.Range(min=1, max=100),
-                          metadata={"description": "Maximum number of results"})
+                           metadata={"description": "Maximum number of results"})
 
 
 class ObjectsListRequestSchema(Schema):
     # Paging parameters
     page = fields.Integer(missing=1, validate=validate.Range(min=1),
-                         metadata={"description": "Page number (starting from 1)"})
+                          metadata={"description": "Page number (starting from 1)"})
     per_page = fields.Integer(missing=100, validate=validate.Range(min=1, max=1000),
-                             metadata={"description": "Number of items per page"})
+                              metadata={"description": "Number of items per page"})
 
     # Sorting parameters
     sort_by = fields.String(missing='name', validate=validate.OneOf(
@@ -419,7 +419,7 @@ class ObjectsListRequestSchema(Schema):
         error="Invalid sort field. Must be one of: catalog, name, ra, decl"
     ))
     sort_order = fields.String(missing='asc', validate=validate.OneOf(['asc', 'desc']),
-                              metadata={"description": "Sort order (asc or desc)"})
+                               metadata={"description": "Sort order (asc or desc)"})
 
     # Filtering parameters
     catalog = fields.String(metadata={"description": "Filter by catalog short name"})
