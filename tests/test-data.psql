@@ -52,17 +52,19 @@ INSERT INTO tasks (task_id, user_id, scope_id, object, ra, decl, exposure, descr
 INSERT INTO tasks (task_id, user_id, scope_id, object, ra, decl, exposure, descr, filter, binning, guiding, dither, calibrate, solve, other_cmd, min_alt, moon_distance, skip_before, skip_after, min_interval, comment, state, imagename, created, activated, performed, max_moon_phase, max_sun_alt, auto_center, calibrated, solved, sent, he_resx, he_resy, he_obsstart, he_exposure, he_settemp, he_ccdtemp, he_pixwidth, he_pixheight, he_xbinning, he_ybinning, he_filter, he_objectra, he_objectdec, he_objectalt, he_objectaz, he_objectha, he_site_lat, he_site_lon, he_pierside, he_jd, he_jd_helio, he_tracktime, he_focal, he_aperture_diam, he_aperture_area, he_scope, he_camera, he_moon_alt, he_moon_angle, he_moon_phase, he_sun_alt, he_solved, he_solved_ra, he_solved_dec, he_solved_refx, he_solved_refy, he_pixscalex, he_pixscaley, he_solved_ra_change_x, he_solved_ra_change_y, he_solved_dec_change_x, he_solved_dec_change_y, he_fwhm, he_stars, eccentricity, sensor_id) VALUES (800, 1, 1, 'NGC 4565', 12.6058, 25.9869, 300, 'Needle Galaxy', 'CV', 1, true, false, true, true, NULL, 30, 0, '2016-03-02 17:08:00', '2016-06-16 16:08:00', 0, '', 6, 'RJAC/2016Q1/__DB_2016-03-04_03-52-29_J000800_RJAC_CV_1x1_0300s_NGC 4565.fit', '2016-03-02 17:08:28', '2016-03-03 18:04:00', '2016-03-04 05:47:35', 100, -18, false, true, false, false, 3326, 2504, '2016-03-04 02:52:30', 300, -20, -20, 5.4, 5.4, 1, 1, 'CV', 12.606111111111112, 25.984166666666667, 72.3314, 230.4149, 1.0047, 38.16555555555556, -2.326388888888889, 'EAST', 2457451.6197916665, 2457451.626479, 10, 2541, 318, 65412.458372049805, 'Planewave 12.5 CDK', 'QSI 583ws S/N 00504709 HW 06.00.00 FW 05.02.09 PI 6.4.962.4', 0.6, 27.7, -28.9, -42.5, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, 1);
 
 
+INSERT INTO catalogs(name, shortname) VALUES ('Caldwell','C');
+
 --
 -- Data for Name: objects; Type: TABLE DATA; Schema:  Owner: hevelius
 --
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C19', 'IC5146', 21.8917, 47.27, 'BN', 'Cyg', 10.0, 12, 12, 'Cocoon Neb');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C20', '7000', 20.9800, 44.33, 'BN', 'Cyg', 6.0, 120, 100, 'North American Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C27', '6888', 20.2000, 38.35, 'BN', 'Cyg', 7.5, 20, 10, 'Crescent Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C33', '6992/5', 20.9400, 31.72, 'SN', 'Cyg', 0, 60, 8, 'East Veil Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C34', '6960', 20.7617, 30.72, 'SN', 'Cyg', 0, 70, 6, 'West Veil Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C49', '2237-9', 6.5383, 5.05, 'BN', 'Mon', 0, 80, 60, 'Rosette Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C60', '4038', 12.0317, -18.87, 'ScG', 'Crv', 11.3, 2.6, 1.8, 'The Antennae');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C61', '4039', 12.0317, -18.88, 'ScG', 'Crv', 13.0, 3.2, 2.2, 'The Antennae');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C80', '5139', 13.4467, -47.48, 'GC', 'Cen', 3.6, 36, 36, 'Omega Centauri');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C92', '3372', 10.7300, -59.87, 'BN', 'Car', 6.2, 120, 120, 'Eta Carinae Nebula');
-INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment) VALUES('C99', '--', 12.8833, -63.00, 'DN', 'Cru', 0, 400, 300, 'Coal Sack');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C19', 'IC5146', 21.8917, 47.27, 'BN', 'Cyg', 10.0, 12, 12, 'Cocoon Neb','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C20', '7000', 20.9800, 44.33, 'BN', 'Cyg', 6.0, 120, 100, 'North American Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C27', '6888', 20.2000, 38.35, 'BN', 'Cyg', 7.5, 20, 10, 'Crescent Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C33', '6992/5', 20.9400, 31.72, 'SN', 'Cyg', 0, 60, 8, 'East Veil Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C34', '6960', 20.7617, 30.72, 'SN', 'Cyg', 0, 70, 6, 'West Veil Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C49', '2237-9', 6.5383, 5.05, 'BN', 'Mon', 0, 80, 60, 'Rosette Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C60', '4038', 12.0317, -18.87, 'ScG', 'Crv', 11.3, 2.6, 1.8, 'The Antennae','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C61', '4039', 12.0317, -18.88, 'ScG', 'Crv', 13.0, 3.2, 2.2, 'The Antennae','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C80', '5139', 13.4467, -47.48, 'GC', 'Cen', 3.6, 36, 36, 'Omega Centauri','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C92', '3372', 10.7300, -59.87, 'BN', 'Car', 6.2, 120, 120, 'Eta Carinae Nebula','C');
+INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C99', '--', 12.8833, -63.00, 'DN', 'Cru', 0, 400, 300, 'Coal Sack','C');
