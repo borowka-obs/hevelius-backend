@@ -1,0 +1,38 @@
+ALTER TABLE objects ADD COLUMN catalog varchar(32), ADD FOREIGN KEY ("catalog") REFERENCES catalogs(shortname);
+
+UPDATE objects SET catalog='NGC' WHERE substring(name,1,3) = 'NGC';
+UPDATE objects SET catalog='IC' WHERE substring(name,1,2) = 'IC';
+UPDATE objects SET catalog='M' WHERE substring(name,1,1) = 'M';
+UPDATE objects SET catalog='C' WHERE substring(name,1,1) = 'C';
+
+ALTER TABLE objects ALTER COLUMN catalog SET NOT NULL;
+
+CREATE INDEX ON tasks(task_id);
+
+
+
+-- For case-insensitive search on name and altname
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX objects_name_trgm_idx ON objects USING gin (name gin_trgm_ops);
+CREATE INDEX objects_altname_trgm_idx ON objects USING gin (altname gin_trgm_ops);
+
+-- For sorting by name
+CREATE INDEX objects_name_idx ON objects (name);
+
+-- For filtering by catalog
+CREATE INDEX objects_catalog_idx ON objects (catalog);
+
+-- For case-insensitive search on name (already created above)
+-- CREATE INDEX idx_objects_name_trgm ON objects USING gin (name gin_trgm_ops);
+
+-- For sorting by different fields
+CREATE INDEX objects_ra_idx ON objects (ra);
+CREATE INDEX objects_decl_idx ON objects (decl);
+
+-- For spatial queries using RA/DEC
+CREATE INDEX objects_ra_decl_idx ON objects (ra, decl);
+
+-- For exact name lookups
+CREATE INDEX objects_name_exact_idx ON objects (name);
+
+UPDATE schema_version SET version = 14;
