@@ -1,11 +1,11 @@
 import unittest
 import os
 import json
-from datetime import datetime
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from hevelius import db
 from heveliusbackend.app import app
+
 
 class TestCatalogs(unittest.TestCase):
     def setUp(self):
@@ -165,13 +165,13 @@ class TestCatalogs(unittest.TestCase):
 
         # Test POST with filters
         response = self.app.post('/api/catalogs/list',
-                               json={
+                                 json={
                                    'catalog': 'ngc',
                                    'name': '7000',
                                    'sort_by': 'name',
                                    'sort_order': 'asc'
-                               },
-                               headers=self.headers)
+                                 },
+                                 headers=self.headers)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertTrue(all(obj['catalog'] == 'ngc' for obj in data['objects']))
