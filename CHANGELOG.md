@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - pagination added for tasks
 - sorting added for tasks
 - filtering added for tasks
+- catalog support added: listing of objects, also querying catalogs
 
 ## 0.2.0 - 2025-03-09
 

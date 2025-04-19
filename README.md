@@ -10,7 +10,7 @@ of the features are usable already.
 
 ## Current capabilities (command-line)
 
-Status as of Mar 2025:
+Status as of Apr 2025:
 
 - **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
@@ -31,8 +31,11 @@ Status as of Mar 2025:
 ## Current capabilities (REST API)
 
 - Log in users
-- List tasks
-- Add new task
+- List tasks (with pagination, filtering, and sorting)
+- Add new observation task
+- Edit existing observation task
+- List objects from catalogs (Messier, Caldwell, NGC, IC are supported)
+- Search objects in catalogs
 - Display heat map of the sky (sky map colored with number of photos taken in each square degree)
 
 ## Documentation
