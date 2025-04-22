@@ -4,12 +4,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 
-## 0.3.0 - Unreleased
+## 0.3.0 - 2025-04-22
 
-- pagination added for tasks
-- sorting added for tasks
-- filtering added for tasks
-- catalog support added: listing of objects, also querying catalogs
+- Pagination added for tasks
+- Sorting added for tasks
+- Filtering added for tasks
+- Telescopes list added
+- Catalogs list and object search added
 
 ## 0.2.0 - 2025-03-09
 
