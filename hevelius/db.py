@@ -315,7 +315,7 @@ def catalog_get(conn, name: str) -> List:
     """
     Returns an object of specified name
     """
-    query = f"SELECT object_id, name, altname, ra, decl FROM objects WHERE name='{name}'"
+    query = f"SELECT object_id, name, altname, ra, decl FROM objects WHERE lower(name)='{name.lower()}'"
     result = run_query(conn, query)
 
     return result
