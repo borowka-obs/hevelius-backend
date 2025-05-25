@@ -1,6 +1,6 @@
 from hevelius import db
 from hevelius.utils import parse_dec, parse_ra, format_dec, format_ra
-from hevelius import config
+from hevelius.config import load_config
 from argparse import ArgumentTypeError
 import sys
 
@@ -36,6 +36,7 @@ def catalog(args):
 
     ra = 0
     decl = 0
+    found = False
     if len(args.object):
         print(f"Looking for object {args.object}")
         obj = db.catalog_get(conn, args.object)
@@ -43,9 +44,14 @@ def catalog(args):
             ra = obj[0][3]
             decl = obj[0][4]
             print(f"Found object {args.object} in a catalog, using its coords: RA {ra} DEC {decl}")
+            found = True
     else:
         ra = parse_ra(args.ra)
         decl = parse_dec(args.decl)
+
+    if not found:
+        print(f"Object {args.object} not found in a catalog")
+        return
 
     radius = float(args.proximity)
     format = format_get(args.format)
@@ -94,6 +100,8 @@ def catalog(args):
     if format == "none":
         return
 
+    repo_path = load_config()['paths']['repo-path']
+
     if format == "csv":
         print("# task_id, object, filename, fwhm, ra, decl, comment, he_resx, he_resy, filter, he_focal, binning")
     # Print a space separated list of task IDs
@@ -107,5 +115,5 @@ def catalog(args):
         elif format == "csv":
             print(f"{frame[0]},{frame[1]},{frame[2]},{frame[3]},{frame[4]},{frame[5]},{frame[6]},{frame[7]},{frame[8]},{frame[9]},{frame[10]}, {frame[11]}")
         elif format == "pixinsight":
-            print(f'   [true, "{config.REPO_PATH}/{frame[2]}", "", ""],')
+            print(f'   [true, "{repo_path}/{frame[2]}", "", ""],')
     print("")
