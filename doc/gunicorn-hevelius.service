@@ -1,0 +1,20 @@
+[Unit]
+Description=Gunicorn instance for Hevelius
+After=network.target
+
+[Service]
+User=hevelius
+Group=hevelius
+WorkingDirectory=/home/hevelius/devel/hevelius-backend
+Environment="PATH=/home/hevelius/devel/hevelius-backend:/home/hevelius/deve/hevelius-backend/hevelius"
+ExecStart=/home/hevelius/devel/hevelius-backend/venv/bin/gunicorn \
+  --keyfile /home/hevelius/tls/privkey.pem --certfile /home/hevelius/tls/cert.pem \
+  --access-logfile /var/log/hevelius/access.log --error-logfile /var/log/hevelius/error.log \
+  --workers 1 --bind 0.0.0.0:5001 heveliusbackend.app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
