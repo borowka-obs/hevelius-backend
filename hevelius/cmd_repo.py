@@ -4,6 +4,7 @@ Code that handles files repository on disk.
 import glob
 import sys
 from astropy.io import fits
+import os
 
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
@@ -353,9 +354,8 @@ def read_fits(filename):
 
     return hdul[0].header
 
-
-def repo(args):
-    """Manages the on disk images repository."""
+def sanity_files(args):
+    """This goes through the list of files and check if related tasks are present (and updates them if needed)"""
 
     if args.file:
         cnx = None
@@ -372,7 +372,156 @@ def repo(args):
         if args.dir:
             path = args.dir
         else:
-            path = config.REPO_PATH
+            path = config.load_config()['paths']['repo-path']
+
 
         print(f"Processing all *.fit files in dir: {path}")
         process_fits_dir(path, show_hdr=args.show_header, dry_run=args.dry_run)
+
+def sanity_db(args):
+    """This goes through the list of tasks and check if related files are present (and flags tasks that have missing files)"""
+
+    # Get configuration for repository path
+    config_data = config.load_config()
+    repo_path = config_data['paths']['repo-path']
+
+    # Parse min/max task_id range if specified
+    min_task_id = getattr(args, 'min_task_id', None)
+    max_task_id = getattr(args, 'max_task_id', None)
+
+    # Check if we should delete invalid tasks
+    delete_invalid = getattr(args, 'delete_invalid', False)
+
+    print(f"Checking database sanity against repository path: {repo_path}")
+    if min_task_id is not None or max_task_id is not None:
+        print(f"Task ID range: {min_task_id or 'all'} to {max_task_id or 'all'}")
+    print(f"Delete invalid tasks: {delete_invalid}")
+    print()
+
+    # Connect to database
+    cnx = db.connect()
+
+    # Build query to get tasks
+    query = "SELECT task_id, imagename FROM tasks"
+    conditions = []
+
+    if min_task_id is not None:
+        conditions.append(f"task_id >= {min_task_id}")
+    if max_task_id is not None:
+        conditions.append(f"task_id <= {max_task_id}")
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY task_id"
+
+    # Execute query
+    tasks = db.run_query(cnx, query)
+
+    if not tasks:
+        print("No tasks found in the specified range.")
+        cnx.close()
+        return
+
+    print(f"Found {len(tasks)} tasks to check.")
+    print()
+
+    # Track issues
+    tasks_no_filename = []
+    tasks_missing_file = []
+    tasks_ok = []
+
+    # Check each task
+    for task in tasks:
+        task_id = task[0]
+        imagename = task[1]
+
+        if not imagename:
+            # Task has no filename specified
+            tasks_no_filename.append(task_id)
+            continue
+
+        # Check if file exists on disk
+        file_path = os.path.join(repo_path, imagename)
+        if os.path.exists(file_path):
+            tasks_ok.append(task_id)
+        else:
+            # Task has filename but file is missing
+            tasks_missing_file.append(task_id)
+
+    # Print results
+    print("=== SANITY CHECK RESULTS ===")
+    print()
+
+    if tasks_no_filename:
+        print(f"Tasks with NO filename specified ({len(tasks_no_filename)}):")
+        for task_id in tasks_no_filename:
+            print(f"  Task {task_id}")
+        print()
+    else:
+        print("✓ All tasks have filenames specified.")
+        print()
+
+    if tasks_missing_file:
+        print(f"Tasks with MISSING files on disk ({len(tasks_missing_file)}):")
+        for task_id in tasks_missing_file:
+            # Get the filename for display
+            task_info = db.run_query(cnx, f"SELECT imagename FROM tasks WHERE task_id = {task_id}")
+            if task_info:
+                filename = task_info[0][0]
+                print(f"  Task {task_id}: {filename}")
+        print()
+    else:
+        print("✓ All files referenced by tasks exist on disk.")
+        print()
+
+    print(f"Tasks OK: {len(tasks_ok)}")
+    print(f"Total issues: {len(tasks_no_filename) + len(tasks_missing_file)}")
+    print()
+
+    # Handle deletion if requested
+    if delete_invalid and (tasks_no_filename or tasks_missing_file):
+        invalid_tasks = tasks_no_filename + tasks_missing_file
+
+        if not getattr(args, 'dry_run', False):
+            print(f"Deleting {len(invalid_tasks)} invalid tasks...")
+
+            # Delete tasks in batches to avoid long-running transactions
+            batch_size = 100
+            for i in range(0, len(invalid_tasks), batch_size):
+                batch = invalid_tasks[i:i + batch_size]
+                task_ids_str = ','.join(map(str, batch))
+
+                delete_query = f"DELETE FROM tasks WHERE task_id IN ({task_ids_str})"
+                result = db.run_query(cnx, delete_query)
+
+                print(f"  Deleted batch {i//batch_size + 1}: {len(batch)} tasks")
+
+            print("Invalid tasks deleted successfully.")
+        else:
+            print(f"DRY RUN: Would delete {len(invalid_tasks)} invalid tasks.")
+            print("Use --delete-invalid without --dry-run to actually delete them.")
+
+    elif delete_invalid:
+        print("No invalid tasks to delete.")
+
+    cnx.close()
+
+
+def repo(args):
+    """Manages the on disk images repository."""
+
+    if args.sanity_files:
+        sanity_files(args)
+
+    if args.sanity_db:
+        sanity_db(args)
+
+    if not args.sanity_files and not args.sanity_db:
+        print("ERROR: No sanity check selected. Use --sanity-files or --sanity-db to check the repository.")
+        return -1
+
+
+
+
+

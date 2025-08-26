@@ -44,6 +44,9 @@ def run():
     repo_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
     repo_parser.add_argument("--sanity-db", help="Goes through the list of tasks in a database and checks if all files are present", action='store_true')
     repo_parser.add_argument("--sanity-files", help="Goes through the list of files and check if related tasks are present", action='store_true')
+    repo_parser.add_argument("--min-task-id", help="Minimum task ID to check (for sanity-db)", type=int)
+    repo_parser.add_argument("--max-task-id", help="Maximum task ID to check (for sanity-db)", type=int)
+    repo_parser.add_argument("--delete-invalid", help="Delete invalid tasks (no filename or missing file) when using sanity-db", action='store_true')
 
     data_parser = subparsers.add_parser('data', help="Explores, analyses and digs through available data (data mining)")
     data_subparsers = data_parser.add_subparsers(help="Commands related to data", dest="data_command")
