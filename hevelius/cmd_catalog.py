@@ -36,7 +36,6 @@ def catalog(args):
 
     ra = 0
     decl = 0
-    found = False
     if len(args.object):
         print(f"Looking for object {args.object}")
         obj = db.catalog_get(conn, args.object)
@@ -44,14 +43,12 @@ def catalog(args):
             ra = obj[0][3]
             decl = obj[0][4]
             print(f"Found object {args.object} in a catalog, using its coords: RA {ra} DEC {decl}")
-            found = True
         else:
             print(f"Object {args.object} not found in a catalog")
             return
     else:
         ra = parse_ra(args.ra)
         decl = parse_dec(args.decl)
-        found = True  # Direct coordinate input is always considered valid
 
     radius = float(args.proximity)
     format = format_get(args.format)
