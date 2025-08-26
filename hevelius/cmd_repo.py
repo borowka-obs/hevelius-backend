@@ -354,6 +354,7 @@ def read_fits(filename):
 
     return hdul[0].header
 
+
 def sanity_files(args):
     """This goes through the list of files and check if related tasks are present (and updates them if needed)"""
 
@@ -374,9 +375,9 @@ def sanity_files(args):
         else:
             path = config.load_config()['paths']['repo-path']
 
-
         print(f"Processing all *.fit files in dir: {path}")
         process_fits_dir(path, show_hdr=args.show_header, dry_run=args.dry_run)
+
 
 def sanity_db(args):
     """This goes through the list of tasks and check if related files are present (and flags tasks that have missing files)"""
@@ -495,7 +496,7 @@ def sanity_db(args):
                 delete_query = f"DELETE FROM tasks WHERE task_id IN ({task_ids_str})"
                 result = db.run_query(cnx, delete_query)
 
-                print(f"  Deleted batch {i//batch_size + 1}: {len(batch)} tasks")
+                print(f"  Deleted batch {i//batch_size + 1}: {len(batch)} tasks, status: {result}")
 
             print("Invalid tasks deleted successfully.")
         else:
@@ -520,8 +521,3 @@ def repo(args):
     if not args.sanity_files and not args.sanity_db:
         print("ERROR: No sanity check selected. Use --sanity-files or --sanity-db to check the repository.")
         return -1
-
-
-
-
-
