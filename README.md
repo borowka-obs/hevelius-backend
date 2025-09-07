@@ -10,7 +10,7 @@ of the features are usable already.
 
 ## Current capabilities (command-line)
 
-Status as of Apr 2025:
+Status as of Sep 2025:
 
 - **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
@@ -22,8 +22,9 @@ Status as of Apr 2025:
 - **4 Catalogs**: Provides 4 catalogs (NGC, IC, Messier, and Caldwell) in a DB format and a basic interface to query it.
 - **PixInsight integration**: This is in the very early stages. The idea is that Hevelius will be able to offload certain
   tasks to Pix or at least export/import data in a format that's compatible with PixInsight.
-- **Command line iterface**: Currently Hevelius has a command line interface written in `python`. A Rest API and gui front-end
-  is planned, but currently not a priority.
+- **Command line iterface**: Currently Hevelius has a command line interface written in `python`.
+- **Web interface**.
+- **Rest API**.
 - **Ability to search based on distance**. Implemented proper Haversine formula.
 - **Database management**: Schema versioning and upgrades, backup, etc.
 - **Configuration**: Config file support and some limited environment variables.
