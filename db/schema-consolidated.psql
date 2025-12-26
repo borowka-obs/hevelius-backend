@@ -1,0 +1,286 @@
+-- =============================================================================
+-- CONSOLIDATED SCHEMA FOR TESTING
+-- =============================================================================
+-- This file represents the complete final schema (version 14) and is used
+-- ONLY for faster test execution. For production deployments, always use
+-- the incremental migration files (07-*.psql through 14-*.psql).
+--
+-- DO NOT manually edit this file. Regenerate it using:
+--   python -m hevelius.cmd_db_migrate --generate-consolidated
+-- or manually by applying all incremental migrations to a fresh database
+-- and dumping the schema.
+--
+-- Generated from incremental files: 07-init.psql through 14-catalogs-and-indexes.psql
+-- =============================================================================
+
+-- -----------------------------------------------------------------------------
+-- Table: users
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+  user_id SERIAL,
+  login varchar(32) DEFAULT NULL,
+  pass varchar(32) DEFAULT NULL,
+  firstname varchar(32) DEFAULT NULL,
+  lastname varchar(32) DEFAULT NULL,
+  share float DEFAULT NULL,
+  phone varchar(11) DEFAULT NULL,
+  email varchar(64) DEFAULT NULL,
+  permissions int NOT NULL DEFAULT 0,
+  aavso_id varchar(5) DEFAULT NULL,
+  ftp_login varchar(32) DEFAULT NULL,
+  ftp_pass varchar(32) DEFAULT NULL,
+  pass_d varchar(50) DEFAULT NULL,
+  PRIMARY KEY (user_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: filters
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS filters (
+  scope_id int DEFAULT NULL,
+  filter_id varchar(16) DEFAULT NULL,
+  descr varchar(128) DEFAULT NULL,
+  id SERIAL,
+  PRIMARY KEY (id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: sensors (from schema 10)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS sensors (
+  sensor_id SERIAL,
+  name varchar(128),
+  resx int,
+  resy int,
+  pixel_x float,
+  pixel_y float,
+  bits smallint,
+  width float,
+  height float,
+  PRIMARY KEY (sensor_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: telescopes (with additions from schema 13)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS telescopes (
+  scope_id int NOT NULL,
+  name varchar(64) DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  min_dec float DEFAULT NULL,
+  max_dec float DEFAULT NULL,
+  focal float,
+  aperture float,
+  lon float,
+  lat float,
+  alt float,
+  active boolean DEFAULT true,
+  sensor_id integer,
+  PRIMARY KEY (scope_id),
+  CONSTRAINT scope_id_unique UNIQUE(scope_id),
+  CONSTRAINT fk_sensor FOREIGN KEY(sensor_id) REFERENCES sensors(sensor_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: catalogs (from schema 09)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS catalogs (
+  name varchar UNIQUE,
+  shortname varchar(32) PRIMARY KEY,
+  filename varchar(64),
+  descr text,
+  url text,
+  version varchar(32)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: objects (with additions from schema 09 and 14)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS objects (
+  object_id SERIAL,
+  name varchar(68) NOT NULL,
+  ra float DEFAULT NULL,
+  decl float DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  comment text DEFAULT NULL,
+  type varchar(4) DEFAULT NULL,
+  epoch varchar(7) DEFAULT NULL,
+  const varchar(3) DEFAULT NULL,
+  magn float DEFAULT NULL,
+  x float DEFAULT NULL,
+  y float DEFAULT NULL,
+  altname varchar(128),
+  distance float,
+  catalog varchar(32) NOT NULL,
+  PRIMARY KEY (object_id),
+  FOREIGN KEY (catalog) REFERENCES catalogs(shortname)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: schema_version
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS schema_version (
+  version int DEFAULT NULL
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: settings
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS settings (
+  settings_id SERIAL,
+  name varchar(50) DEFAULT NULL,
+  value varchar(1024) DEFAULT NULL,
+  comment varchar(100) DEFAULT NULL,
+  PRIMARY KEY (settings_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: task_states (renamed from states in schema 11)
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS task_states (
+  id int NOT NULL UNIQUE,
+  name varchar(16) DEFAULT NULL,
+  descr varchar(128) DEFAULT NULL
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: tasks (with modifications from schema 08, 10, 12)
+-- Final schema with boolean types and sensor_id, without vphot/defocus
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS tasks (
+  task_id SERIAL,
+  user_id int NOT NULL,
+  scope_id int NOT NULL,
+  object varchar(64) DEFAULT NULL,
+  ra float DEFAULT NULL,
+  decl float DEFAULT NULL,
+  exposure float DEFAULT NULL,
+  descr varchar(1024) DEFAULT NULL,
+  filter varchar(16) DEFAULT NULL,
+  binning smallint DEFAULT NULL,
+  guiding bool DEFAULT True,
+  dither bool DEFAULT False,
+  calibrate bool DEFAULT NULL,
+  solve bool DEFAULT NULL,
+  other_cmd varchar(512) DEFAULT NULL,
+  min_alt float DEFAULT NULL,
+  moon_distance float DEFAULT NULL,
+  skip_before timestamp NOT NULL DEFAULT '2000-01-01 00:00:00',
+  skip_after timestamp NOT NULL DEFAULT '3000-01-01 00:00:00',
+  min_interval int DEFAULT NULL,
+  comment text DEFAULT NULL,
+  state int NOT NULL,
+  imagename varchar(256) DEFAULT NULL,
+  created timestamp NOT NULL DEFAULT now(),
+  activated timestamp NULL DEFAULT NULL,
+  performed timestamp NULL DEFAULT NULL,
+  max_moon_phase int DEFAULT NULL,
+  max_sun_alt int DEFAULT NULL,
+  auto_center bool DEFAULT False,
+  calibrated bool DEFAULT False,
+  solved bool DEFAULT False,
+  sent bool DEFAULT False,
+  he_resx int DEFAULT NULL,
+  he_resy int DEFAULT NULL,
+  he_obsstart timestamp DEFAULT NULL,
+  he_exposure float DEFAULT NULL,
+  he_settemp float DEFAULT NULL,
+  he_ccdtemp float DEFAULT NULL,
+  he_pixwidth float DEFAULT NULL,
+  he_pixheight float DEFAULT NULL,
+  he_xbinning int DEFAULT NULL,
+  he_ybinning int DEFAULT NULL,
+  he_filter varchar(20) DEFAULT NULL,
+  he_objectra float DEFAULT NULL,
+  he_objectdec float DEFAULT NULL,
+  he_objectalt float DEFAULT NULL,
+  he_objectaz float DEFAULT NULL,
+  he_objectha float DEFAULT NULL,
+  he_site_lat float DEFAULT NULL,
+  he_site_lon float DEFAULT NULL,
+  he_pierside varchar(4) DEFAULT NULL,
+  he_jd float DEFAULT NULL,
+  he_jd_helio float DEFAULT NULL,
+  he_tracktime float DEFAULT NULL,
+  he_focal float DEFAULT NULL,
+  he_aperture_diam float DEFAULT NULL,
+  he_aperture_area float DEFAULT NULL,
+  he_scope varchar(32) DEFAULT NULL,
+  he_camera varchar(64) DEFAULT NULL,
+  he_moon_alt float DEFAULT NULL,
+  he_moon_angle float DEFAULT NULL,
+  he_moon_phase float DEFAULT NULL,
+  he_sun_alt float DEFAULT NULL,
+  he_solved smallint DEFAULT NULL,
+  he_solved_ra float DEFAULT NULL,
+  he_solved_dec float DEFAULT NULL,
+  he_solved_refx int DEFAULT NULL,
+  he_solved_refy int DEFAULT NULL,
+  he_pixscalex float DEFAULT NULL,
+  he_pixscaley float DEFAULT NULL,
+  he_solved_ra_change_x float DEFAULT NULL,
+  he_solved_ra_change_y float DEFAULT NULL,
+  he_solved_dec_change_x float DEFAULT NULL,
+  he_solved_dec_change_y float DEFAULT NULL,
+  he_fwhm float DEFAULT NULL,
+  he_stars float DEFAULT NULL,
+  eccentricity float DEFAULT NULL,
+  sensor_id integer,
+  PRIMARY KEY (task_id),
+  CONSTRAINT fk_state FOREIGN KEY (state) REFERENCES task_states (id),
+  CONSTRAINT fk_scope FOREIGN KEY (scope_id) REFERENCES telescopes (scope_id),
+  CONSTRAINT fk_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_sensor FOREIGN KEY (sensor_id) REFERENCES sensors (sensor_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Table: user_preferences
+-- -----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS user_preferences (
+  pref_id SERIAL,
+  user_id int DEFAULT NULL,
+  exposure int DEFAULT 75,
+  filter varchar(20) DEFAULT 'CV',
+  binning int DEFAULT 2,
+  guiding smallint DEFAULT 1,
+  dither smallint DEFAULT NULL,
+  calibrate smallint DEFAULT 1,
+  solve int DEFAULT 1,
+  min_alt int DEFAULT 35,
+  moon_distance int DEFAULT 0,
+  max_sun_alt int NOT NULL DEFAULT -12,
+  max_moon_phase int DEFAULT NULL,
+  PRIMARY KEY (pref_id),
+  CONSTRAINT fk_user_pref FOREIGN KEY(user_id) REFERENCES users(user_id)
+);
+
+-- -----------------------------------------------------------------------------
+-- Indexes (from schema 14)
+-- -----------------------------------------------------------------------------
+CREATE INDEX ON tasks(task_id);
+
+-- For case-insensitive search on name and altname
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX objects_name_trgm_idx ON objects USING gin (name gin_trgm_ops);
+CREATE INDEX objects_altname_trgm_idx ON objects USING gin (altname gin_trgm_ops);
+
+-- For sorting by name
+CREATE INDEX objects_name_idx ON objects (name);
+
+-- For filtering by catalog
+CREATE INDEX objects_catalog_idx ON objects (catalog);
+
+-- For sorting by different fields
+CREATE INDEX objects_ra_idx ON objects (ra);
+CREATE INDEX objects_decl_idx ON objects (decl);
+
+-- For spatial queries using RA/DEC
+CREATE INDEX objects_ra_decl_idx ON objects (ra, decl);
+
+-- For exact name lookups
+CREATE INDEX objects_name_exact_idx ON objects (name);
+
+-- -----------------------------------------------------------------------------
+-- Set schema version to 14 (current latest)
+-- -----------------------------------------------------------------------------
+INSERT INTO schema_version VALUES (14);
