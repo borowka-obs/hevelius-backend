@@ -117,20 +117,20 @@ def _parse_mpcorb_line(line: str) -> Optional[dict]:
     if len(line) < 104:
         return None
     try:
-        designation = line[MPCORB_COLS["designation"][0] : MPCORB_COLS["designation"][1]].strip()
+        designation = line[MPCORB_COLS["designation"][0]: MPCORB_COLS["designation"][1]].strip()
         if not designation or designation.startswith("--------"):
             return None
         number = _parse_int(line[4:7])  # columns 5-7 are number for numbered
-        H = _parse_float(line[MPCORB_COLS["H"][0] : MPCORB_COLS["H"][1]])
-        G = _parse_float(line[MPCORB_COLS["G"][0] : MPCORB_COLS["G"][1]])
-        epoch = line[MPCORB_COLS["epoch"][0] : MPCORB_COLS["epoch"][1]].strip()
-        M = _parse_float(line[MPCORB_COLS["M"][0] : MPCORB_COLS["M"][1]])
-        peri = _parse_float(line[MPCORB_COLS["perihelion_arg"][0] : MPCORB_COLS["perihelion_arg"][1]])
-        node = _parse_float(line[MPCORB_COLS["ascending_node"][0] : MPCORB_COLS["ascending_node"][1]])
-        inc = _parse_float(line[MPCORB_COLS["inclination"][0] : MPCORB_COLS["inclination"][1]])
-        e = _parse_float(line[MPCORB_COLS["eccentricity"][0] : MPCORB_COLS["eccentricity"][1]])
-        n = _parse_float(line[MPCORB_COLS["mean_motion"][0] : MPCORB_COLS["mean_motion"][1]])
-        a = _parse_float(line[MPCORB_COLS["semimajor_axis"][0] : MPCORB_COLS["semimajor_axis"][1]])
+        H = _parse_float(line[MPCORB_COLS["H"][0]: MPCORB_COLS["H"][1]])
+        G = _parse_float(line[MPCORB_COLS["G"][0]: MPCORB_COLS["G"][1]])
+        epoch = line[MPCORB_COLS["epoch"][0]: MPCORB_COLS["epoch"][1]].strip()
+        M = _parse_float(line[MPCORB_COLS["M"][0]: MPCORB_COLS["M"][1]])
+        peri = _parse_float(line[MPCORB_COLS["perihelion_arg"][0]: MPCORB_COLS["perihelion_arg"][1]])
+        node = _parse_float(line[MPCORB_COLS["ascending_node"][0]: MPCORB_COLS["ascending_node"][1]])
+        inc = _parse_float(line[MPCORB_COLS["inclination"][0]: MPCORB_COLS["inclination"][1]])
+        e = _parse_float(line[MPCORB_COLS["eccentricity"][0]: MPCORB_COLS["eccentricity"][1]])
+        n = _parse_float(line[MPCORB_COLS["mean_motion"][0]: MPCORB_COLS["mean_motion"][1]])
+        a = _parse_float(line[MPCORB_COLS["semimajor_axis"][0]: MPCORB_COLS["semimajor_axis"][1]])
         if M is None or peri is None or node is None or inc is None or e is None or n is None or a is None:
             return None
         return {
