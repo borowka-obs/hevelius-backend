@@ -11,10 +11,25 @@ CREATE INDEX ON tasks(task_id);
 
 
 
--- For case-insensitive search on name and altname
-CREATE EXTENSION IF NOT EXISTS pg_trgm;
-CREATE INDEX objects_name_trgm_idx ON objects USING gin (name gin_trgm_ops);
-CREATE INDEX objects_altname_trgm_idx ON objects USING gin (altname gin_trgm_ops);
+-- For case-insensitive search on name and altname (optional: requires superuser for pg_trgm)
+DO $$
+BEGIN
+  CREATE EXTENSION IF NOT EXISTS pg_trgm;
+EXCEPTION
+  WHEN insufficient_privilege THEN
+    NULL;  /* non-superuser (e.g. test DB): skip extension */
+END $$;
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm') THEN
+    CREATE INDEX objects_name_trgm_idx ON objects USING gin (name gin_trgm_ops);
+    CREATE INDEX objects_altname_trgm_idx ON objects USING gin (altname gin_trgm_ops);
+  END IF;
+EXCEPTION
+  WHEN OTHERS THEN
+    NULL;  /* e.g. duplicate index or operator missing */
+END $$;
 
 -- For sorting by name
 CREATE INDEX objects_name_idx ON objects (name);
