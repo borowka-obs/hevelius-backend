@@ -11,26 +11,29 @@ import re
 DL = Path(__file__).parent / "_dl"
 NULL = "\\N"
 
+
 # Galactic to equatorial (J2000) in degrees. NGP, l_CP from standard values.
 def gal2eq_deg(l_deg, b_deg):
     """Convert galactic l,b (degrees) to equatorial RA,Dec (degrees). J2000."""
-    l = math.radians(l_deg)
+    lon_rad = math.radians(l_deg)
     b = math.radians(b_deg)
     # J2000 north galactic pole
     ra_ngp = math.radians(192.859508)
     dec_ngp = math.radians(27.128336)
     l_ncp = math.radians(122.931918)
-    sin_dec = math.sin(b) * math.sin(dec_ngp) + math.cos(b) * math.cos(dec_ngp) * math.cos(l - l_ncp)
+    sin_dec = math.sin(b) * math.sin(dec_ngp) + math.cos(b) * math.cos(dec_ngp) * math.cos(lon_rad - l_ncp)
     dec_rad = math.asin(max(-1, min(1, sin_dec)))
-    y = math.cos(b) * math.sin(l - l_ncp)
-    x = math.cos(b) * math.cos(dec_ngp) * math.cos(l - l_ncp) - math.sin(b) * math.sin(dec_ngp)
+    y = math.cos(b) * math.sin(lon_rad - l_ncp)
+    x = math.cos(b) * math.cos(dec_ngp) * math.cos(lon_rad - l_ncp) - math.sin(b) * math.sin(dec_ngp)
     ra_rad = math.atan2(y, x) + ra_ngp
     ra_deg = math.degrees(ra_rad) % 360
     dec_deg = math.degrees(dec_rad)
     return ra_deg, dec_deg
 
+
 def ra_deg_to_hours(ra_deg):
     return ra_deg / 15.0
+
 
 def row(*fields, catalog=None):
     """Row for COPY: name, ra, decl, descr, comment, type, epoch, const, magn, x, y [, catalog]."""
@@ -38,6 +41,7 @@ def row(*fields, catalog=None):
     if catalog is not None:
         parts.append(catalog)
     return "\t".join(parts)
+
 
 def parse_cederblad():
     """VII/231: Cederblad. RA/Dec B1900 in catalog.dat. Bytes 1-3 Ced, 4 letter, 6-16 Name, 17-18 RAh, 20-23 RAm, 25 DE-, 26-27 DEd, 29-30 DEm."""
@@ -68,6 +72,7 @@ def parse_cederblad():
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="Ced"))
     return lines
 
+
 def parse_vdb():
     """VII/21: van den Bergh. Only galactic coords in catalog.dat. Bytes 2-4 VdB, 6-15 DM, 25-29 oGLON, 30-34 oGLAT."""
     lines = []
@@ -90,6 +95,7 @@ def parse_vdb():
         name = f"vdB {vdb}"
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="vdB"))
     return lines
+
 
 def parse_sharpless():
     """VII/20: Sharpless. catalog.dat bytes 1-4 Sh2, 21-22 RAh 1900, 23-24 RAm, 25-27 RAds (0.1s), 28 DE-, 29-30 DEd, 31-32 DEm, 33-34 DEs."""
@@ -119,6 +125,7 @@ def parse_sharpless():
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="Sh2"))
     return lines
 
+
 def parse_lbn():
     """VII/9: Lynds Bright. catalog.dat bytes 2-5 Seq, 21-22 RAh 1950, 24-25 RAm, 28 DE-, 29-30 DEd, 32-33 DEm."""
     lines = []
@@ -144,6 +151,7 @@ def parse_lbn():
         name = f"LBN {seq}"
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="LBN"))
     return lines
+
 
 def parse_ldn():
     """VII/7A: Lynds Dark. ldn file bytes 1-4 LDN, 6-7 RAh 1950, 9-12 RAm, 16 DE-, 17-18 DEd, 20-21 DEm."""
@@ -171,6 +179,7 @@ def parse_ldn():
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Dn", NULL, NULL, NULL, NULL, NULL, catalog="LDN"))
     return lines
 
+
 def parse_collinder():
     """CloudyNights Collinder (updated) from collinder.html. Table: Col #, NGC/Other, Con, RA, DEC, m, #Stars, Size, Class, n."""
     lines = []
@@ -179,7 +188,12 @@ def parse_collinder():
         return lines
     html = p.read_text(encoding="utf-8", errors="replace")
     # Find table body rows: <tr><td>N</td>...
-    row_re = re.compile(r"<tr><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>(.*?)</td></tr>", re.DOTALL)
+    row_re = re.compile(
+        r"<tr><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td>"
+        r"<td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td><td>([^<]*)</td>"
+        r"<td>([^<]*)</td><td>(.*?)</td></tr>",
+        re.DOTALL,
+    )
     for m in row_re.finditer(html):
         col_num_raw, ngc, con, ra_s, dec_s, mag_s, nstars, size, cls, n_ref = m.groups()
         # Col # can be "1" or "463 (20a)" - use first number
@@ -215,6 +229,7 @@ def parse_collinder():
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "OC", NULL, con, magn, NULL, NULL, catalog="Col"))
     return lines
 
+
 def parse_melotte():
     """In-The-Sky Melotte catalogue (view=1). Save page(s) as melotte_p1.html, melotte_p2.html, melotte_p3.html.
     HTML table: <td>Mel N</td>...<td>HH<sup>h</sup>MM<sup>m</sup></td><td>&plus;DD&deg;MM&#39;</td>."""
@@ -246,6 +261,7 @@ def parse_melotte():
             unique.append(r)
     return unique
 
+
 def parse_barnard():
     """VII/220A: Barnard. barnard.dat bytes 2-5 Barn, 23-24 RA2000h, 26-27 RA2000m, 29-30 RA2000s, 33 DE2000-, 34-35 DE2000d, 37-38 DE2000m. J2000."""
     lines = []
@@ -273,12 +289,14 @@ def parse_barnard():
         lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Dn", NULL, NULL, NULL, NULL, NULL, catalog="B"))
     return lines
 
+
 def write_psql(shortname, title, descr, url, filename, parse_fn):
     """Write a catalog .psql file. COPY must include catalog column for FK."""
     lines = parse_fn()
     out = DL.parent / filename
     copy_cols = "name, ra, decl, descr, comment, type, epoch, const, magn, x, y, catalog"
     like_pattern = {"Ced": "Ced %", "vdB": "vdB %", "Sh2": "Sh2-%", "LBN": "LBN %", "LDN": "LDN %", "B": "B%", "Col": "Col %", "Mel": "Mel %"}[shortname]
+
     def esc(s):
         return (s or "").replace("'", "''")
     content = f"""--
@@ -301,6 +319,7 @@ COPY objects ({copy_cols}) FROM stdin;
     content += "\n".join(lines) + "\n\\.\n"
     out.write_text(content, encoding="utf-8")
     return len(lines)
+
 
 def main():
     write_psql(
@@ -368,6 +387,7 @@ def main():
         parse_melotte,
     )
     print("Done. Run convert_catalogs.py to regenerate SQL from _dl/ data.")
+
 
 if __name__ == "__main__":
     main()
