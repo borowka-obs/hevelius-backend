@@ -15,7 +15,7 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
-from hevelius.cmd_asteroid import asteroid_download, asteroid_visible
+from hevelius.cmd_asteroid import asteroids_download, asteroids_visible
 
 
 def run():
@@ -69,8 +69,8 @@ def run():
     catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
     catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
-    asteroid_parser = subparsers.add_parser('asteroid', help="Asteroid observation planning (MPC orbits, visibility)")
-    asteroid_subparsers = asteroid_parser.add_subparsers(help="asteroid commands", dest="asteroid_command")
+    asteroid_parser = subparsers.add_parser('asteroids', help="Asteroid observation planning (MPC orbits, visibility)")
+    asteroid_subparsers = asteroid_parser.add_subparsers(help="asteroids commands", dest="asteroid_command")
     dl_parser = asteroid_subparsers.add_parser('download', help="Download MPCORB.DAT from Minor Planet Center and cache locally")
     dl_parser.add_argument("-f", "--force", help="Re-download even if cache exists", action='store_true')
     dl_parser.add_argument("--load", help="Load (or update) asteroids into the database after download", action='store_true')
@@ -83,7 +83,7 @@ def run():
     vis_parser.add_argument("--mag-min", help="Minimum apparent magnitude", type=float, default=8.0)
     vis_parser.add_argument("--mag-max", help="Maximum apparent magnitude", type=float, default=16.0)
     vis_parser.add_argument("--alt-min", help="Minimum altitude (degrees) over the night", type=float, default=20.0)
-    vis_parser.add_argument("--constraint", help="Limit selection e.g. 'number < 3000'", type=str, default=None)
+    vis_parser.add_argument("--constraint", help="Limit selection: use number_lt_10 (shell-safe) or \"number < 10\" (quote in shell)", type=str, default=None)
     vis_parser.add_argument("--order-by", help="Sort order e.g. 'absolute_magnitude' or 'number'", type=str, default=None)
 
     args = parser.parse_args()
@@ -113,11 +113,11 @@ def run():
         return repo(args)  # see cmd_repo.py
     if args.command == "version":
         return version()
-    if args.command == "asteroid":
+    if args.command == "asteroids":
         if args.asteroid_command == "download":
-            return asteroid_download(args)
+            return asteroids_download(args)
         if args.asteroid_command == "visible":
-            return asteroid_visible(args)
+            return asteroids_visible(args)
         return asteroid_parser.print_help()
     return parser.print_help()
 

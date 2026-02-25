@@ -6,8 +6,14 @@ for a given night/location with magnitude and altitude filters.
 import gzip
 import os
 import re
+import sys
 import urllib.request
 from typing import List, Optional, Tuple
+
+
+def _progress(msg: str) -> None:
+    """Print progress message to stderr (so stdout stays clean for piping)."""
+    print(msg, file=sys.stderr, flush=True)
 
 from astropy.coordinates import (
     AltAz,
@@ -175,6 +181,25 @@ def download_mpcorb(force: bool = False) -> str:
     return out_path
 
 
+def _count_mpcorb_lines(path: str) -> int:
+    """Count lines in MPCORB file that look like asteroid records (approximate)."""
+    count = 0
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
+        for line in f:
+            if len(line) >= 104 and not line.strip().startswith("--------"):
+                count += 1
+    return count
+
+
+def _asteroid_count_db(conn) -> int:
+    """Return number of rows in asteroids table."""
+    cursor = conn.cursor()
+    cursor.execute("SELECT count(*) FROM asteroids")
+    out = cursor.fetchone()[0]
+    cursor.close()
+    return out
+
+
 def load_mpcorb_into_db(conn, path: Optional[str] = None, limit: Optional[int] = None) -> int:
     """
     Parse cached MPCORB.DAT and upsert into asteroids table.
@@ -184,46 +209,67 @@ def load_mpcorb_into_db(conn, path: Optional[str] = None, limit: Optional[int] =
         path = _cache_path()
     if not os.path.isfile(path):
         raise FileNotFoundError(f"MPCORB not found at {path}. Run download first.")
+
+    print("Counting asteroid records in file (one-time pass)...")
+    file_count = _count_mpcorb_lines(path)
+    db_count_before = _asteroid_count_db(conn)
+    total_to_process = min(file_count, limit) if limit else file_count
+    print(f"  MPCORB file: ~{file_count} asteroid records. DB currently: {db_count_before} asteroids.")
+    print(f"  Loading up to {total_to_process} records...")
+    print()
+
     count = 0
-    with open(path, "r", encoding="utf-8", errors="replace") as f:
-        for line in f:
-            row = _parse_mpcorb_line(line)
-            if row is None:
-                continue
-            # Upsert (PostgreSQL)
-            cursor = conn.cursor()
-            cursor.execute(
-                """
-                INSERT INTO asteroids (
-                    number, designation, epoch, mean_anomaly, perihelion_arg,
-                    ascending_node, inclination, eccentricity, mean_motion,
-                    semimajor_axis, absolute_magnitude, slope_parameter
-                ) VALUES (
-                    %(number)s, %(designation)s, %(epoch)s, %(mean_anomaly)s,
-                    %(perihelion_arg)s, %(ascending_node)s, %(inclination)s,
-                    %(eccentricity)s, %(mean_motion)s, %(semimajor_axis)s,
-                    %(absolute_magnitude)s, %(slope_parameter)s
+    progress_interval = max(1, min(50_000, total_to_process // 20))  # ~20 updates or every 50k
+    cursor = conn.cursor()
+    try:
+        with open(path, "r", encoding="utf-8", errors="replace") as f:
+            for line in f:
+                row = _parse_mpcorb_line(line)
+                if row is None:
+                    continue
+                cursor.execute(
+                    """
+                    INSERT INTO asteroids (
+                        number, designation, epoch, mean_anomaly, perihelion_arg,
+                        ascending_node, inclination, eccentricity, mean_motion,
+                        semimajor_axis, absolute_magnitude, slope_parameter
+                    ) VALUES (
+                        %(number)s, %(designation)s, %(epoch)s, %(mean_anomaly)s,
+                        %(perihelion_arg)s, %(ascending_node)s, %(inclination)s,
+                        %(eccentricity)s, %(mean_motion)s, %(semimajor_axis)s,
+                        %(absolute_magnitude)s, %(slope_parameter)s
+                    )
+                    ON CONFLICT (designation) DO UPDATE SET
+                        number = EXCLUDED.number,
+                        epoch = EXCLUDED.epoch,
+                        mean_anomaly = EXCLUDED.mean_anomaly,
+                        perihelion_arg = EXCLUDED.perihelion_arg,
+                        ascending_node = EXCLUDED.ascending_node,
+                        inclination = EXCLUDED.inclination,
+                        eccentricity = EXCLUDED.eccentricity,
+                        mean_motion = EXCLUDED.mean_motion,
+                        semimajor_axis = EXCLUDED.semimajor_axis,
+                        absolute_magnitude = EXCLUDED.absolute_magnitude,
+                        slope_parameter = EXCLUDED.slope_parameter
+                    """,
+                    row,
                 )
-                ON CONFLICT (designation) DO UPDATE SET
-                    number = EXCLUDED.number,
-                    epoch = EXCLUDED.epoch,
-                    mean_anomaly = EXCLUDED.mean_anomaly,
-                    perihelion_arg = EXCLUDED.perihelion_arg,
-                    ascending_node = EXCLUDED.ascending_node,
-                    inclination = EXCLUDED.inclination,
-                    eccentricity = EXCLUDED.eccentricity,
-                    mean_motion = EXCLUDED.mean_motion,
-                    semimajor_axis = EXCLUDED.semimajor_axis,
-                    absolute_magnitude = EXCLUDED.absolute_magnitude,
-                    slope_parameter = EXCLUDED.slope_parameter
-                """,
-                row,
-            )
-            cursor.close()
-            conn.commit()
-            count += 1
-            if limit and count >= limit:
-                break
+                count += 1
+                if count % progress_interval == 0 or count == total_to_process:
+                    conn.commit()
+                    pct = 100.0 * count / total_to_process if total_to_process else 0
+                    print(f"  Loaded {count:,} / {total_to_process:,} ({pct:.1f}%)")
+                elif count % 1000 == 0:
+                    conn.commit()  # periodic commit between progress prints
+                if limit and count >= limit:
+                    break
+    finally:
+        conn.commit()
+        cursor.close()
+
+    db_count_after = _asteroid_count_db(conn)
+    print()
+    print(f"Load complete. Processed {count:,} records. DB now: {db_count_after:,} asteroids.")
     return count
 
 
@@ -342,6 +388,7 @@ def compute_visibility(
         List of visible asteroids with designation, magnitude, max_altitude, etc.
     """
     obs_time = Time(obs_date + " 00:00:00")
+    _progress("Fetching asteroid list from database...")
     conn = db.connect()
     cursor = conn.cursor()
 
@@ -351,23 +398,59 @@ def compute_visibility(
     params = [mag_min - 5, mag_max + 5]
 
     if constraint:
-        # Sanitize: allow only known columns and numeric/comparison
+        # Sanitize: allow only known columns and numeric/comparison.
+        # Quote column names so reserved words (e.g. "number") work in PostgreSQL.
+        # Support: "number_lt_10", "number < 10", or split form "number" "<" "10".
         allowed_cols = {"number", "designation", "absolute_magnitude"}
-        m = re.match(r"^\s*(\w+)\s*(<|<=|>|>=|=|!=)\s*(.+)\s*$", constraint.strip())
-        if m:
-            col, op, val = m.group(1).lower(), m.group(2), m.group(3).strip()
-            if col in allowed_cols and op in ("<", "<=", ">", ">=", "=", "!="):
-                if col == "designation":
-                    where_parts.append("designation " + op + " %s")
-                    params.append(val)
-                else:
-                    try:
-                        v = int(val) if col == "number" else float(val)
-                        where_parts.append(col + " " + op + " %s")
-                        params.append(v)
-                    except ValueError:
-                        pass
-        # else ignore malformed constraint
+        # Normalize: ASCII spaces and comparison chars (avoid Unicode fullwidth etc.)
+        constraint = constraint.strip().replace("\u00a0", " ")
+        constraint = constraint.replace("\uff1c", "<").replace("\uff1e", ">").replace("\uff1d", "=")
+        op_map = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">=", "eq": "=", "ne": "!="}
+        sql_ops = ("<", "<=", ">", ">=", "=", "!=")
+        added = False
+
+        def apply_constraint(col: str, op: str, val_str: str) -> bool:
+            print(f"#### Applying constraint: {col} {op} {val_str}")
+            col = col.lower()
+            if col not in allowed_cols or op not in sql_ops:
+                print(f"#### Invalid constraint: {col}")
+                return False
+            col_ident = '"' + col + '"'
+            if col == "designation":
+                where_parts.append(col_ident + " " + op + " %s")
+                params.append(val_str.strip())
+                return True
+            try:
+                v = int(val_str.strip()) if col == "number" else float(val_str.strip())
+                where_parts.append(col_ident + " " + op + " %s")
+                params.append(v)
+                print(f"#### where_parts: {where_parts}")
+                print(f"#### params: {params}")
+                return True
+            except ValueError:
+                return False
+
+        # Format 1: "number_lt_10" (no spaces)
+        alt = re.match(r"^(\w+)_(lt|lte|gt|gte|eq|ne)_(.+)$", constraint, re.IGNORECASE)
+        if alt:
+            op = op_map.get(alt.group(2).lower())
+            if op:
+                added = apply_constraint(alt.group(1), op, alt.group(3))
+
+        # Format 2: "number < 10" — regex (space around operator)
+        if not added:
+            m = re.match(r"^\s*(\w+)\s*(<|<=|>|>=|=|!=)\s*(.+)\s*$", constraint)
+            if m:
+                added = apply_constraint(m.group(1), m.group(2), m.group(3))
+
+        # Format 3: split by whitespace — "number < 10" -> ["number", "<", "10"]
+        if not added:
+            tokens = constraint.split()
+            if len(tokens) >= 3 and tokens[0].lower() in allowed_cols and tokens[1] in sql_ops:
+                added = apply_constraint(tokens[0], tokens[1], tokens[2])
+
+        if constraint and not added:
+            _progress(f"  Note: constraint {repr(constraint)} was not applied (use e.g. number_lt_10 or --constraint='number < 10').")
 
     order_clause = "absolute_magnitude"
     if order_by:
@@ -375,7 +458,8 @@ def compute_visibility(
         tokens = order_by.strip().lower().split()
         if tokens and tokens[0] in allowed_order:
             direction = " " + tokens[1] if len(tokens) > 1 and tokens[1] in ("asc", "desc") else ""
-            order_clause = tokens[0] + direction
+            # Quote so reserved words (e.g. "number") work in PostgreSQL
+            order_clause = '"' + tokens[0] + '"' + direction
 
     query = (
         "SELECT number, designation, epoch, mean_anomaly, perihelion_arg, "
@@ -383,21 +467,32 @@ def compute_visibility(
         "semimajor_axis, absolute_magnitude, slope_parameter "
         "FROM asteroids WHERE " + " AND ".join(where_parts) + " ORDER BY " + order_clause
     )
+
+    print(f"#### query: {query}")
+    print(f"#### params: {params}")
+
     cursor.execute(query, params)
     asteroids = cursor.fetchall()
     conn.close()
+    _progress(f"  Found {len(asteroids)} asteroid(s) to check.")
 
+    _progress("Computing night window (sunrise/sunset)...")
     night_start, night_end = _get_night_times(location, obs_time)
     # Sample times during night
     n_samples = 20
     times = night_start + np.linspace(0, (night_end - night_start).to(u.hour).value, n_samples) * u.hour
+    _progress(f"  Night: {night_start.iso} to {night_end.iso}")
 
     visible = []
+    _progress("Loading ephemeris and Earth positions...")
     with solar_system_ephemeris.set("builtin"):
         earth_positions = get_body("earth", times)
+    _progress("Computing visibility for each asteroid...")
 
-    for row in asteroids:
+    total = len(asteroids)
+    for idx, row in enumerate(asteroids):
         (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = row
+        _progress(f"  [{idx + 1}/{total}] {number or '':>6} {designation}")
         if a is None or a <= 0 or e is None:
             continue
         epoch_jd = _unpack_epoch(epoch_s)
@@ -444,10 +539,11 @@ def compute_visibility(
                 "max_altitude_deg": round(max_alt, 2),
                 "max_altitude_time": best_time.iso,
             })
+    _progress("Done.")
     return visible
 
 
-def asteroid_download(args):
+def asteroids_download(args):
     """CLI: download and optionally load MPCORB into DB."""
     path = download_mpcorb(force=args.force)
     if args.load:
@@ -457,7 +553,7 @@ def asteroid_download(args):
         print(f"Loaded {n} asteroids into database.")
 
 
-def asteroid_visible(args):
+def asteroids_visible(args):
     """CLI: list visible asteroids for date/location with filters."""
     from astropy.coordinates import EarthLocation
     lat = float(args.lat)

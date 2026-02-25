@@ -96,6 +96,5 @@ An example usage:
 
 ```shell
 # Visible asteroids on a given night (e.g. mag 10–14, altitude ≥ 25°, numbered < 3000)
-hevelius asteroid visible --date 2025-03-15 --lat 52.2 --lon 21.0 --mag-min 10 --mag-max 14 --alt-min 25 --constraint
-"number < 3000" --order-by number
+hevelius asteroids visible --date 2025-03-15 --lat 52.2 --lon 21.0 --mag-min 10 --mag-max 14 --alt-min 25 --constraint number_lt_3000 --order-by number
 ```
