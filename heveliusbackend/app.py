@@ -6,7 +6,6 @@ import logging
 import os
 from flask import Flask, render_template
 
-logger = logging.getLogger(__name__)
 from flask_cors import CORS
 from flask_smorest import Api, Blueprint
 import yaml
@@ -19,6 +18,9 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 
 from hevelius import cmd_stats, db, config as hevelius_config
 from hevelius.version import VERSION
+
+
+logger = logging.getLogger(__name__)
 
 # By default, Flask searches for templates in the templates/ dir.
 # Other params: debug=True, port=8080
