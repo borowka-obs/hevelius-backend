@@ -138,6 +138,89 @@ class TestCatalogs(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
+    def test_catalog_list_filter_by_constellation(self, config):
+        """Test catalog list filtering by constellation (const)"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        cnx = db.connect()
+        db.run_query(cnx, """
+            INSERT INTO catalogs (name, shortname, filename, descr, url, version)
+            VALUES
+            ('New General Catalogue', 'ngc', 'ngc.dat', 'NGC', 'http://example.com/ngc', '1.0'),
+            ('Messier Catalogue', 'm', 'm.dat', 'M', 'http://example.com/m', '1.0')
+            RETURNING shortname""")
+        db.run_query(cnx, """
+            INSERT INTO objects (name, ra, decl, descr, type, catalog, const)
+            VALUES
+            ('NGC6523', 270.97, -24.38, 'Lagoon Nebula', 'EN', 'ngc', 'Sgr'),
+            ('NGC6720', 283.40, 33.03, 'Ring Nebula', 'PN', 'ngc', 'Lyr'),
+            ('M8', 270.97, -24.38, 'Lagoon', 'EN', 'm', 'Sgr')
+            RETURNING object_id""")
+        cnx.close()
+
+        # Filter by constellation Sgr: expect NGC6523 and M8
+        response = self.app.get('/api/catalogs/list?constellation=Sgr', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 2)
+        self.assertTrue(all(obj['const'] == 'Sgr' for obj in data['objects']))
+        names = {obj['name'] for obj in data['objects']}
+        self.assertEqual(names, {'NGC6523', 'M8'})
+
+        # Filter by constellation Lyr: expect only NGC6720
+        response = self.app.get('/api/catalogs/list?constellation=Lyr', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['objects'][0]['name'], 'NGC6720')
+        self.assertEqual(data['objects'][0]['const'], 'Lyr')
+
+        # Constellation filter is case-insensitive
+        response = self.app.get('/api/catalogs/list?constellation=sgr', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 2)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_catalog_list_filter_catalog_case_insensitive(self, config):
+        """Test that catalog filter matches case-insensitively (e.g. catalog=NGC matches 'ngc')"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        cnx = db.connect()
+        db.run_query(cnx, """
+            INSERT INTO catalogs (name, shortname, filename, descr, url, version)
+            VALUES
+            ('New General Catalogue', 'ngc', 'ngc.dat', 'NGC', 'http://example.com/ngc', '1.0'),
+            ('Messier Catalogue', 'm', 'm.dat', 'M', 'http://example.com/m', '1.0')
+            RETURNING shortname""")
+        db.run_query(cnx, """
+            INSERT INTO objects (name, ra, decl, descr, type, catalog)
+            VALUES
+            ('NGC7000', 314.75, 44.37, 'North America Nebula', 'EN', 'ngc'),
+            ('NGC7001', 315.12, 44.45, 'Spiral Galaxy', 'G', 'ngc'),
+            ('M31', 10.68, 41.27, 'Andromeda Galaxy', 'G', 'm')
+            RETURNING object_id""")
+        cnx.close()
+
+        # Query with uppercase catalog=NGC: should return both ngc objects (ILIKE)
+        response = self.app.get('/api/catalogs/list?catalog=NGC', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 2)
+        self.assertTrue(all(obj['catalog'] == 'ngc' for obj in data['objects']))
+
+        # Query with lowercase catalog=m: should return M31
+        response = self.app.get('/api/catalogs/list?catalog=m', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['objects'][0]['name'], 'M31')
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
     def test_catalog_list_post(self, config):
         """Test catalog list endpoint with POST method"""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
