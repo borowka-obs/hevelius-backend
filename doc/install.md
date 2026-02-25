@@ -26,12 +26,19 @@ CREATE USER hevelius WITH PASSWORD 'secret'; -- use an actual password here
 GRANT ALL PRIVILEGES ON DATABASE hevelius TO hevelius;
 ```
 
+Starting with schema 14, an extension is necessary. You need to connect to
+a hevelius database, either using `psql hevelius` or using `\c hevelius`, then:
+
+```
+CREATE EXTENSION pg_trgm;
+```
+
 If you're on Postgres 15 or later, you likely want to also do this:
 
 ```
 ALTER DATABASE hevelius OWNER to hevelius;
 ```
-Otherwise you might get ` permission denied for schema public` when trying to initalize the db.
+Otherwise you might get ` permission denied for schema public` when trying to initialize the db.
 
 ## Configure Hevelius-backend
 

@@ -1,10 +1,9 @@
-## Commands documentation
+# Commands documentation
 
-There are two interfaces for the Hevelius system: web (in very early stages of
-development) and command line. The command-line can be accessed the following
-way:
+There are two interfaces for the Hevelius system: web and command line.
+The command-line can be accessed the following way:
 
-```
+```shell
 $ python bin/hevelius
 Hevelius
 
@@ -28,7 +27,8 @@ options:
 ```
 
 Help for specific commands is available, e.g.
-```
+
+```shell
 $ python bin/hevelius catalog --help
 Hevelius
 
@@ -46,8 +46,7 @@ options:
                         catalog object to look for
 ```
 
-
-### Catalog - searching for catalog objects and associated frames
+## Catalog - searching for catalog objects and associated frames
 
 There are two ways how objects can be located. First is by using a name from the
 catalog: `--object M1`. If the object is found, its coordinates are then used.
@@ -68,4 +67,34 @@ ImageInspection -> SubframeSelector, then click on the `edit instance source cod
 
 An example command line call:
 
-```python bin/hevelius catalog --object C38 --proximity 0.5 --format full```
+```shell
+python bin/hevelius catalog --object C38 --proximity 0.5 --format full
+```
+
+## Asteroids
+
+A basic support for asteroid handling is available.
+
+First, you need to download and load asteroid data from MPC.
+
+```shell
+hevelius asteroid download
+```
+
+The orbitalal parameters downloaded are cached. You can force redownloading
+by using `--force`. Please be gentle on the MPC servers. The data can be loaded
+into database if `--load` is specified. The data can optionally be limited
+using `--limit LIMIT`, e.g. to load first 10 entries just for testing.
+
+Once the database is loaded, the next step is to show visible asteroids.
+Several parameters are mandatory: `--date` that specifies the night date,
+and observatory location, using `--lat` and `--lon`. Many for parameters
+might be specified to filter list of asteroids. For complete list, see
+`bin/hevelius asteroid visible --help`.
+
+An example usage:
+
+```shell
+# Visible asteroids on a given night (e.g. mag 10–14, altitude ≥ 25°, numbered < 3000)
+hevelius asteroids visible --date 2025-03-15 --lat 52.2 --lon 21.0 --mag-min 10 --mag-max 14 --alt-min 25 --constraint number_lt_3000 --order-by number
+```

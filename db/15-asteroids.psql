@@ -1,0 +1,26 @@
+-- Asteroids orbital elements (from MPC MPCORB.DAT).
+-- Used for visibility planning: list asteroids visible on a given night
+-- with magnitude and altitude filters.
+
+CREATE TABLE IF NOT EXISTS asteroids (
+    id SERIAL PRIMARY KEY,
+    number INTEGER,
+    designation VARCHAR(32) NOT NULL,
+    epoch VARCHAR(16) NOT NULL,
+    mean_anomaly DOUBLE PRECISION NOT NULL,
+    perihelion_arg DOUBLE PRECISION NOT NULL,
+    ascending_node DOUBLE PRECISION NOT NULL,
+    inclination DOUBLE PRECISION NOT NULL,
+    eccentricity DOUBLE PRECISION NOT NULL,
+    mean_motion DOUBLE PRECISION NOT NULL,
+    semimajor_axis DOUBLE PRECISION NOT NULL,
+    absolute_magnitude DOUBLE PRECISION,
+    slope_parameter DOUBLE PRECISION,
+    UNIQUE (designation)
+);
+
+CREATE INDEX asteroids_number_idx ON asteroids (number) WHERE number IS NOT NULL;
+CREATE INDEX asteroids_absolute_magnitude_idx ON asteroids (absolute_magnitude);
+CREATE INDEX asteroids_designation_idx ON asteroids (designation);
+
+UPDATE schema_version SET version = 15;
