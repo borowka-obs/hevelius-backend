@@ -10,11 +10,6 @@ import sys
 import urllib.request
 from typing import List, Optional, Tuple
 
-
-def _progress(msg: str) -> None:
-    """Print progress message to stderr (so stdout stays clean for piping)."""
-    print(msg, file=sys.stderr, flush=True)
-
 from astropy.coordinates import (
     AltAz,
     EarthLocation,
@@ -29,7 +24,6 @@ import numpy as np
 
 from hevelius import db
 from hevelius.config import load_config
-
 
 # MPCORB.DAT fixed-width columns (0-based); format from MPC Export Format.
 # Columns 1-7: designation (1-4 packed, 5-7 number or continuation)
@@ -50,6 +44,11 @@ MPCORB_COLS = {
 }
 
 MPCORB_URL = "https://minorplanetcenter.net/iau/MPCORB/MPCORB.DAT.gz"
+
+
+def _progress(msg: str) -> None:
+    """Print progress message to stderr (so stdout stays clean for piping)."""
+    print(msg, file=sys.stderr, flush=True)
 
 
 def _cache_dir() -> str:
