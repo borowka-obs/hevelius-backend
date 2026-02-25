@@ -2,8 +2,11 @@
 Flask application that provides a REST API to the Hevelius backend.
 """
 
+import logging
 import os
 from flask import Flask, render_template
+
+logger = logging.getLogger(__name__)
 from flask_cors import CORS
 from flask_smorest import Api, Blueprint
 import yaml
@@ -415,14 +418,15 @@ class ObjectsListRequestSchema(Schema):
 
     # Sorting parameters
     sort_by = fields.String(missing='name', validate=validate.OneOf(
-        ['catalog', 'name', 'ra', 'decl'],
-        error="Invalid sort field. Must be one of: catalog, name, ra, decl"
+        ['catalog', 'name', 'ra', 'decl', 'const', 'type', 'magn'],
+        error="Invalid sort field. Must be one of: catalog, name, ra, decl, const, type, magn"
     ))
     sort_order = fields.String(missing='asc', validate=validate.OneOf(['asc', 'desc']),
                                metadata={"description": "Sort order (asc or desc)"})
 
     # Filtering parameters
     catalog = fields.String(metadata={"description": "Filter by catalog short name"})
+    constellation = fields.String(metadata={"description": "Filter by constellation code (e.g. Sgr)"})
     name = fields.String(metadata={"description": "Filter by object name"})
 
 
@@ -1160,8 +1164,12 @@ class ObjectsListResource(MethodView):
 
         # Apply filters
         if args.get('catalog'):
-            where_clauses.append("catalog = %s")
+            where_clauses.append("catalog ILIKE %s")
             params.append(args['catalog'])
+
+        if args.get('constellation'):
+            where_clauses.append("const ILIKE %s")
+            params.append(args['constellation'])
 
         if args.get('name'):
             where_clauses.append("name ILIKE %s")
@@ -1193,6 +1201,11 @@ class ObjectsListResource(MethodView):
         # Get paginated results
         objects_list = db.run_query(cnx, query, params)
         cnx.close()
+
+        logger.info(
+            "Catalog list: returned %d entries (page %d, total matching: %d)",
+            len(objects_list), page, total_count
+        )
 
         # Format objects
         formatted_objects = []
