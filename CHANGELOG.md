@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - API: fixed Catalog sorting by magnitude, constellation
 - API: fixed Catalog filtering
 - API: added catalog tests
+- Cederblad (Ced) catalog of bright diffuse Galactic nebulae added
+- van den Bergh (vdB) catalog of reflection nebulae added
+- Sharpless-2 (Sh-2) catalog of H II regions added
+- Lynd's Bright Nebulae (LBN) catalog added
+- Lynd's Dark Nebulae (LDN) catalog added
+- Barnard catalog of dark objects added
+- Collinder (Col) catalog of open star clusters, updated added
 
 ## 0.3.0 - 2025-04-22
 
