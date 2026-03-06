@@ -117,6 +117,9 @@ components:
         state:
           type: integer
           description: Task state
+        scope_id:
+          type: integer
+          description: Telescope ID
         imagename:
           type: string
           description: Image filename
@@ -151,9 +154,24 @@ components:
           type: boolean
           description: Sent status
     TasksList:
-      type: array
-      items:
-        $ref: '#/components/schemas/Task'
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+        total:
+          type: integer
+          description: Total number of tasks
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Items per page
+        pages:
+          type: integer
+          description: Total number of pages
     TaskGetResponse:
       type: object
       properties:
@@ -260,9 +278,12 @@ components:
           type: boolean
           description: Whether the telescope is active
     TelescopesList:
-      type: array
-      items:
-        $ref: '#/components/schemas/Telescope'
+      type: object
+      properties:
+        telescopes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Telescope'
     Catalog:
       type: object
       properties:
@@ -338,6 +359,14 @@ components:
         catalog:
           type: string
           description: Catalog short name
+    NightPlanResponse:
+      type: object
+      properties:
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/Task'
+      description: List of tasks available for execution (no pagination)
     ObjectsList:
       type: object
       properties:
@@ -497,6 +526,11 @@ paths:
                 max_sun_alt:
                   type: integer
                   description: Maximum sun altitude
+                state:
+                  type: integer
+                  description: Task state (0 - disabled, 1 - new)
+                  enum: [0, 1]
+                  default: 1
       responses:
         '200':
           description: Task creation response
@@ -516,23 +550,123 @@ paths:
   /api/tasks:
     get:
       summary: Get list of tasks
-      description: Returns a list of astronomical observation tasks, optionally filtered by user_id
+      description: Returns a paginated list of tasks with sorting and filtering
       parameters:
+        - name: page
+          in: query
+          description: Page number (starting from 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id]
+            default: task_id
+        - name: sort_order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
         - name: user_id
           in: query
-          description: Filter tasks by user ID
+          description: Filter by user ID
           required: false
           schema:
             type: integer
-        - name: limit
+        - name: scope_id
           in: query
-          description: Maximum number of tasks to return
+          description: Filter by telescope ID
           required: false
           schema:
             type: integer
+        - name: object
+          in: query
+          description: Filter by object name (partial match)
+          required: false
+          schema:
+            type: string
+        - name: ra_min
+          in: query
+          description: Minimum RA value
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: ra_max
+          in: query
+          description: Maximum RA value
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: decl_min
+          in: query
+          description: Minimum declination value
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: decl_max
+          in: query
+          description: Maximum declination value
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: exposure
+          in: query
+          description: Filter by exposure time
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: descr
+          in: query
+          description: Filter by description (partial match)
+          required: false
+          schema:
+            type: string
+        - name: state
+          in: query
+          description: Filter by state
+          required: false
+          schema:
+            type: integer
+        - name: performed_after
+          in: query
+          description: Filter tasks performed after this time (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: performed_before
+          in: query
+          description: Filter tasks performed before this time (ISO 8601)
+          required: false
+          schema:
+            type: string
+            format: date-time
       responses:
         '200':
-          description: List of tasks
+          description: List of tasks with pagination
           content:
             application/json:
               schema:
@@ -542,7 +676,7 @@ paths:
 
     post:
       summary: Get list of tasks
-      description: Returns a list of astronomical observation tasks, optionally filtered by user_id
+      description: Returns a paginated list of tasks with sorting and filtering (body parameters)
       requestBody:
         required: false
         content:
@@ -550,15 +684,57 @@ paths:
             schema:
               type: object
               properties:
+                page:
+                  type: integer
+                  default: 1
+                  minimum: 1
+                per_page:
+                  type: integer
+                  default: 100
+                  minimum: 1
+                  maximum: 1000
+                sort_by:
+                  type: string
+                  enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id]
+                  default: task_id
+                sort_order:
+                  type: string
+                  enum: [asc, desc]
+                  default: desc
                 user_id:
                   type: integer
-                  description: Filter tasks by user ID
-                limit:
+                scope_id:
                   type: integer
-                  description: Maximum number of tasks to return
+                object:
+                  type: string
+                ra_min:
+                  type: number
+                  format: float
+                ra_max:
+                  type: number
+                  format: float
+                decl_min:
+                  type: number
+                  format: float
+                decl_max:
+                  type: number
+                  format: float
+                exposure:
+                  type: number
+                  format: float
+                descr:
+                  type: string
+                state:
+                  type: integer
+                performed_after:
+                  type: string
+                  format: date-time
+                performed_before:
+                  type: string
+                  format: date-time
       responses:
         '200':
-          description: List of tasks
+          description: List of tasks with pagination
           content:
             application/json:
               schema:
@@ -693,6 +869,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TaskUpdateResponse'
+  /api/night-plan:
+    get:
+      summary: Get night plan (tasks available for execution)
+      description: Returns tasks that can be executed tonight for a given telescope, optionally filtered by user and date
+      parameters:
+        - name: scope_id
+          in: query
+          required: true
+          schema:
+            type: integer
+          description: Telescope ID
+        - name: user_id
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Optional user ID filter
+        - name: date
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          description: Date in YYYY-MM-DD format (defaults to current date)
+      responses:
+        '200':
+          description: List of tasks for the night
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NightPlanResponse'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Get night plan (tasks available for execution)
+      description: Returns tasks that can be executed tonight for a given telescope (body parameters)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - scope_id
+              properties:
+                scope_id:
+                  type: integer
+                  description: Telescope ID
+                user_id:
+                  type: integer
+                  description: Optional user ID filter
+                date:
+                  type: string
+                  format: date
+                  description: Date in YYYY-MM-DD format
+      responses:
+        '200':
+          description: List of tasks for the night
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NightPlanResponse'
+      security:
+        - bearerAuth: []
   /api/scopes:
     get:
       summary: Get list of telescopes
@@ -768,7 +1008,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [catalog, name, ra, decl]
+            enum: [catalog, name, ra, decl, const, type, magn]
             default: name
         - name: sort_order
           in: query
@@ -829,7 +1069,7 @@ paths:
                 sort_by:
                   type: string
                   description: Field to sort by
-                  enum: [catalog, name, ra, decl]
+                  enum: [catalog, name, ra, decl, const, type, magn]
                   default: name
                 sort_order:
                   type: string
