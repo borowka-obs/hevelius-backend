@@ -29,10 +29,11 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, support_credentials=True)
 
-# Load OpenAPI spec from YAML
+# Load OpenAPI spec from YAML (api/openapi.yaml at project root)
 dir_path = os.path.dirname(os.path.realpath(__file__))
+_project_root = os.path.dirname(dir_path)
 
-with open(os.path.join(dir_path, 'openapi.yaml')) as f:
+with open(os.path.join(_project_root, 'api', 'openapi.yaml')) as f:
     spec = yaml.safe_load(f)
 
 # Configure API documentation
