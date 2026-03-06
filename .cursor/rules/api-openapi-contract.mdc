@@ -1,5 +1,5 @@
 ---
-description: Keep OpenAPI spec in sync with the REST API; update openapi.yaml when adding or changing endpoints.
+description: Keep OpenAPI spec in sync with the REST API; update api/openapi.yaml when adding or changing endpoints.
 alwaysApply: true
 ---
 
@@ -9,7 +9,7 @@ The OpenAPI spec is the **single source of truth** for the Hevelius REST API. Th
 
 ## When you change the API
 
-1. **Update `heveliusbackend/openapi.yaml` first** (or in the same change):
+1. **Update `api/openapi.yaml` first** (or in the same change):
    - New or changed paths, methods, request/response schemas
    - Security (e.g. `security: [bearerAuth]`)
    - Error responses and status codes
@@ -21,5 +21,5 @@ The OpenAPI spec is the **single source of truth** for the Hevelius REST API. Th
 
 ## Spec location
 
-- Path: `heveliusbackend/openapi.yaml`
+- Path: `api/openapi.yaml`
 - The app loads it at runtime for Swagger UI and API config; keep it valid YAML and valid OpenAPI 3.x.

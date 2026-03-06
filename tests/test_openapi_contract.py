@@ -14,8 +14,8 @@ from heveliusbackend.app import app
 
 
 def load_spec():
-    """Load OpenAPI spec from heveliusbackend/openapi.yaml."""
-    spec_path = os.path.join(os.path.dirname(__file__), "..", "heveliusbackend", "openapi.yaml")
+    """Load OpenAPI spec from api/openapi.yaml."""
+    spec_path = os.path.join(os.path.dirname(__file__), "..", "api", "openapi.yaml")
     with open(os.path.normpath(spec_path)) as f:
         return yaml.safe_load(f)
 
