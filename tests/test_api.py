@@ -1115,5 +1115,115 @@ class TestScopes(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestFilters(unittest.TestCase):
+    """Tests for filter CRUD: add, edit, activate, deactivate."""
+
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,
+                additional_claims={'permissions': 1, 'username': 'test_user'}
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_filters_post_add(self, config):
+        """Add new filter via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"short_name": "FNew", "full_name": "Luminance Red", "url": "https://example.com/lr", "active": True}
+        response = self.app.post('/api/filters', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIn('filter_id', data)
+        self.assertEqual(data['filter']['short_name'], 'FNew')
+        self.assertEqual(data['filter']['full_name'], 'Luminance Red')
+        self.assertEqual(data['filter']['url'], 'https://example.com/lr')
+        self.assertTrue(data['filter']['active'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_patch_edit(self, config):
+        """Edit existing filter via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        # Use filter_id 1 (SG from test data)
+        body = {"full_name": "Sloan g' (edited)", "url": "https://example.com/sg"}
+        response = self.app.patch('/api/filters/1', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['filter']['filter_id'], 1)
+        self.assertEqual(data['filter']['short_name'], 'SG')
+        self.assertEqual(data['filter']['full_name'], "Sloan g' (edited)")
+        self.assertEqual(data['filter']['url'], "https://example.com/sg")
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_patch_activate(self, config):
+        """Make filter active via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE filters SET active = false WHERE filter_id = 2")
+        cnx.close()
+        response = self.app.patch('/api/filters/2', data=json.dumps({"active": True}), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertTrue(data['filter']['active'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_patch_deactivate(self, config):
+        """Make filter inactive via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch('/api/filters/1', data=json.dumps({"active": False}), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertFalse(data['filter']['active'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_get_by_id(self, config):
+        """Get single filter by ID."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/filters/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['filter']['filter_id'], 1)
+        self.assertEqual(data['filter']['short_name'], 'SG')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_post_duplicate_short_name(self, config):
+        """Creating filter with existing short_name returns 400."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"short_name": "SG", "full_name": "Duplicate"}
+        response = self.app.post('/api/filters', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_get_not_found(self, config):
+        """GET non-existent filter returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/filters/99999', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_filters_patch_not_found(self, config):
+        """PATCH non-existent filter returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch('/api/filters/99999', data=json.dumps({"active": False}), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -1,0 +1,67 @@
+-- Schema version 15: filters (new entity), sensors extensions, projects, task–project relationship.
+-- Relationships: telescope uses at most one sensor (camera); telescope can use zero or more filters.
+-- Task can belong to zero or more projects. Project can belong to zero or more users.
+
+-- Drop legacy filters table (scope_id, filter_id, descr, id) and create new filters entity
+DROP TABLE IF EXISTS filters CASCADE;
+
+CREATE TABLE IF NOT EXISTS filters (
+    filter_id SERIAL PRIMARY KEY,
+    short_name varchar(8) NOT NULL UNIQUE,
+    full_name varchar(256),
+    url varchar(512),
+    active boolean NOT NULL DEFAULT true
+);
+
+-- Telescope–filter: many-to-many (same filter can be used on multiple telescopes)
+CREATE TABLE IF NOT EXISTS telescope_filters (
+    scope_id int NOT NULL REFERENCES telescopes(scope_id) ON DELETE CASCADE,
+    filter_id int NOT NULL REFERENCES filters(filter_id) ON DELETE CASCADE,
+    PRIMARY KEY (scope_id, filter_id)
+);
+
+-- Extend sensors: vendor, url, active (bit resolution already as "bits")
+ALTER TABLE sensors ADD COLUMN IF NOT EXISTS vendor varchar(128);
+ALTER TABLE sensors ADD COLUMN IF NOT EXISTS url varchar(512);
+ALTER TABLE sensors ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+
+-- Projects: name, description, ra, decl, active
+CREATE TABLE IF NOT EXISTS projects (
+    project_id SERIAL PRIMARY KEY,
+    name varchar(256) NOT NULL,
+    description text,
+    ra float,
+    decl float,
+    active boolean NOT NULL DEFAULT true
+);
+
+-- Project subframes: each with filter, exposure time, count, active
+CREATE TABLE IF NOT EXISTS project_subframes (
+    id SERIAL PRIMARY KEY,
+    project_id int NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    filter_id int NOT NULL REFERENCES filters(filter_id) ON DELETE CASCADE,
+    exposure_time float NOT NULL,
+    count integer,
+    active boolean NOT NULL DEFAULT true
+);
+
+-- Project–user: many-to-many
+CREATE TABLE IF NOT EXISTS project_users (
+    project_id int NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    user_id int NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+    PRIMARY KEY (project_id, user_id)
+);
+
+-- Task–project: many-to-many (task can belong to zero or more projects)
+CREATE TABLE IF NOT EXISTS task_projects (
+    task_id int NOT NULL REFERENCES tasks(task_id) ON DELETE CASCADE,
+    project_id int NOT NULL REFERENCES projects(project_id) ON DELETE CASCADE,
+    PRIMARY KEY (task_id, project_id)
+);
+
+CREATE INDEX IF NOT EXISTS project_subframes_project_id_idx ON project_subframes(project_id);
+CREATE INDEX IF NOT EXISTS project_users_user_id_idx ON project_users(user_id);
+CREATE INDEX IF NOT EXISTS task_projects_project_id_idx ON task_projects(project_id);
+CREATE INDEX IF NOT EXISTS telescope_filters_filter_id_idx ON telescope_filters(filter_id);
+
+UPDATE schema_version SET version = 15;

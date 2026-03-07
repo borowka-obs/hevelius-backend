@@ -68,3 +68,14 @@ INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, c
 INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C80', '5139', 13.4467, -47.48, 'GC', 'Cen', 3.6, 36, 36, 'Omega Centauri','C');
 INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C92', '3372', 10.7300, -59.87, 'BN', 'Car', 6.2, 120, 120, 'Eta Carinae Nebula','C');
 INSERT INTO objects(name, altname, ra, decl, type, const, magn, x, y, comment, catalog) VALUES('C99', '--', 12.8833, -63.00, 'DN', 'Cru', 0, 400, 300, 'Coal Sack','C');
+
+--
+-- Data for schema 15: filters, projects, telescope_filters, project_subframes, project_users, task_projects
+--
+INSERT INTO filters (filter_id, short_name, full_name, url, active) VALUES (1, 'SG', 'Sloan g', NULL, true);
+INSERT INTO filters (filter_id, short_name, full_name, url, active) VALUES (2, 'CV', 'Clear/Luminance', NULL, true);
+INSERT INTO telescope_filters (scope_id, filter_id) VALUES (1, 1), (1, 2), (2, 1), (2, 2);
+INSERT INTO projects (project_id, name, description, ra, decl, active) VALUES (1, 'Z Peg campaign', 'LPV monitoring', 0.00182, 25.8864, true);
+INSERT INTO project_subframes (project_id, filter_id, exposure_time, count, active) VALUES (1, 1, 20, 10, true), (1, 2, 300, 5, true);
+INSERT INTO project_users (project_id, user_id) VALUES (1, 1), (1, 3);
+INSERT INTO task_projects (task_id, project_id) VALUES (12600, 1), (14140, 1), (87775, 1);

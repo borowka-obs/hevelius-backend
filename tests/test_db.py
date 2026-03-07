@@ -1,4 +1,6 @@
+import os
 from hevelius import db
+from hevelius.cmd_equipment import add_filter, edit_filter, set_filter_active
 import unittest
 from tests.dbtest import use_repository
 
@@ -13,7 +15,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 14)
+        self.assertEqual(version, 15)
 
     @use_repository
     def test_sensor(self, config):
@@ -172,3 +174,87 @@ class DbTest(unittest.TestCase):
                 self.assertEqual(type(task[0]), int)  # task_id should be integer
 
         conn.close()
+
+    @use_repository
+    def test_filters_and_telescope_filters(self, config):
+        """Test that filters and telescope_filters (schema 15) work."""
+        conn = db.connect(config)
+        rows = db.run_query(conn, "SELECT filter_id, short_name, full_name, url, active FROM filters ORDER BY filter_id")
+        conn.close()
+        self.assertGreaterEqual(len(rows), 2)
+        self.assertEqual(rows[0][1], 'SG')
+        self.assertEqual(rows[0][4], True)
+        conn = db.connect(config)
+        tf = db.run_query(conn, "SELECT scope_id, filter_id FROM telescope_filters ORDER BY scope_id, filter_id")
+        conn.close()
+        self.assertGreaterEqual(len(tf), 2)
+        self.assertIn((1, 1), tf)
+
+    @use_repository
+    def test_sensors_have_vendor_url_active(self, config):
+        """Test that sensors table has vendor, url, active columns (schema 15)."""
+        conn = db.connect(config)
+        rows = db.run_query(conn, "SELECT sensor_id, name, vendor, url, active FROM sensors ORDER BY sensor_id LIMIT 1")
+        conn.close()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]), 5)
+        self.assertTrue(rows[0][4])  # active defaults to true
+
+    @use_repository
+    def test_projects_and_subframes(self, config):
+        """Test that projects, project_subframes, project_users, task_projects exist and have data."""
+        conn = db.connect(config)
+        projects = db.run_query(conn, "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id")
+        conn.close()
+        self.assertGreaterEqual(len(projects), 1)
+        self.assertEqual(projects[0][1], 'Z Peg campaign')
+        conn = db.connect(config)
+        sub = db.run_query(conn, "SELECT project_id, filter_id, exposure_time, count, active FROM project_subframes ORDER BY id")
+        conn.close()
+        self.assertGreaterEqual(len(sub), 1)
+        self.assertEqual(sub[0][2], 20)
+        self.assertEqual(sub[0][3], 10)
+        conn = db.connect(config)
+        tp = db.run_query(conn, "SELECT task_id, project_id FROM task_projects LIMIT 3")
+        conn.close()
+        self.assertGreaterEqual(len(tp), 1)
+
+    @use_repository
+    def test_filter_add_edit_activate_deactivate_cli(self, config):
+        """CLI: add filter, edit, activate, deactivate."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            # Add new filter
+            fid = add_filter("XX", "Test Filter", "https://example.com", active=True)
+            self.assertIsNotNone(fid)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE short_name = 'XX'")
+            conn.close()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][2], "Test Filter")
+            self.assertTrue(rows[0][4])
+            filter_id = rows[0][0]
+            # Edit
+            ok = edit_filter(filter_id, full_name="Test Filter Updated", active=False)
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT full_name, active FROM filters WHERE filter_id = %s", (filter_id,))
+            conn.close()
+            self.assertEqual(rows[0][0], "Test Filter Updated")
+            self.assertFalse(rows[0][1])
+            # Activate
+            ok = set_filter_active(filter_id, True)
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT active FROM filters WHERE filter_id = %s", (filter_id,))
+            conn.close()
+            self.assertTrue(rows[0][0])
+            # Deactivate
+            ok = set_filter_active(filter_id, False)
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT active FROM filters WHERE filter_id = %s", (filter_id,))
+            conn.close()
+            self.assertFalse(rows[0][0])
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)

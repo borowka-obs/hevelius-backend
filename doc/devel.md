@@ -50,3 +50,50 @@ is `hostname:port:database_name:username:password` e.g.
 ```
 localhost:5432:hevelius:hevelius:secret1
 ```
+
+
+## Fast DB tests
+
+The DB can be run in two modes: slow (using incremental migrations) or fast (using template database).
+
+Here's the final comparison:
+
+Performance Results
+
+------------------------------|---------------|--------
+Mode                          | 57 tests      | Speedup
+------------------------------|---------------|----
+Fast (template database)      |	~10.2 seconds | ~4x faster
+------------------------------|---------------|--------
+Slow (incremental migrations) |	~39.9 seconds | baseline
+
+The DB template solution that makes your tests run approximately 4x faster while keeping the incremental schema files for production deployments. Here's what was created/modified:
+
+The consolidated schem is available in db/schema-consolidated.psql - A consolidated schema file representing the final schema state (version 14). This is used only for testing and contains all tables, indexes, and constraints in their final form.
+
+tests/conftest.py - A pytest configuration file that automatically cleans up template databases at the end of the test session.
+
+tests/dbtest.py - Updated to use PostgreSQL's template database feature:
+Creates template databases once per test session (one per unique load_test_data file)
+Uses CREATE DATABASE ... TEMPLATE to clone databases instantly
+Falls back to incremental migrations if HEVELIUS_SLOW_TESTS=1 is set
+
+Automatically handles different test data files with separate templates
+
+How It Works
+
+First test run: Creates a template database using the consolidated schema + test data
+Subsequent tests: Clone the template database (nearly instant via filesystem copy)
+End of session: Clean up all template databases
+
+Environment Variables
+
+Default behavior: Fast mode using template databases
+HEVELIUS_SLOW_TESTS=1: Use incremental migrations (useful for testing the actual migration path)
+HEVELIUS_DEBUG: Keep test databases for debugging
+
+Keeping Schema in Sync
+
+When you add new incremental migration files, you'll need to update db/schema-consolidated.psql to reflect the changes. The consolidated file includes a comment header explaining this. You can either:
+Manually update it based on the new migration
+Apply all migrations to a fresh database and dump the schema

@@ -20,6 +20,12 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 15 (filters, sensors, projects)
+
+- **filters** – Optical filters: filter_id (PK), short_name (≤8 chars), full_name, url, active (default true). Many-to-many with telescopes via **telescope_filters**.
+- **sensors** – Extended with vendor, url, active (default true). Telescope uses at most one sensor (camera); the same sensor can be used on multiple telescopes.
+- **projects** – name, description, ra, decl, active (default true). **project_subframes**: filter_id, exposure_time, count (integer), active (default true). **project_users**: many-to-many with users. **task_projects**: tasks can belong to zero or more projects.
+
 
 ## Setting up MySQL database (obsolete)
 
