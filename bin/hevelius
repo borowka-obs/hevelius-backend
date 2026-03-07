@@ -15,6 +15,7 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
+from hevelius.cmd_equipment import list_filters, list_sensors, list_projects, show_project
 
 
 def run():
@@ -68,6 +69,16 @@ def run():
     catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
     catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
+    filters_parser = subparsers.add_parser('filters', help="List optical filters")
+    filters_parser.add_argument('--active-only', action='store_true', help="Show only active filters")
+
+    sensors_parser = subparsers.add_parser('sensors', help="List sensors (cameras)")
+    sensors_parser.add_argument('--active-only', action='store_true', help="Show only active sensors")
+
+    projects_parser = subparsers.add_parser('projects', help="List or show projects")
+    projects_parser.add_argument('project_id', nargs='?', type=int, help="If given, show single project by ID")
+    projects_parser.add_argument('--active-only', action='store_true', help="(Reserved for future use)")
+
     args = parser.parse_args()
 
     # db commands: version, migrate, backup, stats
@@ -95,6 +106,17 @@ def run():
         return repo(args)  # see cmd_repo.py
     if args.command == "version":
         return version()
+    if args.command == "filters":
+        list_filters(active_only=args.active_only)
+        return 0
+    if args.command == "sensors":
+        list_sensors(active_only=args.active_only)
+        return 0
+    if args.command == "projects":
+        if args.project_id is not None:
+            return show_project(args.project_id) or 0
+        list_projects()
+        return 0
     return parser.print_help()
 
 
