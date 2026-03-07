@@ -7,7 +7,7 @@ import os
 from flask import Flask, render_template, request
 
 from flask_cors import CORS
-from flask_smorest import Api, Blueprint
+from flask_smorest import Api, Blueprint, abort
 import yaml
 import json
 import plotly
@@ -370,6 +370,20 @@ class FilterSchema(Schema):
     full_name = fields.String(metadata={"description": "Full filter name"})
     url = fields.String(metadata={"description": "URL for filter info"})
     active = fields.Boolean(metadata={"description": "Whether the filter is active"})
+
+
+class FilterCreateSchema(Schema):
+    short_name = fields.String(required=True, validate=validate.Length(max=8), metadata={"description": "Short name (e.g. SG, CV)"})
+    full_name = fields.String(validate=validate.Length(max=256), load_default=None)
+    url = fields.String(validate=validate.Length(max=512), load_default=None)
+    active = fields.Boolean(load_default=True)
+
+
+class FilterUpdateSchema(Schema):
+    short_name = fields.String(validate=validate.Length(max=8), load_default=None)
+    full_name = fields.String(validate=validate.Length(max=256), load_default=None)
+    url = fields.String(validate=validate.Length(max=512), load_default=None)
+    active = fields.Boolean(load_default=None)
 
 
 class TelescopeSchema(Schema):
@@ -1148,6 +1162,10 @@ class ScopesResource(MethodView):
         return {"telescopes": telescopes}
 
 
+def _row_to_filter(r):
+    return {"filter_id": r[0], "short_name": r[1], "full_name": r[2], "url": r[3], "active": r[4]}
+
+
 @blp.route("/filters")
 class FiltersResource(MethodView):
     @jwt_required()
@@ -1164,11 +1182,106 @@ class FiltersResource(MethodView):
         cnx = db.connect()
         rows = db.run_query(cnx, query, params if params else None)
         cnx.close()
-        filters_list = [
-            {"filter_id": r[0], "short_name": r[1], "full_name": r[2], "url": r[3], "active": r[4]}
-            for r in (rows or [])
-        ]
+        filters_list = [_row_to_filter(r) for r in (rows or [])]
         return {"filters": filters_list}
+
+    @jwt_required()
+    @blp.arguments(FilterCreateSchema)
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "filter_id": fields.Integer(),
+        "filter": fields.Nested(FilterSchema),
+        "msg": fields.String()
+    }))
+    def post(self, filter_data):
+        """Add new filter"""
+        short_name = filter_data["short_name"]
+        full_name = filter_data.get("full_name")
+        url = filter_data.get("url")
+        active = filter_data.get("active", True)
+        cnx = db.connect()
+        try:
+            row = db.run_query(
+                cnx,
+                "INSERT INTO filters (short_name, full_name, url, active) VALUES (%s, %s, %s, %s) RETURNING filter_id",
+                (short_name, full_name, url, active)
+            )
+        except Exception as e:
+            cnx.close()
+            err = str(e).lower()
+            if "unique constraint" in err or "duplicate key" in err:
+                abort(400, message="Filter with this short_name already exists.")
+            raise
+        filter_id = row if isinstance(row, int) else (row[0] if row else None)
+        cnx.close()
+        if filter_id is None:
+            abort(500, message="Failed to create filter.")
+        # Fetch the created row
+        cnx = db.connect()
+        rows = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE filter_id = %s", (filter_id,))
+        cnx.close()
+        if not rows:
+            abort(500, message="Filter created but could not be retrieved.")
+        return {
+            "status": True,
+            "filter_id": filter_id,
+            "filter": _row_to_filter(rows[0]),
+            "msg": "Filter created successfully."
+        }
+
+
+@blp.route("/filters/<int:filter_id>")
+class FilterDetailResource(MethodView):
+    @jwt_required()
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "filter": fields.Nested(FilterSchema),
+        "msg": fields.String()
+    }))
+    def get(self, filter_id):
+        """Get single filter"""
+        cnx = db.connect()
+        rows = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE filter_id = %s", (filter_id,))
+        cnx.close()
+        if not rows:
+            abort(404, message="Filter not found.")
+        return {"status": True, "filter": _row_to_filter(rows[0]), "msg": "OK"}
+
+    @jwt_required()
+    @blp.arguments(FilterUpdateSchema)
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "filter": fields.Nested(FilterSchema),
+        "msg": fields.String()
+    }))
+    def patch(self, filter_data, filter_id):
+        """Edit filter (partial update). Set active true/false to activate or deactivate."""
+        cnx = db.connect()
+        rows = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE filter_id = %s", (filter_id,))
+        if not rows:
+            cnx.close()
+            abort(404, message="Filter not found.")
+        updates = []
+        params = []
+        for key in ("short_name", "full_name", "url", "active"):
+            if key in filter_data and filter_data[key] is not None:
+                updates.append(f"{key} = %s")
+                params.append(filter_data[key])
+        if not updates:
+            cnx.close()
+            return {"status": True, "filter": _row_to_filter(rows[0]), "msg": "No changes."}
+        params.append(filter_id)
+        try:
+            db.run_query(cnx, "UPDATE filters SET " + ", ".join(updates) + " WHERE filter_id = %s", tuple(params))
+        except Exception as e:
+            cnx.close()
+            err = str(e).lower()
+            if "unique constraint" in err or "duplicate key" in err:
+                abort(400, message="Filter with this short_name already exists.")
+            raise
+        updated = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE filter_id = %s", (filter_id,))
+        cnx.close()
+        return {"status": True, "filter": _row_to_filter(updated[0]), "msg": "Filter updated."}
 
 
 @blp.route("/sensors")

@@ -272,6 +272,59 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Filter'
+    FilterCreate:
+      type: object
+      required:
+        - short_name
+      properties:
+        short_name:
+          type: string
+          maxLength: 8
+          description: Short name (e.g. SG, CV)
+        full_name:
+          type: string
+          maxLength: 256
+          description: Full filter name
+        url:
+          type: string
+          maxLength: 512
+          description: URL for filter info
+        active:
+          type: boolean
+          default: true
+          description: Whether the filter is active
+    FilterUpdate:
+      type: object
+      properties:
+        short_name:
+          type: string
+          maxLength: 8
+          description: Short name (e.g. SG, CV)
+        full_name:
+          type: string
+          maxLength: 256
+          description: Full filter name
+        url:
+          type: string
+          maxLength: 512
+          description: URL for filter info
+        active:
+          type: boolean
+          description: Whether the filter is active
+    FilterResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+          description: Operation status
+        filter_id:
+          type: integer
+          description: Filter ID (on create)
+        filter:
+          $ref: '#/components/schemas/Filter'
+        msg:
+          type: string
+          description: Status message
     ProjectSubframe:
       type: object
       properties:
@@ -1070,6 +1123,83 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FiltersList'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Add new filter
+      description: Creates a new filter
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterCreate'
+      responses:
+        '200':
+          description: Filter created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterResponse'
+        '400':
+          description: Bad request (e.g. duplicate short_name)
+        '422':
+          description: Validation error
+      security:
+        - bearerAuth: []
+  /api/filters/{filter_id}:
+    get:
+      summary: Get single filter
+      description: Returns a filter by ID
+      parameters:
+        - name: filter_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Filter details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  filter:
+                    $ref: '#/components/schemas/Filter'
+                  msg:
+                    type: string
+        '404':
+          description: Filter not found
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Edit filter
+      description: Update an existing filter (partial update). Use active true/false to activate or deactivate.
+      parameters:
+        - name: filter_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilterUpdate'
+      responses:
+        '200':
+          description: Filter updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilterResponse'
+        '404':
+          description: Filter not found
+        '400':
+          description: Bad request (e.g. duplicate short_name)
       security:
         - bearerAuth: []
   /api/sensors:
