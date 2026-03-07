@@ -8,10 +8,10 @@ way:
 $ python bin/hevelius
 Hevelius
 
-usage: hevelius [-h] {stats,migrate,version,config,backup,repo,distrib,groups,catalog} ...
+usage: hevelius [-h] {stats,migrate,version,config,backup,repo,distrib,groups,catalog,filters,sensors,projects} ...
 
 positional arguments:
-  {stats,migrate,version,config,backup,repo,distrib,groups,catalog}
+  {stats,migrate,version,config,backup,repo,distrib,groups,catalog,filters,sensors,projects}
                         commands
     stats               Show database statistics
     migrate             Migrate to the latest DB schema
@@ -22,6 +22,9 @@ positional arguments:
     distrib             Shows photos distribution
     groups              Shows frames' groups
     catalog             Finds astronomical objects in a catalog
+    filters             List optical filters
+    sensors             List sensors (cameras)
+    projects            List or show projects
 
 options:
   -h, --help            show this help message and exit
@@ -69,3 +72,18 @@ ImageInspection -> SubframeSelector, then click on the `edit instance source cod
 An example command line call:
 
 ```python bin/hevelius catalog --object C38 --proximity 0.5 --format full```
+
+### Filters, sensors, and projects (schema 15+)
+
+- **filters** – List optical filters (short name, full name, URL, active). Use `--active-only` to show only active filters.
+- **sensors** – List sensors/cameras (resolution, pixel size, bit depth, vendor, URL, active). Use `--active-only` to show only active sensors.
+- **projects** – List projects (name, description, RA, Dec). Optionally pass a project ID to show one project with its subframes (filter, exposure time, active) and associated user IDs.
+
+Example:
+
+```bash
+python bin/hevelius filters
+python bin/hevelius sensors --active-only
+python bin/hevelius projects
+python bin/hevelius projects 1
+```
