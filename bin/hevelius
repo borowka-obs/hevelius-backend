@@ -15,7 +15,15 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
-from hevelius.cmd_equipment import list_filters, list_sensors, list_projects, show_project
+from hevelius.cmd_equipment import (
+    list_filters,
+    list_sensors,
+    list_projects,
+    show_project,
+    add_filter,
+    edit_filter,
+    set_filter_active,
+)
 
 
 def run():
@@ -72,6 +80,26 @@ def run():
     filters_parser = subparsers.add_parser('filters', help="List optical filters")
     filters_parser.add_argument('--active-only', action='store_true', help="Show only active filters")
 
+    filter_parser = subparsers.add_parser('filter', help="Add, edit, or set active state of a filter")
+    filter_sub = filter_parser.add_subparsers(dest='filter_command', help="Filter subcommand")
+    filter_add = filter_sub.add_parser('add', help="Add a new filter (short_name full_name)")
+    filter_add.add_argument('short_name', help="Short name (max 8 chars)")
+    filter_add.add_argument('full_name', nargs='?', default=None, help="Full filter name (e.g. H-alpha)")
+    filter_add.add_argument('--url', help="URL for filter info")
+    filter_add.add_argument('--active', action='store_true', default=True, help="Filter is active (default)")
+    filter_add.add_argument('--inactive', action='store_true', help="Create filter as inactive")
+    filter_edit = filter_sub.add_parser('edit', help="Edit an existing filter")
+    filter_edit.add_argument('filter_id', type=int, help="Filter ID to edit")
+    filter_edit.add_argument('--short-name', help="Short name (max 8 chars)")
+    filter_edit.add_argument('--full-name', help="Full filter name")
+    filter_edit.add_argument('--url', help="URL for filter info")
+    filter_edit.add_argument('--active', action='store_true', help="Set filter active")
+    filter_edit.add_argument('--inactive', action='store_true', help="Set filter inactive")
+    filter_activate = filter_sub.add_parser('activate', help="Make filter active")
+    filter_activate.add_argument('filter_id', type=int, help="Filter ID")
+    filter_deactivate = filter_sub.add_parser('deactivate', help="Make filter inactive")
+    filter_deactivate.add_argument('filter_id', type=int, help="Filter ID")
+
     sensors_parser = subparsers.add_parser('sensors', help="List sensors (cameras)")
     sensors_parser.add_argument('--active-only', action='store_true', help="Show only active sensors")
 
@@ -109,6 +137,22 @@ def run():
     if args.command == "filters":
         list_filters(active_only=args.active_only)
         return 0
+    if args.command == "filter":
+        if args.filter_command == "add":
+            active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
+            return 0 if add_filter(args.short_name, args.full_name, args.url, active) is not None else 1
+        if args.filter_command == "edit":
+            active = None
+            if getattr(args, 'active', False):
+                active = True
+            if getattr(args, 'inactive', False):
+                active = False
+            return 0 if edit_filter(args.filter_id, args.short_name, args.full_name, args.url, active) else 1
+        if args.filter_command == "activate":
+            return 0 if set_filter_active(args.filter_id, True) else 1
+        if args.filter_command == "deactivate":
+            return 0 if set_filter_active(args.filter_id, False) else 1
+        return filter_parser.print_help() or 1
     if args.command == "sensors":
         list_sensors(active_only=args.active_only)
         return 0
