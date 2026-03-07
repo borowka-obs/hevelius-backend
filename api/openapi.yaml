@@ -153,6 +153,11 @@ components:
         sent:
           type: boolean
           description: Sent status
+        project_ids:
+          type: array
+          items:
+            type: integer
+          description: Project IDs this task belongs to
     TasksList:
       type: object
       properties:
@@ -232,6 +237,102 @@ components:
           type: number
           format: float
           description: Sensor height (mm)
+        vendor:
+          type: string
+          description: Sensor/camera vendor
+        url:
+          type: string
+          description: URL for sensor info
+        active:
+          type: boolean
+          description: Whether the sensor is active
+    Filter:
+      type: object
+      properties:
+        filter_id:
+          type: integer
+          description: Filter primary key
+        short_name:
+          type: string
+          maxLength: 8
+          description: Short name (e.g. SG, CV)
+        full_name:
+          type: string
+          description: Full filter name
+        url:
+          type: string
+          description: URL for filter info
+        active:
+          type: boolean
+          description: Whether the filter is active
+    FiltersList:
+      type: object
+      properties:
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Filter'
+    ProjectSubframe:
+      type: object
+      properties:
+        id:
+          type: integer
+        project_id:
+          type: integer
+        filter_id:
+          type: integer
+        filter:
+          $ref: '#/components/schemas/Filter'
+        exposure_time:
+          type: number
+          format: float
+        count:
+          type: integer
+          description: Number of subframes
+        active:
+          type: boolean
+    Project:
+      type: object
+      properties:
+        project_id:
+          type: integer
+        name:
+          type: string
+        description:
+          type: string
+        ra:
+          type: number
+          format: float
+        decl:
+          type: number
+          format: float
+        active:
+          type: boolean
+          description: Whether the project is active
+        subframes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectSubframe'
+        user_ids:
+          type: array
+          items:
+            type: integer
+          description: User IDs associated with the project
+    ProjectsList:
+      type: object
+      properties:
+        projects:
+          type: array
+          items:
+            $ref: '#/components/schemas/Project'
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        pages:
+          type: integer
     Telescope:
       type: object
       properties:
@@ -274,6 +375,11 @@ components:
           description: Altitude
         sensor:
           $ref: '#/components/schemas/Sensor'
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/Filter'
+          description: Filters available on this telescope
         active:
           type: boolean
           description: Whether the telescope is active
@@ -944,6 +1050,111 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TelescopesList'
+      security:
+        - bearerAuth: []
+  /api/filters:
+    get:
+      summary: Get list of filters
+      description: Returns all filters, optionally filtered by active status
+      parameters:
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by active status
+      responses:
+        '200':
+          description: List of filters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FiltersList'
+      security:
+        - bearerAuth: []
+  /api/sensors:
+    get:
+      summary: Get list of sensors
+      description: Returns all sensors (cameras), optionally filtered by active status
+      parameters:
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+          description: Filter by active status
+      responses:
+        '200':
+          description: List of sensors
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sensors:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Sensor'
+      security:
+        - bearerAuth: []
+  /api/projects:
+    get:
+      summary: Get list of projects
+      description: Returns a paginated list of projects
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: user_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by user ID (projects the user belongs to)
+      responses:
+        '200':
+          description: List of projects
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectsList'
+      security:
+        - bearerAuth: []
+  /api/projects/{project_id}:
+    get:
+      summary: Get single project
+      description: Returns a project with its subframes and user IDs
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Project details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  project:
+                    $ref: '#/components/schemas/Project'
+                  msg:
+                    type: string
+        '404':
+          description: Project not found
       security:
         - bearerAuth: []
   /api/catalogs/search:

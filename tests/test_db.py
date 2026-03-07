@@ -13,7 +13,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 14)
+        self.assertEqual(version, 15)
 
     @use_repository
     def test_sensor(self, config):
@@ -172,3 +172,47 @@ class DbTest(unittest.TestCase):
                 self.assertEqual(type(task[0]), int)  # task_id should be integer
 
         conn.close()
+
+    @use_repository
+    def test_filters_and_telescope_filters(self, config):
+        """Test that filters and telescope_filters (schema 15) work."""
+        conn = db.connect(config)
+        rows = db.run_query(conn, "SELECT filter_id, short_name, full_name, url, active FROM filters ORDER BY filter_id")
+        conn.close()
+        self.assertGreaterEqual(len(rows), 2)
+        self.assertEqual(rows[0][1], 'SG')
+        self.assertEqual(rows[0][4], True)
+        conn = db.connect(config)
+        tf = db.run_query(conn, "SELECT scope_id, filter_id FROM telescope_filters ORDER BY scope_id, filter_id")
+        conn.close()
+        self.assertGreaterEqual(len(tf), 2)
+        self.assertIn((1, 1), tf)
+
+    @use_repository
+    def test_sensors_have_vendor_url_active(self, config):
+        """Test that sensors table has vendor, url, active columns (schema 15)."""
+        conn = db.connect(config)
+        rows = db.run_query(conn, "SELECT sensor_id, name, vendor, url, active FROM sensors ORDER BY sensor_id LIMIT 1")
+        conn.close()
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows[0]), 5)
+        self.assertTrue(rows[0][4])  # active defaults to true
+
+    @use_repository
+    def test_projects_and_subframes(self, config):
+        """Test that projects, project_subframes, project_users, task_projects exist and have data."""
+        conn = db.connect(config)
+        projects = db.run_query(conn, "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id")
+        conn.close()
+        self.assertGreaterEqual(len(projects), 1)
+        self.assertEqual(projects[0][1], 'Z Peg campaign')
+        conn = db.connect(config)
+        sub = db.run_query(conn, "SELECT project_id, filter_id, exposure_time, count, active FROM project_subframes ORDER BY id")
+        conn.close()
+        self.assertGreaterEqual(len(sub), 1)
+        self.assertEqual(sub[0][2], 20)
+        self.assertEqual(sub[0][3], 10)
+        conn = db.connect(config)
+        tp = db.run_query(conn, "SELECT task_id, project_id FROM task_projects LIMIT 3")
+        conn.close()
+        self.assertGreaterEqual(len(tp), 1)

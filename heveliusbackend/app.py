@@ -4,7 +4,7 @@ Flask application that provides a REST API to the Hevelius backend.
 
 import logging
 import os
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 
 from flask_cors import CORS
 from flask_smorest import Api, Blueprint
@@ -271,6 +271,7 @@ class Task(Schema):
     calibrated = fields.Boolean(metadata={"description": "Calibration status"})
     solved = fields.Boolean(metadata={"description": "Plate solving status"})
     sent = fields.Boolean(metadata={"description": "Sent status"})
+    project_ids = fields.List(fields.Integer(), metadata={"description": "Project IDs this task belongs to"})
 
 
 class TasksList(Schema):
@@ -358,6 +359,17 @@ class SensorSchema(Schema):
     bits = fields.Integer(metadata={"description": "Bit depth"})
     width = fields.Float(metadata={"description": "Sensor width (mm)"})
     height = fields.Float(metadata={"description": "Sensor height (mm)"})
+    vendor = fields.String(metadata={"description": "Sensor/camera vendor"})
+    url = fields.String(metadata={"description": "URL for sensor info"})
+    active = fields.Boolean(metadata={"description": "Whether the sensor is active"})
+
+
+class FilterSchema(Schema):
+    filter_id = fields.Integer(required=True, metadata={"description": "Filter primary key"})
+    short_name = fields.String(metadata={"description": "Short name"})
+    full_name = fields.String(metadata={"description": "Full filter name"})
+    url = fields.String(metadata={"description": "URL for filter info"})
+    active = fields.Boolean(metadata={"description": "Whether the filter is active"})
 
 
 class TelescopeSchema(Schema):
@@ -372,11 +384,41 @@ class TelescopeSchema(Schema):
     lat = fields.Float(metadata={"description": "Latitude"})
     alt = fields.Float(metadata={"description": "Altitude"})
     sensor = fields.Nested(SensorSchema, allow_none=True, metadata={"description": "Associated sensor"})
+    filters = fields.List(fields.Nested(FilterSchema), metadata={"description": "Filters on this telescope"})
     active = fields.Boolean(metadata={"description": "Whether the telescope is active"})
 
 
 class TelescopesListSchema(Schema):
     telescopes = fields.List(fields.Nested(TelescopeSchema))
+
+
+class ProjectSubframeSchema(Schema):
+    id = fields.Integer()
+    project_id = fields.Integer()
+    filter_id = fields.Integer()
+    filter = fields.Nested(FilterSchema, allow_none=True)
+    exposure_time = fields.Float()
+    count = fields.Integer()
+    active = fields.Boolean()
+
+
+class ProjectSchema(Schema):
+    project_id = fields.Integer()
+    name = fields.String()
+    description = fields.String()
+    ra = fields.Float()
+    decl = fields.Float()
+    active = fields.Boolean()
+    subframes = fields.List(fields.Nested(ProjectSubframeSchema))
+    user_ids = fields.List(fields.Integer())
+
+
+class ProjectsListSchema(Schema):
+    projects = fields.List(fields.Nested(ProjectSchema))
+    total = fields.Integer()
+    page = fields.Integer()
+    per_page = fields.Integer()
+    pages = fields.Integer()
 
 
 class CatalogSchema(Schema):
@@ -703,6 +745,16 @@ class TasksResource(MethodView):
 
         # Get paginated results
         tasks_list = db.run_query(cnx, query, params)
+        task_ids = [t[0] for t in tasks_list]
+        project_ids_by_task = {}
+        if task_ids:
+            placeholders = ",".join(["%s"] * len(task_ids))
+            tp_rows = db.run_query(cnx, f"SELECT task_id, project_id FROM task_projects WHERE task_id IN ({placeholders})", task_ids)
+            for tr in (tp_rows or []):
+                tid, pid = tr[0], tr[1]
+                if tid not in project_ids_by_task:
+                    project_ids_by_task[tid] = []
+                project_ids_by_task[tid].append(pid)
         cnx.close()
 
         # Format tasks
@@ -741,7 +793,8 @@ class TasksResource(MethodView):
                 'auto_center': bool(task[29]),
                 'calibrated': bool(task[30]),
                 'solved': bool(task[31]),
-                'sent': bool(task[32])
+                'sent': bool(task[32]),
+                'project_ids': sorted(project_ids_by_task.get(task[0], []))
             }
             formatted_tasks.append(task_dict)
 
@@ -785,13 +838,13 @@ class TaskGetResource(MethodView):
             min_interval, comment, state, imagename,
             created, activated, performed, max_moon_phase,
             max_sun_alt, auto_center, calibrated, solved,
-            sent, scope_id FROM tasks, users WHERE task_id = %s"""
+            sent, scope_id FROM tasks, users WHERE tasks.user_id = users.user_id AND task_id = %s"""
 
         cnx = db.connect()
         task = db.run_query(cnx, query, (task_id,))
-        cnx.close()
 
         if not task:
+            cnx.close()
             return {
                 'status': False,
                 'msg': f'Task {task_id} not found',
@@ -799,6 +852,9 @@ class TaskGetResource(MethodView):
             }
 
         task = task[0]  # Get first (and should be only) result
+        tp_rows = db.run_query(cnx, "SELECT project_id FROM task_projects WHERE task_id = %s", (task_id,))
+        project_ids = sorted([r[0] for r in (tp_rows or [])])
+        cnx.close()
 
         # Format the task data
         task_dict = {
@@ -834,7 +890,8 @@ class TaskGetResource(MethodView):
             'calibrated': bool(task[29]),
             'solved': bool(task[30]),
             'sent': bool(task[31]),
-            'scope_id': task[32]
+            'scope_id': task[32],
+            'project_ids': project_ids
         }
 
         return {
@@ -1027,20 +1084,38 @@ class ScopesResource(MethodView):
     @jwt_required()
     @blp.response(200, TelescopesListSchema)
     def get(self):
-        """Get list of telescopes with their associated sensors"""
-        # Query to get telescopes with their sensors
+        """Get list of telescopes with their associated sensors and filters"""
         query = """
             SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
                    t.lon, t.lat, t.alt, t.sensor_id, t.active,
                    s.sensor_id, s.name, s.resx, s.resy, s.pixel_x, s.pixel_y,
-                   s.bits, s.width, s.height
+                   s.bits, s.width, s.height, s.vendor, s.url, s.active AS sensor_active
             FROM telescopes t
             LEFT JOIN sensors s ON t.sensor_id = s.sensor_id
             ORDER BY t.scope_id
         """
-
         cnx = db.connect()
         results = db.run_query(cnx, query)
+        scope_ids = [r[0] for r in results]
+        telescope_filters = {}
+        if scope_ids:
+            placeholders = ",".join(["%s"] * len(scope_ids))
+            tf_query = f"""
+                SELECT tf.scope_id, f.filter_id, f.short_name, f.full_name, f.url, f.active
+                FROM telescope_filters tf
+                JOIN filters f ON tf.filter_id = f.filter_id
+                WHERE tf.scope_id IN ({placeholders})
+                ORDER BY tf.scope_id, f.filter_id
+            """
+            tf_rows = db.run_query(cnx, tf_query, scope_ids)
+            for r in tf_rows:
+                sid = r[0]
+                if sid not in telescope_filters:
+                    telescope_filters[sid] = []
+                telescope_filters[sid].append({
+                    'filter_id': r[1], 'short_name': r[2], 'full_name': r[3],
+                    'url': r[4], 'active': r[5]
+                })
         cnx.close()
 
         telescopes = []
@@ -1056,28 +1131,154 @@ class ScopesResource(MethodView):
                 'lon': row[7],
                 'lat': row[8],
                 'alt': row[9],
-                'active': row[11]
+                'active': row[11],
+                'filters': telescope_filters.get(row[0], [])
             }
-
-            # Add sensor data if available
-            if row[10] is not None:  # if sensor_id is not null
+            if row[10] is not None:
                 telescope['sensor'] = {
-                    'sensor_id': row[12],
-                    'name': row[13],
-                    'resx': row[14],
-                    'resy': row[15],
-                    'pixel_x': row[16],
-                    'pixel_y': row[17],
-                    'bits': row[18],
-                    'width': row[19],
-                    'height': row[20]
+                    'sensor_id': row[12], 'name': row[13], 'resx': row[14], 'resy': row[15],
+                    'pixel_x': row[16], 'pixel_y': row[17], 'bits': row[18],
+                    'width': row[19], 'height': row[20],
+                    'vendor': row[21], 'url': row[22], 'active': row[23]
                 }
             else:
                 telescope['sensor'] = None
-
             telescopes.append(telescope)
 
         return {"telescopes": telescopes}
+
+
+@blp.route("/filters")
+class FiltersResource(MethodView):
+    @jwt_required()
+    @blp.response(200, Schema.from_dict({"filters": fields.List(fields.Nested(FilterSchema))}))
+    def get(self):
+        """Get list of filters"""
+        active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
+        query = "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE 1=1"
+        params = []
+        if active is not None:
+            query += " AND active = %s"
+            params.append(active)
+        query += " ORDER BY filter_id"
+        cnx = db.connect()
+        rows = db.run_query(cnx, query, params if params else None)
+        cnx.close()
+        filters_list = [
+            {"filter_id": r[0], "short_name": r[1], "full_name": r[2], "url": r[3], "active": r[4]}
+            for r in (rows or [])
+        ]
+        return {"filters": filters_list}
+
+
+@blp.route("/sensors")
+class SensorsResource(MethodView):
+    @jwt_required()
+    @blp.response(200, Schema.from_dict({"sensors": fields.List(fields.Nested(SensorSchema))}))
+    def get(self):
+        """Get list of sensors (cameras)"""
+        active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
+        query = """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
+                   FROM sensors WHERE 1=1"""
+        params = []
+        if active is not None:
+            query += " AND active = %s"
+            params.append(active)
+        query += " ORDER BY sensor_id"
+        cnx = db.connect()
+        rows = db.run_query(cnx, query, params if params else None)
+        cnx.close()
+        sensors_list = [
+            {
+                "sensor_id": r[0], "name": r[1], "resx": r[2], "resy": r[3],
+                "pixel_x": r[4], "pixel_y": r[5], "bits": r[6], "width": r[7], "height": r[8],
+                "vendor": r[9], "url": r[10], "active": r[11]
+            }
+            for r in (rows or [])
+        ]
+        return {"sensors": sensors_list}
+
+
+@blp.route("/projects")
+class ProjectsResource(MethodView):
+    @jwt_required()
+    @blp.response(200, ProjectsListSchema)
+    def get(self):
+        """Get list of projects with paging"""
+        page = request.args.get("page", 1, type=int)
+        per_page = min(request.args.get("per_page", 100, type=int), 1000)
+        user_id = request.args.get("user_id", type=int)
+        offset = (page - 1) * per_page
+        cnx = db.connect()
+        if user_id is not None:
+            count_q = "SELECT COUNT(*) FROM projects p JOIN project_users pu ON p.project_id = pu.project_id WHERE pu.user_id = %s"
+            list_q = """SELECT p.project_id, p.name, p.description, p.ra, p.decl, p.active
+                       FROM projects p JOIN project_users pu ON p.project_id = pu.project_id
+                       WHERE pu.user_id = %s ORDER BY p.project_id LIMIT %s OFFSET %s"""
+            total = db.run_query(cnx, count_q, (user_id,))[0][0]
+            rows = db.run_query(cnx, list_q, (user_id, per_page, offset))
+        else:
+            count_q = "SELECT COUNT(*) FROM projects"
+            list_q = "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
+            total = db.run_query(cnx, count_q)[0][0]
+            rows = db.run_query(cnx, list_q, (per_page, offset))
+        projects = []
+        for r in (rows or []):
+            pid, name, descr, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5]
+            sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
+                       ps.exposure_time, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+            sub_rows = db.run_query(cnx, sub_q, (pid,))
+            user_q = "SELECT user_id FROM project_users WHERE project_id = %s"
+            user_rows = db.run_query(cnx, user_q, (pid,))
+            subframes = [
+                {
+                    "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
+                    "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
+                    "exposure_time": sr[8], "count": sr[9], "active": sr[10]
+                }
+                for sr in (sub_rows or [])
+            ]
+            user_ids = [ur[0] for ur in (user_rows or [])]
+            projects.append({
+                "project_id": pid, "name": name, "description": descr, "ra": ra, "decl": decl, "active": active,
+                "subframes": subframes, "user_ids": user_ids
+            })
+        cnx.close()
+        pages = (total + per_page - 1) // per_page if total else 0
+        return {"projects": projects, "total": total, "page": page, "per_page": per_page, "pages": pages}
+
+
+@blp.route("/projects/<int:project_id>")
+class ProjectDetailResource(MethodView):
+    @jwt_required()
+    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "project": fields.Nested(ProjectSchema), "msg": fields.String()}))
+    def get(self, project_id):
+        """Get single project with subframes and user IDs"""
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT project_id, name, description, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        if not row:
+            cnx.close()
+            return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
+        r = row[0]
+        sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
+                   ps.exposure_time, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+        sub_rows = db.run_query(cnx, sub_q, (project_id,))
+        user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
+        cnx.close()
+        subframes = [
+            {
+                "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
+                "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
+                "exposure_time": sr[8], "count": sr[9], "active": sr[10]
+            }
+            for sr in (sub_rows or [])
+        ]
+        user_ids = [ur[0] for ur in (user_rows or [])]
+        project = {
+            "project_id": r[0], "name": r[1], "description": r[2], "ra": r[3], "decl": r[4], "active": r[5],
+            "subframes": subframes, "user_ids": user_ids
+        }
+        return {"status": True, "project": project, "msg": "OK"}
 
 
 @blp.route("/catalogs/search")

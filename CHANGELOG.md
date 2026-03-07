@@ -5,6 +5,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.4.0 - unreleased
 
+- **Schema 15**: Filters, sensors, and projects
+  - **filters**: New entity with short_name (≤8 chars), full_name, filter_id, url, active (default true). Many-to-many with telescopes via telescope_filters.
+  - **sensors**: Extended with vendor, url, active (default true). Telescope uses at most one camera; same camera can be used on multiple telescopes.
+  - **projects**: name, description, ra, decl; project_subframes (filter, exposure_time, active); project_users (many-to-many); task_projects (task ↔ project many-to-many).
+- **API**: GET /api/filters, GET /api/sensors, GET /api/projects, GET /api/projects/{project_id}. Telescopes list includes filters; tasks list and task-get include project_ids.
+- **CLI**: `hevelius filters`, `hevelius sensors`, `hevelius projects` [project_id]. Options: --active-only for filters and sensors.
 - API: fixed Catalog sorting by magnitude, constellation
 - API: fixed Catalog filtering
 - API: added catalog tests
