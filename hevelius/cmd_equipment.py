@@ -258,3 +258,213 @@ def show_project(project_id):
     print("User IDs:", [u[0] for u in (users or [])])
     cnx.close()
     return 0
+
+
+# --- Telescopes ---
+
+SCOPE_SORT_FIELDS = {"scope_id", "name", "focal", "active"}
+
+
+def list_telescopes(sort_by="scope_id", sort_order="asc"):
+    """List all telescopes with optional sorting (scope_id, name, focal, active)."""
+    if sort_by not in SCOPE_SORT_FIELDS:
+        sort_by = "scope_id"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+    order = f"ORDER BY t.{sort_by} {sort_order}"
+    cnx = db.connect()
+    rows = db.run_query(cnx, f"""
+        SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
+               t.lon, t.lat, t.alt, t.sensor_id, t.active,
+               s.name AS sensor_name
+        FROM telescopes t
+        LEFT JOIN sensors s ON t.sensor_id = s.sensor_id
+        {order}
+    """)
+    cnx.close()
+    if not rows:
+        print("No telescopes found.")
+        return
+    print(f"{'ID':<6} {'Name':<24} {'Focal':<8} {'Sensor':<22} Active")
+    print("-" * 75)
+    for r in rows:
+        name = (r[1] or "")[:22]
+        focal = r[5] if r[5] is not None else ""
+        sensor = (r[12] or "")[:20] if len(r) > 12 else ""
+        print(f"{r[0]:<6} {name:<24} {focal!s:<8} {sensor:<22} {r[11]}")
+
+
+def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
+                  lon=None, lat=None, alt=None, sensor_id=None, active=True):
+    """Add a new telescope. scope_id is optional (auto-assigned if omitted). Returns scope_id on success, None on failure."""
+    if sensor_id == 0:
+        sensor_id = None
+    cnx = db.connect()
+    if scope_id is None:
+        row = db.run_query(cnx, "SELECT COALESCE(MAX(scope_id), 0) + 1 FROM telescopes")
+        scope_id = row[0][0] if row else 1
+    else:
+        existing = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
+        if existing:
+            cnx.close()
+            print(f"Error: Telescope scope_id={scope_id} already exists.")
+            return None
+    cols = ["scope_id", "name"]
+    vals = [scope_id, name]
+    for key, val in [
+        ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec), ("focal", focal),
+        ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
+    ]:
+        if val is not None:
+            cols.append(key)
+            vals.append(val)
+    if sensor_id is not None:
+        cols.append("sensor_id")
+        vals.append(sensor_id)
+    placeholders = ", ".join(["%s"] * len(vals))
+    try:
+        db.run_query(cnx, f"INSERT INTO telescopes ({', '.join(cols)}) VALUES ({placeholders})", vals)
+    except Exception as e:
+        cnx.close()
+        print(f"Error: {e}")
+        return None
+    cnx.close()
+    print(f"Created telescope scope_id={scope_id} name={name}")
+    return scope_id
+
+
+def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
+                   lon=None, lat=None, alt=None, sensor_id=None, active=None):
+    """Edit an existing telescope. sensor_id=0 removes the sensor. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
+    if not row:
+        cnx.close()
+        print(f"Telescope scope_id={scope_id} not found.")
+        return False
+    updates = []
+    params = []
+    for key, val in [
+        ("name", name), ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec),
+        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
+    ]:
+        if val is not None:
+            updates.append(f"{key} = %s")
+            params.append(val)
+    if sensor_id is not None:
+        updates.append("sensor_id = %s")
+        params.append(None if sensor_id == 0 else sensor_id)
+    if not updates:
+        cnx.close()
+        print("No changes specified.")
+        return False
+    params.append(scope_id)
+    db.run_query(cnx, "UPDATE telescopes SET " + ", ".join(updates) + " WHERE scope_id = %s", tuple(params))
+    cnx.close()
+    print(f"Updated telescope scope_id={scope_id}.")
+    return True
+
+
+def show_telescope(scope_id):
+    """Show telescope details including sensor and filters. Returns 0 on success, 1 if not found."""
+    cnx = db.connect()
+    row = db.run_query(cnx, """
+        SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
+               t.lon, t.lat, t.alt, t.sensor_id, t.active
+        FROM telescopes t WHERE t.scope_id = %s
+    """, (scope_id,))
+    if not row:
+        cnx.close()
+        print(f"Telescope scope_id={scope_id} not found.")
+        return 1
+    r = row[0]
+    print(f"Scope ID:  {r[0]}")
+    print(f"Name:      {r[1]}")
+    print(f"Descr:     {r[2] or ''}")
+    print(f"Min dec:   {r[3]}")
+    print(f"Max dec:   {r[4]}")
+    print(f"Focal:     {r[5]}")
+    print(f"Aperture:  {r[6]}")
+    print(f"Lon/Lat/Alt: {r[7]} / {r[8]} / {r[9]}")
+    print(f"Active:    {r[11]}")
+    if r[10] is not None:
+        srow = db.run_query(cnx, """
+            SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
+            FROM sensors WHERE sensor_id = %s
+        """, (r[10],))
+        if srow:
+            s = srow[0]
+            print("Sensor (camera):")
+            print(f"  sensor_id={s[0]} name={s[1]} res={s[2]}x{s[3]} pixel={s[4]}x{s[5]} µm bits={s[6]}")
+            print(f"  size={s[7]}x{s[8]} mm vendor={s[9]} url={s[10]} active={s[11]}")
+    else:
+        print("Sensor: (none)")
+    filters = db.run_query(cnx, """
+        SELECT f.filter_id, f.short_name, f.full_name, f.url, f.active
+        FROM telescope_filters tf JOIN filters f ON tf.filter_id = f.filter_id
+        WHERE tf.scope_id = %s ORDER BY f.filter_id
+    """, (scope_id,))
+    print("Filters:")
+    if filters:
+        for f in filters:
+            print(f"  filter_id={f[0]} short_name={f[1]} full_name={f[2]} active={f[4]}")
+    else:
+        print("  (none)")
+    cnx.close()
+    return 0
+
+
+def set_telescope_sensor(scope_id, sensor_id):
+    """Set or clear the telescope's sensor. sensor_id=0 removes the sensor. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
+    if not row:
+        cnx.close()
+        print(f"Telescope scope_id={scope_id} not found.")
+        return False
+    sid = None if sensor_id == 0 else sensor_id
+    if sid is not None:
+        srow = db.run_query(cnx, "SELECT sensor_id FROM sensors WHERE sensor_id = %s", (sid,))
+        if not srow:
+            cnx.close()
+            print(f"Sensor id={sensor_id} not found.")
+            return False
+    db.run_query(cnx, "UPDATE telescopes SET sensor_id = %s WHERE scope_id = %s", (sid, scope_id))
+    cnx.close()
+    if sid is None:
+        print(f"Removed sensor from telescope scope_id={scope_id}.")
+    else:
+        print(f"Set telescope scope_id={scope_id} sensor_id={sensor_id}.")
+    return True
+
+
+def add_telescope_filter(scope_id, filter_id):
+    """Add a filter to a telescope. Returns True on success."""
+    cnx = db.connect()
+    scope = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
+    flt = db.run_query(cnx, "SELECT filter_id FROM filters WHERE filter_id = %s", (filter_id,))
+    if not scope or not flt:
+        cnx.close()
+        print("Telescope or filter not found.")
+        return False
+    try:
+        db.run_query(cnx, "INSERT INTO telescope_filters (scope_id, filter_id) VALUES (%s, %s)", (scope_id, filter_id))
+    except Exception as e:
+        cnx.close()
+        if "unique" in str(e).lower() or "duplicate" in str(e).lower():
+            print("Filter is already assigned to this telescope.")
+        else:
+            print(f"Error: {e}")
+        return False
+    cnx.close()
+    print(f"Added filter_id={filter_id} to telescope scope_id={scope_id}.")
+    return True
+
+
+def remove_telescope_filter(scope_id, filter_id):
+    """Remove a filter from a telescope. Returns True on success."""
+    cnx = db.connect()
+    r = db.run_query(cnx, "DELETE FROM telescope_filters WHERE scope_id = %s AND filter_id = %s", (scope_id, filter_id))
+    cnx.close()
+    print(f"Removed filter_id={filter_id} from telescope scope_id={scope_id}.")
+    return True
