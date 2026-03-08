@@ -250,6 +250,10 @@ components:
       type: object
       required:
         - name
+        - resx
+        - resy
+        - pixel_x
+        - pixel_y
       properties:
         name:
           type: string
@@ -271,15 +275,16 @@ components:
           description: Pixel size Y (microns)
         bits:
           type: integer
-          description: Bit depth
+          default: 0
+          description: Bit depth (default 0 if omitted)
         width:
           type: number
           format: float
-          description: Sensor width (mm)
+          description: Sensor width (mm); if omitted, computed as resx * pixel_x / 1000
         height:
           type: number
           format: float
-          description: Sensor height (mm)
+          description: Sensor height (mm); if omitted, computed as resy * pixel_y / 1000
         vendor:
           type: string
           maxLength: 128
