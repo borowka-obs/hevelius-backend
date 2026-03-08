@@ -534,6 +534,93 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Telescope'
+    ScopeCreate:
+      type: object
+      required: [name]
+      properties:
+        scope_id:
+          type: integer
+          description: Optional telescope ID; if omitted, next available scope_id is assigned
+        name:
+          type: string
+          maxLength: 64
+        descr:
+          type: string
+          maxLength: 1024
+        min_dec:
+          type: number
+          format: float
+        max_dec:
+          type: number
+          format: float
+        focal:
+          type: number
+          format: float
+        aperture:
+          type: number
+          format: float
+        lon:
+          type: number
+          format: float
+        lat:
+          type: number
+          format: float
+        alt:
+          type: number
+          format: float
+        sensor_id:
+          type: integer
+          description: Camera/sensor ID; use 0 or omit to leave unset
+        active:
+          type: boolean
+          default: true
+    ScopeUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        descr:
+          type: string
+          maxLength: 1024
+        min_dec:
+          type: number
+          format: float
+        max_dec:
+          type: number
+          format: float
+        focal:
+          type: number
+          format: float
+        aperture:
+          type: number
+          format: float
+        lon:
+          type: number
+          format: float
+        lat:
+          type: number
+          format: float
+        alt:
+          type: number
+          format: float
+        sensor_id:
+          type: integer
+          description: Camera/sensor ID; use 0 to remove sensor
+        active:
+          type: boolean
+    ScopeResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        scope_id:
+          type: integer
+          description: The telescope ID (assigned or provided)
+        scope:
+          $ref: '#/components/schemas/Telescope'
+        msg:
+          type: string
     Catalog:
       type: object
       properties:
@@ -1186,7 +1273,20 @@ paths:
   /api/scopes:
     get:
       summary: Get list of telescopes
-      description: Returns a list of telescopes with their associated sensors
+      description: Returns a list of telescopes with their associated sensors and filters. Supports sorting.
+      parameters:
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [scope_id, name, focal, active]
+            default: scope_id
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
       responses:
         '200':
           description: List of telescopes
@@ -1194,6 +1294,139 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TelescopesList'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Add new telescope
+      description: Creates a new telescope. name is required; scope_id is optional (auto-assigned if omitted).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeCreate'
+      responses:
+        '200':
+          description: Telescope created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeResponse'
+        '400':
+          description: Bad request (e.g. duplicate scope_id)
+      security:
+        - bearerAuth: []
+  /api/scopes/{scope_id}:
+    get:
+      summary: Get telescope details
+      description: Returns a single telescope with full sensor and filters list.
+      parameters:
+        - name: scope_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Telescope details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeResponse'
+        '404':
+          description: Telescope not found
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Edit telescope
+      description: Update telescope fields. Use sensor_id 0 to remove the sensor.
+      parameters:
+        - name: scope_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScopeUpdate'
+      responses:
+        '200':
+          description: Telescope updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScopeResponse'
+        '404':
+          description: Telescope not found
+      security:
+        - bearerAuth: []
+  /api/scopes/{scope_id}/filters:
+    post:
+      summary: Add filter to telescope
+      description: Associate a filter with this telescope.
+      parameters:
+        - name: scope_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filter_id]
+              properties:
+                filter_id:
+                  type: integer
+      responses:
+        '200':
+          description: Filter added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Telescope or filter not found
+      security:
+        - bearerAuth: []
+  /api/scopes/{scope_id}/filters/{filter_id}:
+    delete:
+      summary: Remove filter from telescope
+      description: Removes the association between the telescope and the filter.
+      parameters:
+        - name: scope_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: filter_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Filter removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Telescope or filter association not found
       security:
         - bearerAuth: []
   /api/filters:
