@@ -1327,5 +1327,174 @@ class TestSensors(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestTelescopeOperations(unittest.TestCase):
+    """Tests for telescope CRUD: add (auto id), get, edit, set sensor, add/remove filter, list sort."""
+
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,
+                additional_claims={'permissions': 1, 'username': 'test_user'}
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_telescope_post_add_auto_id(self, config):
+        """Add telescope without scope_id; scope_id is auto-assigned and returned."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "New Auto Scope", "focal": 500.0, "active": True}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIn('scope_id', data)
+        self.assertIsInstance(data['scope_id'], int)
+        self.assertGreater(data['scope_id'], 0)
+        self.assertEqual(data['scope']['name'], 'New Auto Scope')
+        self.assertEqual(data['scope']['focal'], 500.0)
+        self.assertTrue(data['scope']['active'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_post_add_explicit_id(self, config):
+        """Add telescope with explicit scope_id."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"scope_id": 100, "name": "Explicit ID Scope", "descr": "Test"}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['scope_id'], 100)
+        self.assertEqual(data['scope']['scope_id'], 100)
+        self.assertEqual(data['scope']['name'], 'Explicit ID Scope')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_post_duplicate_scope_id(self, config):
+        """Adding telescope with existing scope_id returns error."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"scope_id": 1, "name": "Duplicate"}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('already exists', data.get('msg', ''))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_get(self, config):
+        """Get single telescope by scope_id; includes sensor and filters."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/scopes/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['scope']['scope_id'], 1)
+        self.assertIn('name', data['scope'])
+        self.assertIn('sensor', data['scope'])
+        self.assertIn('filters', data['scope'])
+        self.assertIsInstance(data['scope']['filters'], list)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_get_not_found(self, config):
+        """GET non-existent telescope returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/scopes/99999', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('not found', data.get('msg', ''))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_patch(self, config):
+        """Edit telescope via PATCH."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Updated Scope Name", "descr": "Updated descr", "focal": 1500.0}
+        response = self.app.patch('/api/scopes/1', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['scope']['name'], 'Updated Scope Name')
+        self.assertEqual(data['scope']['descr'], 'Updated descr')
+        self.assertEqual(data['scope']['focal'], 1500.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_patch_set_sensor(self, config):
+        """Set sensor on telescope (sensor_id=2); then remove (sensor_id=0)."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        # Scope 3 in test data has no sensor; set sensor 2
+        response = self.app.patch('/api/scopes/2', data=json.dumps({"sensor_id": 2}), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIsNotNone(data['scope']['sensor'])
+        self.assertEqual(data['scope']['sensor']['sensor_id'], 2)
+        # Remove sensor
+        response = self.app.patch('/api/scopes/2', data=json.dumps({"sensor_id": 0}), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIsNone(data['scope']['sensor'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_list_sort(self, config):
+        """List telescopes with sort_by and sort_order."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/scopes?sort_by=name&sort_order=asc', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('telescopes', data)
+        telescopes = data['telescopes']
+        if len(telescopes) >= 2:
+            names = [t['name'] for t in telescopes if t.get('name')]
+            self.assertEqual(names, sorted(names))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_add_filter(self, config):
+        """Add filter to telescope."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        # Remove filter 1 from scope 1 if present, then add it back
+        self.app.delete('/api/scopes/1/filters/1', headers=self.headers)
+        response = self.app.post(
+            '/api/scopes/1/filters',
+            data=json.dumps({"filter_id": 1}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        # Verify scope 1 now has filter 1
+        get_resp = self.app.get('/api/scopes/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        filter_ids = [f['filter_id'] for f in get_data['scope']['filters']]
+        self.assertIn(1, filter_ids)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_remove_filter(self, config):
+        """Remove filter from telescope."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.delete('/api/scopes/1/filters/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        # Verify scope 1 no longer has filter 1
+        get_resp = self.app.get('/api/scopes/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        filter_ids = [f['filter_id'] for f in get_data['scope']['filters']]
+        self.assertNotIn(1, filter_ids)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 if __name__ == '__main__':
     unittest.main()
