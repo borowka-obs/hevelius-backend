@@ -472,7 +472,7 @@ def add_telescope_filter(scope_id, filter_id):
 def remove_telescope_filter(scope_id, filter_id):
     """Remove a filter from a telescope. Returns True on success."""
     cnx = db.connect()
-    r = db.run_query(cnx, "DELETE FROM telescope_filters WHERE scope_id = %s AND filter_id = %s", (scope_id, filter_id))
+    db.run_query(cnx, "DELETE FROM telescope_filters WHERE scope_id = %s AND filter_id = %s", (scope_id, filter_id))
     cnx.close()
     print(f"Removed filter_id={filter_id} from telescope scope_id={scope_id}.")
     return True
