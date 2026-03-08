@@ -264,7 +264,7 @@ class DbTest(unittest.TestCase):
         """CLI: add sensor, edit sensor."""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
         try:
-            sid = add_sensor("CLI Test Sensor", resx=1000, resy=1000, pixel_x=4.0, vendor="CLI", active=True)
+            sid = add_sensor("CLI Test Sensor", resx=1000, resy=1000, pixel_x=4.0, pixel_y=4.0, vendor="CLI", active=True)
             self.assertIsNotNone(sid)
             conn = db.connect()
             rows = db.run_query(conn, "SELECT sensor_id, name, resx, vendor, active FROM sensors WHERE name = 'CLI Test Sensor'")

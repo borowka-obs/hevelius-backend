@@ -366,11 +366,11 @@ class SensorSchema(Schema):
 
 class SensorCreateSchema(Schema):
     name = fields.String(required=True, validate=validate.Length(max=128))
-    resx = fields.Integer(load_default=None)
-    resy = fields.Integer(load_default=None)
-    pixel_x = fields.Float(load_default=None)
-    pixel_y = fields.Float(load_default=None)
-    bits = fields.Integer(load_default=None)
+    resx = fields.Integer(required=True)
+    resy = fields.Integer(required=True)
+    pixel_x = fields.Float(required=True)
+    pixel_y = fields.Float(required=True)
+    bits = fields.Integer(load_default=0)
     width = fields.Float(load_default=None)
     height = fields.Float(load_default=None)
     vendor = fields.String(validate=validate.Length(max=128), load_default=None)
@@ -1315,10 +1315,16 @@ class FilterDetailResource(MethodView):
 SENSOR_SORT_FIELDS = {"sensor_id", "name", "resx", "resy", "pixel_x", "pixel_y", "width", "height", "vendor"}
 
 
+def _round2(val):
+    """Round to 2 decimal places for display; None stays None."""
+    return round(val, 2) if val is not None else None
+
+
 def _row_to_sensor(r):
     return {
         "sensor_id": r[0], "name": r[1], "resx": r[2], "resy": r[3],
-        "pixel_x": r[4], "pixel_y": r[5], "bits": r[6], "width": r[7], "height": r[8],
+        "pixel_x": r[4], "pixel_y": r[5], "bits": r[6],
+        "width": _round2(r[7]), "height": _round2(r[8]),
         "vendor": r[9], "url": r[10], "active": r[11]
     }
 
@@ -1358,8 +1364,23 @@ class SensorsResource(MethodView):
         "msg": fields.String()
     }))
     def post(self, sensor_data):
-        """Add new sensor"""
+        """Add new sensor. width/height computed from resx*px/1000 if not provided. bits defaults to 0."""
         name = sensor_data["name"]
+        resx = sensor_data["resx"]
+        resy = sensor_data["resy"]
+        pixel_x = sensor_data["pixel_x"]
+        pixel_y = sensor_data["pixel_y"]
+        bits = sensor_data.get("bits") if sensor_data.get("bits") is not None else 0
+        width = sensor_data.get("width")
+        height = sensor_data.get("height")
+        if width is None:
+            width = round(resx * pixel_x / 1000.0, 2)
+        else:
+            width = round(width, 2)
+        if height is None:
+            height = round(resy * pixel_y / 1000.0, 2)
+        else:
+            height = round(height, 2)
         cnx = db.connect()
         row = db.run_query(
             cnx,
@@ -1367,13 +1388,13 @@ class SensorsResource(MethodView):
                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING sensor_id""",
             (
                 name,
-                sensor_data.get("resx"),
-                sensor_data.get("resy"),
-                sensor_data.get("pixel_x"),
-                sensor_data.get("pixel_y"),
-                sensor_data.get("bits"),
-                sensor_data.get("width"),
-                sensor_data.get("height"),
+                resx,
+                resy,
+                pixel_x,
+                pixel_y,
+                bits,
+                width,
+                height,
                 sensor_data.get("vendor"),
                 sensor_data.get("url"),
                 sensor_data.get("active", True),

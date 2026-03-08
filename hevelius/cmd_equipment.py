@@ -109,7 +109,21 @@ SENSOR_SORT_FIELDS = {"sensor_id", "name", "resx", "resy", "pixel_x", "pixel_y",
 
 def add_sensor(name, resx=None, resy=None, pixel_x=None, pixel_y=None, bits=None, width=None, height=None,
                vendor=None, url=None, active=True):
-    """Add a new sensor. Returns sensor_id on success, None on error."""
+    """Add a new sensor. resx, resy, pixel_x, pixel_y are required. width/height are computed if not given.
+    bits defaults to 0. Returns sensor_id on success, None on error."""
+    if resx is None or resy is None or pixel_x is None or pixel_y is None:
+        print("Error: resx, resy, pixel_x and pixel_y are required (use --resx, --resy, --pixel-x, --pixel-y).")
+        return None
+    if width is None:
+        width = round(resx * pixel_x / 1000.0, 2)
+    if height is None:
+        height = round(resy * pixel_y / 1000.0, 2)
+    if width is not None:
+        width = round(width, 2)
+    if height is not None:
+        height = round(height, 2)
+    if bits is None:
+        bits = 0
     cnx = db.connect()
     try:
         row = db.run_query(
@@ -144,7 +158,9 @@ def edit_sensor(sensor_id, name=None, resx=None, resy=None, pixel_x=None, pixel_
     params = []
     for key, val in [
         ("name", name), ("resx", resx), ("resy", resy), ("pixel_x", pixel_x), ("pixel_y", pixel_y),
-        ("bits", bits), ("width", width), ("height", height), ("vendor", vendor), ("url", url), ("active", active)
+        ("bits", bits), ("width", round(width, 2) if width is not None else None),
+        ("height", round(height, 2) if height is not None else None),
+        ("vendor", vendor), ("url", url), ("active", active)
     ]:
         if val is not None:
             updates.append(f"{key} = %s")
@@ -186,11 +202,15 @@ def list_sensors(active_only=False, sort_by="sensor_id", sort_order="asc"):
     print(f"{'ID':<6} {'Name':<28} {'Res':<12} {'Pixel(µm)':<14} bits  {'Size(mm)':<14} vendor/url active")
     print("-" * 100)
     for r in rows:
-        res = f"{r[2]}x{r[3]}"
-        px = f"{r[4]}x{r[5]}"
-        size = f"{r[7]}x{r[8]}"
+        res = f"{r[2] or 0}x{r[3] or 0}"
+        px = f"{r[4] or 0}x{r[5] or 0}"
+        w = round((r[7] or 0), 2)
+        h = round((r[8] or 0), 2)
+        size = f"{w:.2f}x{h:.2f}"
+        bits_val = r[6] if r[6] is not None else 0
         vendor = (r[9] or "")[:12]
-        print(f"{r[0]:<6} {(r[1] or '')[:26]:<28} {res:<12} {px:<14} {r[6]:<4} {size:<14} {vendor:<12} {r[11]}")
+        active_val = r[11] if r[11] is not None else False
+        print(f"{r[0]:<6} {(r[1] or '')[:26]:<28} {res:<12} {px:<14} {bits_val:<4} {size:<14} {vendor:<12} {active_val}")
 
 
 def list_projects():

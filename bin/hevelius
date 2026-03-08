@@ -110,13 +110,13 @@ def run():
 
     sensor_parser = subparsers.add_parser('sensor', help="Add or edit a sensor (camera)")
     sensor_sub = sensor_parser.add_subparsers(dest='sensor_command', help="Sensor subcommand")
-    sensor_add = sensor_sub.add_parser('add', help="Add a new sensor")
+    sensor_add = sensor_sub.add_parser('add', help="Add a new sensor (resx, resy, pixel-x, pixel-y required)")
     sensor_add.add_argument('name', help="Sensor/camera name")
-    sensor_add.add_argument('--resx', type=int, help="Resolution X (pixels)")
-    sensor_add.add_argument('--resy', type=int, help="Resolution Y (pixels)")
-    sensor_add.add_argument('--pixel-x', type=float, help="Pixel size X (microns)")
-    sensor_add.add_argument('--pixel-y', type=float, help="Pixel size Y (microns)")
-    sensor_add.add_argument('--bits', type=int, help="Bit depth")
+    sensor_add.add_argument('--resx', type=int, required=True, help="Resolution X (pixels)")
+    sensor_add.add_argument('--resy', type=int, required=True, help="Resolution Y (pixels)")
+    sensor_add.add_argument('--pixel-x', type=float, required=True, help="Pixel size X (microns)")
+    sensor_add.add_argument('--pixel-y', type=float, required=True, help="Pixel size Y (microns)")
+    sensor_add.add_argument('--bits', type=int, default=0, help="Bit depth (default: 0)")
     sensor_add.add_argument('--width', type=float, help="Sensor width (mm)")
     sensor_add.add_argument('--height', type=float, help="Sensor height (mm)")
     sensor_add.add_argument('--vendor', help="Vendor name")
@@ -196,11 +196,11 @@ def run():
             active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
             return 0 if add_sensor(
                 args.name,
-                resx=getattr(args, 'resx', None),
-                resy=getattr(args, 'resy', None),
-                pixel_x=getattr(args, 'pixel_x', None),
-                pixel_y=getattr(args, 'pixel_y', None),
-                bits=getattr(args, 'bits', None),
+                resx=args.resx,
+                resy=args.resy,
+                pixel_x=args.pixel_x,
+                pixel_y=args.pixel_y,
+                bits=getattr(args, 'bits', 0),
                 width=getattr(args, 'width', None),
                 height=getattr(args, 'height', None),
                 vendor=getattr(args, 'vendor', None),
