@@ -120,8 +120,8 @@ def setup_database_test_case(*, load_test_data: str = None):
             # Terminate other connections so we can use the DB as template (PostgreSQL
             # requires no connections to the source DB when creating a template)
             maintenance_cursor.execute(
-                f"SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
-                f"WHERE datname = %s AND pid <> pg_backend_pid();",
+                "SELECT pg_terminate_backend(pid) FROM pg_stat_activity "
+                "WHERE datname = %s AND pid <> pg_backend_pid();",
                 (test_db_name,)
             )
             maintenance_cursor.execute(
