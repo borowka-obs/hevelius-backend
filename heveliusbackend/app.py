@@ -1377,14 +1377,20 @@ class FiltersResource(MethodView):
     @jwt_required()
     @blp.response(200, Schema.from_dict({"filters": fields.List(fields.Nested(FilterSchema))}))
     def get(self):
-        """Get list of filters"""
+        """Get list of filters. Sortable by filter_id, short_name, full_name, active (default filter_id)."""
         active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
+        sort_by = request.args.get("sort_by", "filter_id")
+        sort_order = (request.args.get("sort_order") or "asc").upper()
+        if sort_by not in ("filter_id", "short_name", "full_name", "active"):
+            sort_by = "filter_id"
+        if sort_order not in ("ASC", "DESC"):
+            sort_order = "ASC"
         query = "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE 1=1"
         params = []
         if active is not None:
             query += " AND active = %s"
             params.append(active)
-        query += " ORDER BY filter_id"
+        query += f" ORDER BY {sort_by} {sort_order}"
         cnx = db.connect()
         rows = db.run_query(cnx, query, params if params else None)
         cnx.close()

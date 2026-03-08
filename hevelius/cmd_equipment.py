@@ -86,13 +86,21 @@ def set_filter_active(filter_id, active):
     return True
 
 
-def list_filters(active_only=False):
-    """List all filters from the database."""
+FILTER_SORT_FIELDS = {"filter_id", "short_name", "full_name", "active"}
+
+
+def list_filters(active_only=False, sort_by="filter_id", sort_order="asc"):
+    """List all filters from the database. Sortable by filter_id, short_name, full_name, active."""
+    if sort_by not in FILTER_SORT_FIELDS:
+        sort_by = "filter_id"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+    order = f"ORDER BY {sort_by} {sort_order}"
     cnx = db.connect()
     if active_only:
-        rows = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters WHERE active = true ORDER BY filter_id")
+        rows = db.run_query(cnx, f"SELECT filter_id, short_name, full_name, url, active FROM filters WHERE active = true {order}")
     else:
-        rows = db.run_query(cnx, "SELECT filter_id, short_name, full_name, url, active FROM filters ORDER BY filter_id")
+        rows = db.run_query(cnx, f"SELECT filter_id, short_name, full_name, url, active FROM filters {order}")
     cnx.close()
     if not rows:
         print("No filters found.")
