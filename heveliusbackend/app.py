@@ -364,6 +364,34 @@ class SensorSchema(Schema):
     active = fields.Boolean(metadata={"description": "Whether the sensor is active"})
 
 
+class SensorCreateSchema(Schema):
+    name = fields.String(required=True, validate=validate.Length(max=128))
+    resx = fields.Integer(load_default=None)
+    resy = fields.Integer(load_default=None)
+    pixel_x = fields.Float(load_default=None)
+    pixel_y = fields.Float(load_default=None)
+    bits = fields.Integer(load_default=None)
+    width = fields.Float(load_default=None)
+    height = fields.Float(load_default=None)
+    vendor = fields.String(validate=validate.Length(max=128), load_default=None)
+    url = fields.String(validate=validate.Length(max=512), load_default=None)
+    active = fields.Boolean(load_default=True)
+
+
+class SensorUpdateSchema(Schema):
+    name = fields.String(validate=validate.Length(max=128), load_default=None)
+    resx = fields.Integer(load_default=None)
+    resy = fields.Integer(load_default=None)
+    pixel_x = fields.Float(load_default=None)
+    pixel_y = fields.Float(load_default=None)
+    bits = fields.Integer(load_default=None)
+    width = fields.Float(load_default=None)
+    height = fields.Float(load_default=None)
+    vendor = fields.String(validate=validate.Length(max=128), load_default=None)
+    url = fields.String(validate=validate.Length(max=512), load_default=None)
+    active = fields.Boolean(load_default=None)
+
+
 class FilterSchema(Schema):
     filter_id = fields.Integer(required=True, metadata={"description": "Filter primary key"})
     short_name = fields.String(metadata={"description": "Short name"})
@@ -1284,32 +1312,139 @@ class FilterDetailResource(MethodView):
         return {"status": True, "filter": _row_to_filter(updated[0]), "msg": "Filter updated."}
 
 
+SENSOR_SORT_FIELDS = {"sensor_id", "name", "resx", "resy", "pixel_x", "pixel_y", "width", "height", "vendor"}
+
+
+def _row_to_sensor(r):
+    return {
+        "sensor_id": r[0], "name": r[1], "resx": r[2], "resy": r[3],
+        "pixel_x": r[4], "pixel_y": r[5], "bits": r[6], "width": r[7], "height": r[8],
+        "vendor": r[9], "url": r[10], "active": r[11]
+    }
+
+
 @blp.route("/sensors")
 class SensorsResource(MethodView):
     @jwt_required()
     @blp.response(200, Schema.from_dict({"sensors": fields.List(fields.Nested(SensorSchema))}))
     def get(self):
-        """Get list of sensors (cameras)"""
+        """Get list of sensors (cameras) with optional sorting"""
         active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
+        sort_by = request.args.get("sort_by", "sensor_id")
+        sort_order = request.args.get("sort_order", "asc")
+        if sort_by not in SENSOR_SORT_FIELDS:
+            sort_by = "sensor_id"
+        if sort_order not in ("asc", "desc"):
+            sort_order = "asc"
         query = """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
                    FROM sensors WHERE 1=1"""
         params = []
         if active is not None:
             query += " AND active = %s"
             params.append(active)
-        query += " ORDER BY sensor_id"
+        query += f" ORDER BY {sort_by} {sort_order}"
         cnx = db.connect()
         rows = db.run_query(cnx, query, params if params else None)
         cnx.close()
-        sensors_list = [
-            {
-                "sensor_id": r[0], "name": r[1], "resx": r[2], "resy": r[3],
-                "pixel_x": r[4], "pixel_y": r[5], "bits": r[6], "width": r[7], "height": r[8],
-                "vendor": r[9], "url": r[10], "active": r[11]
-            }
-            for r in (rows or [])
-        ]
+        sensors_list = [_row_to_sensor(r) for r in (rows or [])]
         return {"sensors": sensors_list}
+
+    @jwt_required()
+    @blp.arguments(SensorCreateSchema)
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "sensor_id": fields.Integer(),
+        "sensor": fields.Nested(SensorSchema),
+        "msg": fields.String()
+    }))
+    def post(self, sensor_data):
+        """Add new sensor"""
+        name = sensor_data["name"]
+        cnx = db.connect()
+        row = db.run_query(
+            cnx,
+            """INSERT INTO sensors (name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING sensor_id""",
+            (
+                name,
+                sensor_data.get("resx"),
+                sensor_data.get("resy"),
+                sensor_data.get("pixel_x"),
+                sensor_data.get("pixel_y"),
+                sensor_data.get("bits"),
+                sensor_data.get("width"),
+                sensor_data.get("height"),
+                sensor_data.get("vendor"),
+                sensor_data.get("url"),
+                sensor_data.get("active", True),
+            )
+        )
+        sensor_id = row if isinstance(row, int) else (row[0] if row else None)
+        cnx.close()
+        if sensor_id is None:
+            abort(500, message="Failed to create sensor.")
+        cnx = db.connect()
+        rows = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height,
+                                        vendor, url, active FROM sensors WHERE sensor_id = %s""", (sensor_id,))
+        cnx.close()
+        if not rows:
+            abort(500, message="Sensor created but could not be retrieved.")
+        return {
+            "status": True,
+            "sensor_id": sensor_id,
+            "sensor": _row_to_sensor(rows[0]),
+            "msg": "Sensor created successfully."
+        }
+
+
+@blp.route("/sensors/<int:sensor_id>")
+class SensorDetailResource(MethodView):
+    @jwt_required()
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "sensor": fields.Nested(SensorSchema),
+        "msg": fields.String()
+    }))
+    def get(self, sensor_id):
+        """Get single sensor"""
+        cnx = db.connect()
+        rows = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height,
+                                       vendor, url, active FROM sensors WHERE sensor_id = %s""", (sensor_id,))
+        cnx.close()
+        if not rows:
+            abort(404, message="Sensor not found.")
+        return {"status": True, "sensor": _row_to_sensor(rows[0]), "msg": "OK"}
+
+    @jwt_required()
+    @blp.arguments(SensorUpdateSchema)
+    @blp.response(200, Schema.from_dict({
+        "status": fields.Boolean(),
+        "sensor": fields.Nested(SensorSchema),
+        "msg": fields.String()
+    }))
+    def patch(self, sensor_data, sensor_id):
+        """Edit sensor (partial update)"""
+        cnx = db.connect()
+        rows = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height,
+                                       vendor, url, active FROM sensors WHERE sensor_id = %s""", (sensor_id,))
+        if not rows:
+            cnx.close()
+            abort(404, message="Sensor not found.")
+        updates = []
+        params = []
+        for key in ("name", "resx", "resy", "pixel_x", "pixel_y", "bits", "width", "height", "vendor", "url", "active"):
+            if key in sensor_data and sensor_data[key] is not None:
+                updates.append(f"{key} = %s")
+                params.append(sensor_data[key])
+        if not updates:
+            cnx.close()
+            return {"status": True, "sensor": _row_to_sensor(rows[0]), "msg": "No changes."}
+        params.append(sensor_id)
+        db.run_query(cnx, "UPDATE sensors SET " + ", ".join(updates) + " WHERE sensor_id = %s", tuple(params))
+        updated = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height,
+                                         vendor, url, active FROM sensors WHERE sensor_id = %s""", (sensor_id,))
+        cnx.close()
+        return {"status": True, "sensor": _row_to_sensor(updated[0]), "msg": "Sensor updated."}
 
 
 @blp.route("/projects")

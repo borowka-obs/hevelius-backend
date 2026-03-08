@@ -23,6 +23,8 @@ from hevelius.cmd_equipment import (
     add_filter,
     edit_filter,
     set_filter_active,
+    add_sensor,
+    edit_sensor,
 )
 
 
@@ -102,6 +104,39 @@ def run():
 
     sensors_parser = subparsers.add_parser('sensors', help="List sensors (cameras)")
     sensors_parser.add_argument('--active-only', action='store_true', help="Show only active sensors")
+    sensors_parser.add_argument('--sort-by', choices=['pixel_x', 'pixel_y', 'name', 'vendor', 'width', 'height', 'resx', 'resy', 'sensor_id'],
+                                default='sensor_id', help="Sort by field")
+    sensors_parser.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
+
+    sensor_parser = subparsers.add_parser('sensor', help="Add or edit a sensor (camera)")
+    sensor_sub = sensor_parser.add_subparsers(dest='sensor_command', help="Sensor subcommand")
+    sensor_add = sensor_sub.add_parser('add', help="Add a new sensor")
+    sensor_add.add_argument('name', help="Sensor/camera name")
+    sensor_add.add_argument('--resx', type=int, help="Resolution X (pixels)")
+    sensor_add.add_argument('--resy', type=int, help="Resolution Y (pixels)")
+    sensor_add.add_argument('--pixel-x', type=float, help="Pixel size X (microns)")
+    sensor_add.add_argument('--pixel-y', type=float, help="Pixel size Y (microns)")
+    sensor_add.add_argument('--bits', type=int, help="Bit depth")
+    sensor_add.add_argument('--width', type=float, help="Sensor width (mm)")
+    sensor_add.add_argument('--height', type=float, help="Sensor height (mm)")
+    sensor_add.add_argument('--vendor', help="Vendor name")
+    sensor_add.add_argument('--url', help="URL for sensor info")
+    sensor_add.add_argument('--active', action='store_true', default=True, help="Sensor is active (default)")
+    sensor_add.add_argument('--inactive', action='store_true', help="Create sensor as inactive")
+    sensor_edit = sensor_sub.add_parser('edit', help="Edit an existing sensor")
+    sensor_edit.add_argument('sensor_id', type=int, help="Sensor ID to edit")
+    sensor_edit.add_argument('--name', help="Sensor name")
+    sensor_edit.add_argument('--resx', type=int, help="Resolution X (pixels)")
+    sensor_edit.add_argument('--resy', type=int, help="Resolution Y (pixels)")
+    sensor_edit.add_argument('--pixel-x', type=float, help="Pixel size X (microns)")
+    sensor_edit.add_argument('--pixel-y', type=float, help="Pixel size Y (microns)")
+    sensor_edit.add_argument('--bits', type=int, help="Bit depth")
+    sensor_edit.add_argument('--width', type=float, help="Sensor width (mm)")
+    sensor_edit.add_argument('--height', type=float, help="Sensor height (mm)")
+    sensor_edit.add_argument('--vendor', help="Vendor name")
+    sensor_edit.add_argument('--url', help="URL for sensor info")
+    sensor_edit.add_argument('--active', action='store_true', help="Set sensor active")
+    sensor_edit.add_argument('--inactive', action='store_true', help="Set sensor inactive")
 
     projects_parser = subparsers.add_parser('projects', help="List or show projects")
     projects_parser.add_argument('project_id', nargs='?', type=int, help="If given, show single project by ID")
@@ -154,8 +189,45 @@ def run():
             return 0 if set_filter_active(args.filter_id, False) else 1
         return filter_parser.print_help() or 1
     if args.command == "sensors":
-        list_sensors(active_only=args.active_only)
+        list_sensors(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
         return 0
+    if args.command == "sensor":
+        if args.sensor_command == "add":
+            active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
+            return 0 if add_sensor(
+                args.name,
+                resx=getattr(args, 'resx', None),
+                resy=getattr(args, 'resy', None),
+                pixel_x=getattr(args, 'pixel_x', None),
+                pixel_y=getattr(args, 'pixel_y', None),
+                bits=getattr(args, 'bits', None),
+                width=getattr(args, 'width', None),
+                height=getattr(args, 'height', None),
+                vendor=getattr(args, 'vendor', None),
+                url=getattr(args, 'url', None),
+                active=active
+            ) is not None else 1
+        if args.sensor_command == "edit":
+            active = None
+            if getattr(args, 'active', False):
+                active = True
+            if getattr(args, 'inactive', False):
+                active = False
+            return 0 if edit_sensor(
+                args.sensor_id,
+                name=getattr(args, 'name', None),
+                resx=getattr(args, 'resx', None),
+                resy=getattr(args, 'resy', None),
+                pixel_x=getattr(args, 'pixel_x', None),
+                pixel_y=getattr(args, 'pixel_y', None),
+                bits=getattr(args, 'bits', None),
+                width=getattr(args, 'width', None),
+                height=getattr(args, 'height', None),
+                vendor=getattr(args, 'vendor', None),
+                url=getattr(args, 'url', None),
+                active=active
+            ) else 1
+        return sensor_parser.print_help() or 1
     if args.command == "projects":
         if args.project_id is not None:
             return show_project(args.project_id) or 0

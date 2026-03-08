@@ -1225,5 +1225,107 @@ class TestFilters(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestSensors(unittest.TestCase):
+    """Tests for sensor CRUD and list sorting."""
+
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,
+                additional_claims={'permissions': 1, 'username': 'test_user'}
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_sensors_post_add(self, config):
+        """Add new sensor via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {
+            "name": "Test Camera",
+            "resx": 1920,
+            "resy": 1080,
+            "pixel_x": 5.0,
+            "pixel_y": 5.0,
+            "vendor": "TestVendor",
+            "active": True
+        }
+        response = self.app.post('/api/sensors', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertIn('sensor_id', data)
+        self.assertEqual(data['sensor']['name'], 'Test Camera')
+        self.assertEqual(data['sensor']['resx'], 1920)
+        self.assertEqual(data['sensor']['resy'], 1080)
+        self.assertEqual(data['sensor']['vendor'], 'TestVendor')
+        self.assertTrue(data['sensor']['active'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_sensors_patch_edit(self, config):
+        """Edit existing sensor via API."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "QSI 583ws (edited)", "vendor": "QSI"}
+        response = self.app.patch('/api/sensors/1', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['sensor']['sensor_id'], 1)
+        self.assertEqual(data['sensor']['name'], "QSI 583ws (edited)")
+        self.assertEqual(data['sensor']['vendor'], "QSI")
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_sensors_get_by_id(self, config):
+        """Get single sensor by ID."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/sensors/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['sensor']['sensor_id'], 1)
+        self.assertEqual(data['sensor']['name'], 'QSI 583ws')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_sensors_list_sort(self, config):
+        """List sensors with sort_by and sort_order."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/sensors?sort_by=name&sort_order=asc', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('sensors', data)
+        sensors = data['sensors']
+        self.assertGreaterEqual(len(sensors), 2)
+        names = [s['name'] for s in sensors]
+        self.assertEqual(names, sorted(names))
+        response2 = self.app.get('/api/sensors?sort_by=pixel_x&sort_order=desc', headers=self.headers)
+        data2 = json.loads(response2.data)
+        self.assertEqual(response2.status_code, 200)
+        pixels = [s['pixel_x'] for s in data2['sensors'] if s.get('pixel_x') is not None]
+        self.assertEqual(pixels, sorted(pixels, reverse=True))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_sensors_get_not_found(self, config):
+        """GET non-existent sensor returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/sensors/99999', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_sensors_patch_not_found(self, config):
+        """PATCH non-existent sensor returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch('/api/sensors/99999', data=json.dumps({"name": "X"}), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 if __name__ == '__main__':
     unittest.main()
