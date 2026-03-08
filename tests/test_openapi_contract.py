@@ -46,6 +46,7 @@ class TestOpenAPISpec(unittest.TestCase):
             "/api/filters",
             "/api/filters/{filter_id}",
             "/api/sensors",
+            "/api/sensors/{sensor_id}",
             "/api/projects",
             "/api/projects/{project_id}",
             "/api/catalogs/search",
