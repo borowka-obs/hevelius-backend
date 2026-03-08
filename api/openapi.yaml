@@ -246,6 +246,92 @@ components:
         active:
           type: boolean
           description: Whether the sensor is active
+    SensorCreate:
+      type: object
+      required:
+        - name
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          description: Sensor name
+        resx:
+          type: integer
+          description: Resolution X (pixels)
+        resy:
+          type: integer
+          description: Resolution Y (pixels)
+        pixel_x:
+          type: number
+          format: float
+          description: Pixel size X (microns)
+        pixel_y:
+          type: number
+          format: float
+          description: Pixel size Y (microns)
+        bits:
+          type: integer
+          description: Bit depth
+        width:
+          type: number
+          format: float
+          description: Sensor width (mm)
+        height:
+          type: number
+          format: float
+          description: Sensor height (mm)
+        vendor:
+          type: string
+          maxLength: 128
+        url:
+          type: string
+          maxLength: 512
+        active:
+          type: boolean
+          default: true
+    SensorUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 128
+        resx:
+          type: integer
+        resy:
+          type: integer
+        pixel_x:
+          type: number
+          format: float
+        pixel_y:
+          type: number
+          format: float
+        bits:
+          type: integer
+        width:
+          type: number
+          format: float
+        height:
+          type: number
+          format: float
+        vendor:
+          type: string
+          maxLength: 128
+        url:
+          type: string
+          maxLength: 512
+        active:
+          type: boolean
+    SensorResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        sensor_id:
+          type: integer
+        sensor:
+          $ref: '#/components/schemas/Sensor'
+        msg:
+          type: string
     Filter:
       type: object
       properties:
@@ -1205,7 +1291,7 @@ paths:
   /api/sensors:
     get:
       summary: Get list of sensors
-      description: Returns all sensors (cameras), optionally filtered by active status
+      description: Returns all sensors (cameras), optionally filtered by active status, with optional sorting
       parameters:
         - name: active
           in: query
@@ -1213,6 +1299,22 @@ paths:
           schema:
             type: boolean
           description: Filter by active status
+        - name: sort_by
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [pixel_x, pixel_y, name, vendor, width, height, resx, resy, sensor_id]
+            default: sensor_id
+          description: Sort field
+        - name: sort_order
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
       responses:
         '200':
           description: List of sensors
@@ -1225,6 +1327,79 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Sensor'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Add new sensor
+      description: Creates a new sensor (camera)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorCreate'
+      responses:
+        '200':
+          description: Sensor created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorResponse'
+        '422':
+          description: Validation error
+      security:
+        - bearerAuth: []
+  /api/sensors/{sensor_id}:
+    get:
+      summary: Get single sensor
+      description: Returns a sensor by ID
+      parameters:
+        - name: sensor_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Sensor details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  sensor:
+                    $ref: '#/components/schemas/Sensor'
+                  msg:
+                    type: string
+        '404':
+          description: Sensor not found
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Edit sensor
+      description: Update an existing sensor (partial update)
+      parameters:
+        - name: sensor_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SensorUpdate'
+      responses:
+        '200':
+          description: Sensor updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorResponse'
+        '404':
+          description: Sensor not found
       security:
         - bearerAuth: []
   /api/projects:

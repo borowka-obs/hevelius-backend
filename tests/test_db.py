@@ -1,6 +1,6 @@
 import os
 from hevelius import db
-from hevelius.cmd_equipment import add_filter, edit_filter, set_filter_active
+from hevelius.cmd_equipment import add_filter, edit_filter, set_filter_active, add_sensor, edit_sensor
 import unittest
 from tests.dbtest import use_repository
 
@@ -256,5 +256,30 @@ class DbTest(unittest.TestCase):
             rows = db.run_query(conn, "SELECT active FROM filters WHERE filter_id = %s", (filter_id,))
             conn.close()
             self.assertFalse(rows[0][0])
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)
+
+    @use_repository
+    def test_sensor_add_edit_cli(self, config):
+        """CLI: add sensor, edit sensor."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            sid = add_sensor("CLI Test Sensor", resx=1000, resy=1000, pixel_x=4.0, vendor="CLI", active=True)
+            self.assertIsNotNone(sid)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT sensor_id, name, resx, vendor, active FROM sensors WHERE name = 'CLI Test Sensor'")
+            conn.close()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][2], 1000)
+            self.assertEqual(rows[0][3], "CLI")
+            self.assertTrue(rows[0][4])
+            sensor_id = rows[0][0]
+            ok = edit_sensor(sensor_id, name="CLI Test Sensor Updated", vendor="CLI-edit")
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT name, vendor FROM sensors WHERE sensor_id = %s", (sensor_id,))
+            conn.close()
+            self.assertEqual(rows[0][0], "CLI Test Sensor Updated")
+            self.assertEqual(rows[0][1], "CLI-edit")
         finally:
             os.environ.pop('HEVELIUS_DB_NAME', None)

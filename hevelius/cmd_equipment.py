@@ -104,15 +104,81 @@ def list_filters(active_only=False):
         print(f"{r[0]:<6} {r[1]:<8} {(r[2] or '')[:22]:<24} {url:<20} {r[4]}")
 
 
-def list_sensors(active_only=False):
+SENSOR_SORT_FIELDS = {"sensor_id", "name", "resx", "resy", "pixel_x", "pixel_y", "width", "height", "vendor"}
+
+
+def add_sensor(name, resx=None, resy=None, pixel_x=None, pixel_y=None, bits=None, width=None, height=None,
+               vendor=None, url=None, active=True):
+    """Add a new sensor. Returns sensor_id on success, None on error."""
+    cnx = db.connect()
+    try:
+        row = db.run_query(
+            cnx,
+            """INSERT INTO sensors (name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING sensor_id""",
+            (name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active)
+        )
+    except Exception as e:
+        cnx.close()
+        print(f"Error: {e}")
+        return None
+    sensor_id = row if isinstance(row, int) else (row[0] if row else None)
+    cnx.close()
+    if sensor_id is None:
+        print("Error: Failed to create sensor.")
+        return None
+    print(f"Created sensor id={sensor_id} name={name}")
+    return sensor_id
+
+
+def edit_sensor(sensor_id, name=None, resx=None, resy=None, pixel_x=None, pixel_y=None, bits=None,
+                width=None, height=None, vendor=None, url=None, active=None):
+    """Update an existing sensor. Returns True on success."""
+    cnx = db.connect()
+    rows = db.run_query(cnx, "SELECT sensor_id FROM sensors WHERE sensor_id = %s", (sensor_id,))
+    if not rows:
+        cnx.close()
+        print(f"Sensor id={sensor_id} not found.")
+        return False
+    updates = []
+    params = []
+    for key, val in [
+        ("name", name), ("resx", resx), ("resy", resy), ("pixel_x", pixel_x), ("pixel_y", pixel_y),
+        ("bits", bits), ("width", width), ("height", height), ("vendor", vendor), ("url", url), ("active", active)
+    ]:
+        if val is not None:
+            updates.append(f"{key} = %s")
+            params.append(val)
+    if not updates:
+        cnx.close()
+        print("No changes specified.")
+        return False
+    params.append(sensor_id)
+    try:
+        db.run_query(cnx, "UPDATE sensors SET " + ", ".join(updates) + " WHERE sensor_id = %s", tuple(params))
+    except Exception as e:
+        cnx.close()
+        print(f"Error: {e}")
+        return False
+    cnx.close()
+    print(f"Updated sensor id={sensor_id}.")
+    return True
+
+
+def list_sensors(active_only=False, sort_by="sensor_id", sort_order="asc"):
     """List all sensors (cameras) from the database."""
+    if sort_by not in SENSOR_SORT_FIELDS:
+        sort_by = "sensor_id"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+    order = f"ORDER BY {sort_by} {sort_order}"
     cnx = db.connect()
     if active_only:
-        rows = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
-                                   FROM sensors WHERE active = true ORDER BY sensor_id""")
+        rows = db.run_query(cnx, f"""SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
+                                   FROM sensors WHERE active = true {order}""")
     else:
-        rows = db.run_query(cnx, """SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
-                                   FROM sensors ORDER BY sensor_id""")
+        rows = db.run_query(cnx, f"""SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active
+                                   FROM sensors {order}""")
     cnx.close()
     if not rows:
         print("No sensors found.")
