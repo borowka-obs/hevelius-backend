@@ -1432,7 +1432,7 @@ paths:
   /api/filters:
     get:
       summary: Get list of filters
-      description: Returns all filters, optionally filtered by active status
+      description: Returns all filters, optionally filtered by active status. Supports sorting.
       parameters:
         - name: active
           in: query
@@ -1440,6 +1440,20 @@ paths:
           schema:
             type: boolean
           description: Filter by active status
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            enum: [filter_id, short_name, full_name, active]
+            default: filter_id
+          description: Sort by field
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+          description: Sort order
       responses:
         '200':
           description: List of filters

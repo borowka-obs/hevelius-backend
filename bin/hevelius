@@ -87,6 +87,9 @@ def run():
 
     filters_parser = subparsers.add_parser('filters', help="List optical filters")
     filters_parser.add_argument('--active-only', action='store_true', help="Show only active filters")
+    filters_parser.add_argument('--sort-by', choices=['filter_id', 'short_name', 'full_name', 'active'],
+                                default='filter_id', help="Sort by field")
+    filters_parser.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
 
     filter_parser = subparsers.add_parser('filter', help="Add, edit, or set active state of a filter")
     filter_sub = filter_parser.add_subparsers(dest='filter_command', help="Filter subcommand")
@@ -218,7 +221,7 @@ def run():
     if args.command == "version":
         return version()
     if args.command == "filters":
-        list_filters(active_only=args.active_only)
+        list_filters(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
         return 0
     if args.command == "filter":
         if args.filter_command == "add":
