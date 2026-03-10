@@ -77,7 +77,13 @@ An example command line call:
 
 - **filters** – List optical filters (short name, full name, URL, active). Use `--active-only` to show only active filters.
 - **sensors** – List sensors/cameras (resolution, pixel size, bit depth, vendor, URL, active). Use `--active-only` to show only active sensors.
-- **projects** – List projects (name, description, RA, Dec). Optionally pass a project ID to show one project with its subframes (filter, exposure time, active) and associated user IDs.
+- **projects** – List projects (ID, name, scope_id, RA, Dec, active, description). Optionally pass a project ID to show one project with its subframes (filter, exposure time, goal_count, active) and associated user IDs.
+- **project add** – Create a project: `hevelius project add NAME --scope-id ID [--ra HOURS] [--dec DEGREES] [--description TEXT]`. Name and scope_id are required. If `--ra` and `--dec` are omitted, coordinates are resolved from the catalog by name; if not found, the command fails.
+- **project edit** – Update a project: `hevelius project edit PROJECT_ID [--name NAME] [--scope-id ID] [--description TEXT] [--ra HOURS] [--dec DEGREES] [--active|--inactive]`.
+- **project show** – Show one project: `hevelius project show PROJECT_ID`.
+- **project subframe add** – Add a subframe: `hevelius project subframe add PROJECT_ID --filter-id ID --exposure-time SEC [--goal-count N] [--active|--inactive]`.
+- **project subframe edit** – Edit a subframe: `hevelius project subframe edit PROJECT_ID SUBFRAME_ID [--filter-id ID] [--exposure-time SEC] [--goal-count N] [--active|--inactive]`.
+- **project subframe remove** – Remove a subframe: `hevelius project subframe remove PROJECT_ID SUBFRAME_ID`.
 
 Example:
 

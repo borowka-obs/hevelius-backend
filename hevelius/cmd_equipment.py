@@ -5,6 +5,16 @@ CLI commands for filters, sensors (cameras), and projects.
 from hevelius import db
 
 
+def get_filter_id_by_short_name(short_name):
+    """Look up filter_id by filter short_name. Returns filter_id (int) or None if not found."""
+    if not short_name or not str(short_name).strip():
+        return None
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT filter_id FROM filters WHERE short_name = %s", (str(short_name).strip(),))
+    cnx.close()
+    return row[0][0] if row else None
+
+
 def add_filter(short_name, full_name=None, url=None, active=True):
     """Add a new filter. Returns filter_id on success, None on error."""
     cnx = db.connect()
@@ -224,23 +234,23 @@ def list_sensors(active_only=False, sort_by="sensor_id", sort_order="asc"):
 def list_projects():
     """List all projects from the database."""
     cnx = db.connect()
-    rows = db.run_query(cnx, "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id")
+    rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id")
     cnx.close()
     if not rows:
         print("No projects found.")
         return
-    print(f"{'ID':<6} {'Name':<30} {'RA':<10} {'Dec':<10} Active  Description")
-    print("-" * 85)
+    print(f"{'ID':<6} {'Name':<30} {'Scope':<6} {'RA':<10} {'Dec':<10} Active  Description")
+    print("-" * 95)
     for r in rows:
         name = (r[1] or "")[:28]
         descr = (r[2] or "")[:32]
-        print(f"{r[0]:<6} {name:<30} {r[3]!s:<10} {r[4]!s:<10} {r[5]!s:<6} {descr}")
+        print(f"{r[0]:<6} {name:<30} {r[3]:<6} {r[4]!s:<10} {r[5]!s:<10} {r[6]!s:<6} {descr}")
 
 
 def show_project(project_id):
     """Show a single project with its subframes and user IDs."""
     cnx = db.connect()
-    row = db.run_query(cnx, "SELECT project_id, name, description, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+    row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
     if not row:
         cnx.close()
         print(f"Project {project_id} not found.")
@@ -249,23 +259,121 @@ def show_project(project_id):
     print(f"Project ID: {r[0]}")
     print(f"Name:       {r[1]}")
     print(f"Description:{r[2] or ''}")
-    print(f"RA:         {r[3]}")
-    print(f"Dec:        {r[4]}")
-    print(f"Active:     {r[5]}")
-    sub = db.run_query(cnx, """SELECT ps.id, f.short_name, ps.exposure_time, ps.count, ps.active
+    print(f"Scope ID:   {r[3]}")
+    print(f"RA:         {r[4]}")
+    print(f"Dec:        {r[5]}")
+    print(f"Active:     {r[6]}")
+    sub = db.run_query(cnx, """SELECT ps.id, f.short_name, ps.exposure_time, ps.goal_count, ps.active
                                FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                                WHERE ps.project_id = %s ORDER BY ps.id""", (project_id,))
     print("Subframes:")
     if sub:
         for s in sub:
-            count_str = f", count={s[3]}" if s[3] is not None else ""
-            print(f"  - filter {s[1]}, exposure {s[2]}s{count_str}, active={s[4]}")
+            goal_str = f", goal_count={s[3]}" if s[3] is not None else ""
+            print(f"  - id={s[0]} filter {s[1]}, exposure {s[2]}s{goal_str}, active={s[4]}")
     else:
         print("  (none)")
     users = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
     print("User IDs:", [u[0] for u in (users or [])])
     cnx.close()
     return 0
+
+
+def add_project(name, scope_id, description=None, ra=None, dec=None, active=True):
+    """Add a new project. name and scope_id required. If ra/dec not given, resolve from catalog by name. Returns project_id or None on failure."""
+    cnx = db.connect()
+    if ra is None or dec is None:
+        cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
+        if not cat:
+            cnx.close()
+            return None
+        ra, dec = cat[0][2], cat[0][3]
+    scope_exists = db.run_query(cnx, "SELECT 1 FROM telescopes WHERE scope_id = %s", (scope_id,))
+    if not scope_exists:
+        cnx.close()
+        return None
+    db.run_query(cnx, "INSERT INTO projects (name, description, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s)",
+                 (name, description or "", scope_id, ra, dec, active))
+    row = db.run_query(cnx, "SELECT project_id FROM projects WHERE name=%s AND scope_id=%s ORDER BY project_id DESC LIMIT 1", (name, scope_id))
+    project_id = row[0][0]
+    cnx.close()
+    return project_id
+
+
+def edit_project(project_id, name=None, description=None, scope_id=None, ra=None, dec=None, active=None):
+    """Update project fields. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+    if not row:
+        cnx.close()
+        return False
+    updates = []
+    args = []
+    for key, val in (("name", name), ("description", description), ("scope_id", scope_id), ("ra", ra), ("decl", dec), ("active", active)):
+        if val is not None:
+            updates.append(f"{key} = %s")
+            args.append(val)
+    if not updates:
+        cnx.close()
+        return True
+    args.append(project_id)
+    db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
+    cnx.close()
+    return True
+
+
+def add_project_subframe(project_id, filter_id, exposure_time, goal_count=None, active=True):
+    """Add a subframe to a project. Returns subframe id or None."""
+    cnx = db.connect()
+    try:
+        proj = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        if not proj:
+            return None
+        subframe_id = db.run_query(
+            cnx,
+            "INSERT INTO project_subframes (project_id, filter_id, exposure_time, goal_count, active) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (project_id, filter_id, exposure_time, goal_count, active),
+        )
+        if subframe_id is None:
+            return None
+        cnx.commit()
+        return subframe_id
+    finally:
+        cnx.close()
+
+
+def edit_project_subframe(project_id, subframe_id, filter_id=None, exposure_time=None, goal_count=None, active=None):
+    """Update a subframe. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+    if not row:
+        cnx.close()
+        return False
+    updates = []
+    args = []
+    for key, val in (("filter_id", filter_id), ("exposure_time", exposure_time), ("goal_count", goal_count), ("active", active)):
+        if val is not None:
+            updates.append(f"{key} = %s")
+            args.append(val)
+    if not updates:
+        cnx.close()
+        return True
+    args.extend([project_id, subframe_id])
+    db.run_query(cnx, "UPDATE project_subframes SET " + ", ".join(updates) + " WHERE project_id = %s AND id = %s", tuple(args))
+    cnx.close()
+    return True
+
+
+def remove_project_subframe(project_id, subframe_id):
+    """Remove a subframe from a project. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+    if not row:
+        cnx.close()
+        return False
+    db.run_query(cnx, "DELETE FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+    cnx.close()
+    return True
 
 
 # --- Telescopes ---

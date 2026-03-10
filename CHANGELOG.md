@@ -5,16 +5,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.4.0 - unreleased
 
-- Schema bumped to 15: Filters, sensors, and projects
+- Schema bumped to 16: Projects scope and subframe goal
+  - projects: added scope_id (NOT NULL, FK to telescopes).
+  - project_subframes: renamed count to goal_count.
+- Schema 15: Filters, sensors, and projects
   - filters: New entity with short_name (≤8 chars), full_name, filter_id, url, active (default true).
     Many-to-many with telescopes via telescope_filters.
   - sensors: Extended with vendor, url, active (default true). Telescope uses at most one camera;
     same camera can be used on multiple telescopes.
-  - projects: name, description, ra, decl; project_subframes (filter, exposure_time, active);
+  - projects: name, description, ra, decl, scope_id; project_subframes (filter, exposure_time, goal_count, active);
     project_users (many-to-many); task_projects (task ↔ project many-to-many).
 - API: GET /api/filters, GET /api/sensors, GET /api/projects, GET /api/projects/{project_id}.
+  POST /api/projects (create: name, scope_id required; ra/dec optional, resolved from catalog by name if omitted).
+  PATCH /api/projects/{project_id}. POST /api/projects/{project_id}/subframes, PATCH/DELETE subframes.
   Telescopes list includes filters; tasks list and task-get include project_ids.
 - CLI: `hevelius filters`, `hevelius sensors`, `hevelius projects` [project_id].
+  `hevelius project add`, `project edit`, `project show`, `project subframe add/edit/remove`.
   Options: --active-only for filters and sensors.
 - API: fixed Catalog sorting by magnitude, constellation
 - API: fixed Catalog filtering

@@ -62,6 +62,16 @@ def _reset_sequences_after_load(test_config):
             "SELECT setval(pg_get_serial_sequence('sensors', 'sensor_id'), "
             "COALESCE((SELECT MAX(sensor_id) FROM sensors), 1))"
         )
+        db.run_query(
+            conn,
+            "SELECT setval(pg_get_serial_sequence('projects', 'project_id'), "
+            "COALESCE((SELECT MAX(project_id) FROM projects), 1))"
+        )
+        db.run_query(
+            conn,
+            "SELECT setval(pg_get_serial_sequence('project_subframes', 'id'), "
+            "COALESCE((SELECT MAX(id) FROM project_subframes), 1))"
+        )
     finally:
         conn.close()
 

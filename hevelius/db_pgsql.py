@@ -29,6 +29,7 @@ def run_query(conn, query, values=None):
     elif (query.strip().lower().startswith("insert")):
         try:
             result = cursor.fetchone()[0]  # Try to fetch if RETURNING is used
+            conn.commit()  # Ensure commit when RETURNING is used
         except psycopg2.ProgrammingError:
             # No results to fetch (INSERT without RETURNING)
             conn.commit()  # Make sure the changes are committed
