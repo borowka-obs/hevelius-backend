@@ -1722,7 +1722,9 @@ class ProjectsResource(MethodView):
         for r in (rows or []):
             pid, name, descr, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
             sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                       ps.exposure_time, ps.goal_count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+                       ps.exposure_time, ps.goal_count, ps.active
+                       FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                       WHERE ps.project_id = %s"""
             sub_rows = db.run_query(cnx, sub_q, (pid,))
             user_q = "SELECT user_id FROM project_users WHERE project_id = %s"
             user_rows = db.run_query(cnx, user_q, (pid,))
@@ -1767,11 +1769,16 @@ class ProjectsResource(MethodView):
             abort(400, message="Invalid scope_id: telescope not found.")
         db.run_query(cnx, "INSERT INTO projects (name, description, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s)",
                      (name, description, scope_id, ra, decl, active))
-        row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE name=%s AND scope_id=%s ORDER BY project_id DESC LIMIT 1",
+        row = db.run_query(cnx, """SELECT project_id, name, description, scope_id, ra, decl, active
+                                   FROM projects
+                                   WHERE name=%s AND scope_id=%s
+                                   ORDER BY project_id DESC LIMIT 1""",
                            (name, scope_id))
         project_id = row[0][0]
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
+                   ps.exposure_time, ps.goal_count, ps.active
+                   FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                   WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
         subframes = [
@@ -1835,7 +1842,8 @@ class ProjectDetailResource(MethodView):
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
         row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
+                   ps.exposure_time, ps.goal_count, ps.active
+                   FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
         subframes = [
@@ -1918,7 +1926,8 @@ class ProjectSubframeDetailResource(MethodView):
             filter_id = body["filter_id"]
         updates = []
         args = []
-        for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")), ("goal_count", body.get("goal_count")), ("active", body.get("active"))]:
+        for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")), ("goal_count", body.get("goal_count")),
+                         ("active", body.get("active"))]:
             if val is not None:
                 updates.append(f"{key} = %s")
                 args.append(val)
