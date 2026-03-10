@@ -430,9 +430,46 @@ components:
         exposure_time:
           type: number
           format: float
-        count:
+        goal_count:
           type: integer
-          description: Number of subframes
+          description: Target number of subframes
+        active:
+          type: boolean
+    ProjectSubframeCreate:
+      type: object
+      required:
+        - exposure_time
+      description: Specify exactly one of filter (short name) or filter_id; not both.
+      properties:
+        filter:
+          type: string
+          description: Filter short name (looked up to get filter_id). Mutually exclusive with filter_id.
+        filter_id:
+          type: integer
+          description: Filter ID. Mutually exclusive with filter.
+        exposure_time:
+          type: number
+          format: float
+        goal_count:
+          type: integer
+        active:
+          type: boolean
+          default: true
+    ProjectSubframeUpdate:
+      type: object
+      description: filter and filter_id are mutually exclusive.
+      properties:
+        filter:
+          type: string
+          description: Filter short name (looked up to get filter_id). Mutually exclusive with filter_id.
+        filter_id:
+          type: integer
+          description: Filter ID. Mutually exclusive with filter.
+        exposure_time:
+          type: number
+          format: float
+        goal_count:
+          type: integer
         active:
           type: boolean
     Project:
@@ -444,6 +481,9 @@ components:
           type: string
         description:
           type: string
+        scope_id:
+          type: integer
+          description: Telescope (scope) ID for this project
         ra:
           type: number
           format: float
@@ -462,6 +502,47 @@ components:
           items:
             type: integer
           description: User IDs associated with the project
+    ProjectCreate:
+      type: object
+      required:
+        - name
+        - scope_id
+      properties:
+        name:
+          type: string
+        scope_id:
+          type: integer
+          description: Telescope (scope) ID for this project
+        description:
+          type: string
+        ra:
+          type: number
+          format: float
+          description: RA (hours). Omit to resolve from catalog by name.
+        decl:
+          type: number
+          format: float
+          description: Declination (degrees). Omit to resolve from catalog by name.
+        active:
+          type: boolean
+          default: true
+    ProjectUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        scope_id:
+          type: integer
+        ra:
+          type: number
+          format: float
+        decl:
+          type: number
+          format: float
+        active:
+          type: boolean
     ProjectsList:
       type: object
       properties:
@@ -1686,6 +1767,35 @@ paths:
                 $ref: '#/components/schemas/ProjectsList'
       security:
         - bearerAuth: []
+    post:
+      summary: Create a new project
+      description: Create project. name and scope_id required. If ra/dec omitted, resolved from catalog by name.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCreate'
+      responses:
+        '201':
+          description: Project created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  project_id:
+                    type: integer
+                  project:
+                    $ref: '#/components/schemas/Project'
+                  msg:
+                    type: string
+        '400':
+          description: Bad request (e.g. name not in catalog when ra/dec omitted)
+      security:
+        - bearerAuth: []
   /api/projects/{project_id}:
     get:
       summary: Get single project
@@ -1712,6 +1822,135 @@ paths:
                     type: string
         '404':
           description: Project not found
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update a project
+      description: Update project fields
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectUpdate'
+      responses:
+        '200':
+          description: Project updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  project:
+                    $ref: '#/components/schemas/Project'
+                  msg:
+                    type: string
+        '404':
+          description: Project not found
+      security:
+        - bearerAuth: []
+  /api/projects/{project_id}/subframes:
+    post:
+      summary: Add a subframe to a project
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSubframeCreate'
+      responses:
+        '201':
+          description: Subframe added
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  subframe_id:
+                    type: integer
+                  msg:
+                    type: string
+        '404':
+          description: Project not found
+      security:
+        - bearerAuth: []
+  /api/projects/{project_id}/subframes/{subframe_id}:
+    patch:
+      summary: Update a subframe
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: subframe_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectSubframeUpdate'
+      responses:
+        '200':
+          description: Subframe updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Project or subframe not found
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Remove a subframe from a project
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: subframe_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Subframe removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Project or subframe not found
       security:
         - bearerAuth: []
   /api/catalogs/search:

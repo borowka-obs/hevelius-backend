@@ -1,0 +1,15 @@
+-- Schema version 16: projects.scope_id (FK to telescope), project_subframes.count -> goal_count
+
+-- Add scope_id to projects (FK to telescopes, NOT NULL)
+ALTER TABLE projects ADD COLUMN scope_id integer REFERENCES telescopes(scope_id) ON DELETE RESTRICT;
+-- Set existing rows to first telescope if any
+UPDATE projects SET scope_id = (SELECT MIN(scope_id) FROM telescopes) WHERE scope_id IS NULL;
+-- If no telescopes exist, delete projects or set a sentinel; we require at least one telescope for NOT NULL
+ALTER TABLE projects ALTER COLUMN scope_id SET NOT NULL;
+
+-- Rename count to goal_count in project_subframes
+ALTER TABLE project_subframes RENAME COLUMN count TO goal_count;
+
+CREATE INDEX IF NOT EXISTS projects_scope_id_idx ON projects(scope_id);
+
+UPDATE schema_version SET version = 16;
