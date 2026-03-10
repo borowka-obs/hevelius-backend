@@ -20,6 +20,12 @@ from hevelius.cmd_equipment import (
     list_sensors,
     list_projects,
     show_project,
+    add_project,
+    edit_project,
+    get_filter_id_by_short_name,
+    add_project_subframe,
+    edit_project_subframe,
+    remove_project_subframe,
     add_filter,
     edit_filter,
     add_sensor,
@@ -143,9 +149,53 @@ def run():
     sensor_edit.add_argument('--active', action='store_true', help="Set sensor active")
     sensor_edit.add_argument('--inactive', action='store_true', help="Set sensor inactive")
 
-    projects_parser = subparsers.add_parser('projects', help="List or show projects")
+    projects_parser = subparsers.add_parser('projects', help="List projects")
     projects_parser.add_argument('project_id', nargs='?', type=int, help="If given, show single project by ID")
     projects_parser.add_argument('--active-only', action='store_true', help="(Reserved for future use)")
+
+    project_parser = subparsers.add_parser('project', help="Add, edit, show project or manage subframes")
+    project_sub = project_parser.add_subparsers(dest='project_command', help="Project subcommand")
+    project_add = project_sub.add_parser('add', help="Add a new project (name and scope_id required; ra/dec from catalog if omitted)")
+    project_add.add_argument('name', help="Project name (used for catalog lookup if ra/dec not given)")
+    project_add.add_argument('--scope-id', type=int, required=True, help="Telescope (scope) ID")
+    project_add.add_argument('--ra', type=float, default=None, help="RA in hours (omit to resolve from catalog by name)")
+    project_add.add_argument('--dec', type=float, default=None, help="Declination in degrees (omit to resolve from catalog by name)")
+    project_add.add_argument('--description', default='', help="Project description")
+    project_add.add_argument('--active', action='store_true', default=True, help="Project is active (default)")
+    project_add.add_argument('--inactive', action='store_true', help="Create project as inactive")
+    project_edit = project_sub.add_parser('edit', help="Edit an existing project")
+    project_edit.add_argument('project_id', type=int, help="Project ID to edit")
+    project_edit.add_argument('--name', help="Project name")
+    project_edit.add_argument('--scope-id', type=int, default=None, help="Telescope (scope) ID")
+    project_edit.add_argument('--description', default=None, help="Project description")
+    project_edit.add_argument('--ra', type=float, default=None, help="RA in hours")
+    project_edit.add_argument('--dec', type=float, default=None, help="Declination in degrees")
+    project_edit.add_argument('--active', action='store_true', help="Set project active")
+    project_edit.add_argument('--inactive', action='store_true', help="Set project inactive")
+    project_show = project_sub.add_parser('show', help="Show project details")
+    project_show.add_argument('project_id', type=int, help="Project ID")
+    subframe_parser = project_sub.add_parser('subframe', help="Add, edit, or remove a subframe")
+    subframe_sub = subframe_parser.add_subparsers(dest='subframe_command', help="Subframe subcommand")
+    subframe_add = subframe_sub.add_parser('add', help="Add a subframe to a project")
+    subframe_add.add_argument('project_id', type=int, help="Project ID")
+    subframe_add.add_argument('--filter', type=str, default=None, help="Filter by short name (use this OR --filter-id, not both)")
+    subframe_add.add_argument('--filter-id', type=int, default=None, help="Filter ID (use this OR --filter, not both)")
+    subframe_add.add_argument('--exposure-time', type=float, required=True, help="Exposure time (seconds)")
+    subframe_add.add_argument('--goal-count', type=int, default=None, help="Target number of subframes")
+    subframe_add.add_argument('--active', action='store_true', default=True, help="Subframe active (default)")
+    subframe_add.add_argument('--inactive', action='store_true', help="Create subframe as inactive")
+    subframe_edit = subframe_sub.add_parser('edit', help="Edit a subframe")
+    subframe_edit.add_argument('project_id', type=int, help="Project ID")
+    subframe_edit.add_argument('subframe_id', type=int, help="Subframe ID (from project show)")
+    subframe_edit.add_argument('--filter', type=str, default=None, help="Filter by short name (use this OR --filter-id, not both)")
+    subframe_edit.add_argument('--filter-id', type=int, default=None, help="Filter ID (use this OR --filter, not both)")
+    subframe_edit.add_argument('--exposure-time', type=float, default=None, help="Exposure time (seconds)")
+    subframe_edit.add_argument('--goal-count', type=int, default=None, help="Target number of subframes")
+    subframe_edit.add_argument('--active', action='store_true', help="Set subframe active")
+    subframe_edit.add_argument('--inactive', action='store_true', help="Set subframe inactive")
+    subframe_remove = subframe_sub.add_parser('remove', help="Remove a subframe from a project")
+    subframe_remove.add_argument('project_id', type=int, help="Project ID")
+    subframe_remove.add_argument('subframe_id', type=int, help="Subframe ID to remove")
 
     telescopes_parser = subparsers.add_parser('telescopes', help="List telescopes")
     telescopes_parser.add_argument('--sort-by', choices=['scope_id', 'name', 'focal', 'active'], default='scope_id', help="Sort by field")
@@ -280,6 +330,99 @@ def run():
             return show_project(args.project_id) or 0
         list_projects()
         return 0
+    if args.command == "project":
+        if args.project_command == "add":
+            active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
+            pid = add_project(
+                args.name,
+                scope_id=args.scope_id,
+                description=getattr(args, 'description', '') or '',
+                ra=getattr(args, 'ra', None),
+                dec=getattr(args, 'dec', None),
+                active=active
+            )
+            if pid is None:
+                print("Failed to add project: name not in catalog (provide --ra and --dec) or invalid scope_id.", file=sys.stderr)
+                return 1
+            print(f"Created project_id={pid}")
+            return 0
+        if args.project_command == "edit":
+            active = None
+            if getattr(args, 'active', False):
+                active = True
+            if getattr(args, 'inactive', False):
+                active = False
+            ok = edit_project(
+                args.project_id,
+                name=getattr(args, 'name', None),
+                description=getattr(args, 'description', None),
+                scope_id=getattr(args, 'scope_id', None),
+                ra=getattr(args, 'ra', None),
+                dec=getattr(args, 'dec', None),
+                active=active
+            )
+            return 0 if ok else 1
+        if args.project_command == "show":
+            return show_project(args.project_id) or 0
+        if args.project_command == "subframe":
+            if args.subframe_command == "add":
+                has_filter = bool(getattr(args, 'filter', None) and str(getattr(args, 'filter', '')).strip())
+                has_filter_id = getattr(args, 'filter_id', None) is not None
+                if has_filter and has_filter_id:
+                    print("Error: specify only one of --filter or --filter-id.", file=sys.stderr)
+                    return 1
+                if not has_filter and not has_filter_id:
+                    print("Error: specify either --filter (short name) or --filter-id.", file=sys.stderr)
+                    return 1
+                filter_id = args.filter_id if has_filter_id else get_filter_id_by_short_name(args.filter)
+                if filter_id is None:
+                    print("Error: filter not found (invalid --filter-id or unknown short name).", file=sys.stderr)
+                    return 1
+                active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
+                sid = add_project_subframe(
+                    args.project_id,
+                    filter_id=filter_id,
+                    exposure_time=args.exposure_time,
+                    goal_count=getattr(args, 'goal_count', None),
+                    active=active
+                )
+                if sid is not None:
+                    print(f"Added subframe ID: {sid}")
+                    return 0
+                print("Failed to add subframe: project not found or invalid filter.", file=sys.stderr)
+                return 1
+            if args.subframe_command == "edit":
+                has_filter = bool(getattr(args, 'filter', None) and str(getattr(args, 'filter', '')).strip())
+                has_filter_id = getattr(args, 'filter_id', None) is not None
+                if has_filter and has_filter_id:
+                    print("Error: specify only one of --filter or --filter-id.", file=sys.stderr)
+                    return 1
+                filter_id = None
+                if has_filter_id:
+                    filter_id = args.filter_id
+                elif has_filter:
+                    filter_id = get_filter_id_by_short_name(args.filter)
+                    if filter_id is None:
+                        print("Error: filter short name not found.", file=sys.stderr)
+                        return 1
+                active = None
+                if getattr(args, 'active', False):
+                    active = True
+                if getattr(args, 'inactive', False):
+                    active = False
+                ok = edit_project_subframe(
+                    args.project_id,
+                    args.subframe_id,
+                    filter_id=filter_id,
+                    exposure_time=getattr(args, 'exposure_time', None),
+                    goal_count=getattr(args, 'goal_count', None),
+                    active=active
+                )
+                return 0 if ok else 1
+            if args.subframe_command == "remove":
+                return 0 if remove_project_subframe(args.project_id, args.subframe_id) else 1
+            return subframe_parser.print_help() or 1
+        return project_parser.print_help() or 1
     if args.command == "telescopes":
         list_telescopes(sort_by=args.sort_by, sort_order=args.sort_order)
         return 0
