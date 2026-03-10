@@ -469,7 +469,7 @@ class ProjectSubframeSchema(Schema):
     filter_id = fields.Integer()
     filter = fields.Nested(FilterSchema, allow_none=True)
     exposure_time = fields.Float()
-    count = fields.Integer()
+    goal_count = fields.Integer()
     active = fields.Boolean()
 
 
@@ -477,11 +477,46 @@ class ProjectSchema(Schema):
     project_id = fields.Integer()
     name = fields.String()
     description = fields.String()
+    scope_id = fields.Integer()
     ra = fields.Float()
     decl = fields.Float()
     active = fields.Boolean()
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
+
+
+class ProjectCreateSchema(Schema):
+    name = fields.String(required=True)
+    scope_id = fields.Integer(required=True)
+    description = fields.String(load_default="")
+    ra = fields.Float(load_default=None)
+    decl = fields.Float(load_default=None)
+    active = fields.Boolean(load_default=True)
+
+
+class ProjectUpdateSchema(Schema):
+    name = fields.String()
+    description = fields.String()
+    scope_id = fields.Integer()
+    ra = fields.Float()
+    decl = fields.Float()
+    active = fields.Boolean()
+
+
+class ProjectSubframeCreateSchema(Schema):
+    filter = fields.String(load_default=None)  # short name; mutually exclusive with filter_id
+    filter_id = fields.Integer(load_default=None)
+    exposure_time = fields.Float(required=True)
+    goal_count = fields.Integer(load_default=None)
+    active = fields.Boolean(load_default=True)
+
+
+class ProjectSubframeUpdateSchema(Schema):
+    filter = fields.String(load_default=None)  # short name; mutually exclusive with filter_id
+    filter_id = fields.Integer(load_default=None)
+    exposure_time = fields.Float()
+    goal_count = fields.Integer()
+    active = fields.Boolean()
 
 
 class ProjectsListSchema(Schema):
@@ -1652,6 +1687,14 @@ class SensorDetailResource(MethodView):
         return {"status": True, "sensor": _row_to_sensor(updated[0]), "msg": "Sensor updated."}
 
 
+def _project_row_to_dict(r, subframes=None, user_ids=None):
+    """Build project dict from projects row (project_id, name, description, scope_id, ra, decl, active)."""
+    return {
+        "project_id": r[0], "name": r[1], "description": r[2], "scope_id": r[3], "ra": r[4], "decl": r[5], "active": r[6],
+        "subframes": subframes or [], "user_ids": user_ids or []
+    }
+
+
 @blp.route("/projects")
 class ProjectsResource(MethodView):
     @jwt_required()
@@ -1665,21 +1708,23 @@ class ProjectsResource(MethodView):
         cnx = db.connect()
         if user_id is not None:
             count_q = "SELECT COUNT(*) FROM projects p JOIN project_users pu ON p.project_id = pu.project_id WHERE pu.user_id = %s"
-            list_q = """SELECT p.project_id, p.name, p.description, p.ra, p.decl, p.active
+            list_q = """SELECT p.project_id, p.name, p.description, p.scope_id, p.ra, p.decl, p.active
                        FROM projects p JOIN project_users pu ON p.project_id = pu.project_id
                        WHERE pu.user_id = %s ORDER BY p.project_id LIMIT %s OFFSET %s"""
             total = db.run_query(cnx, count_q, (user_id,))[0][0]
             rows = db.run_query(cnx, list_q, (user_id, per_page, offset))
         else:
             count_q = "SELECT COUNT(*) FROM projects"
-            list_q = "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
+            list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
             total = db.run_query(cnx, count_q)[0][0]
             rows = db.run_query(cnx, list_q, (per_page, offset))
         projects = []
         for r in (rows or []):
-            pid, name, descr, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5]
+            pid, name, descr, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
             sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                       ps.exposure_time, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+                       ps.exposure_time, ps.goal_count, ps.active
+                       FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                       WHERE ps.project_id = %s"""
             sub_rows = db.run_query(cnx, sub_q, (pid,))
             user_q = "SELECT user_id FROM project_users WHERE project_id = %s"
             user_rows = db.run_query(cnx, user_q, (pid,))
@@ -1687,18 +1732,64 @@ class ProjectsResource(MethodView):
                 {
                     "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                     "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                    "exposure_time": sr[8], "count": sr[9], "active": sr[10]
+                    "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]
                 }
                 for sr in (sub_rows or [])
             ]
             user_ids = [ur[0] for ur in (user_rows or [])]
             projects.append({
-                "project_id": pid, "name": name, "description": descr, "ra": ra, "decl": decl, "active": active,
+                "project_id": pid, "name": name, "description": descr, "scope_id": scope_id, "ra": ra, "decl": decl, "active": active,
                 "subframes": subframes, "user_ids": user_ids
             })
         cnx.close()
         pages = (total + per_page - 1) // per_page if total else 0
         return {"projects": projects, "total": total, "page": page, "per_page": per_page, "pages": pages}
+
+    @jwt_required()
+    @blp.arguments(ProjectCreateSchema, location="json")
+    @blp.response(201)
+    def post(self, body):
+        """Create project. name and scope_id required. If ra/dec omitted, resolve from catalog by name."""
+        name = body["name"]
+        scope_id = body["scope_id"]
+        description = body.get("description") or ""
+        ra = body.get("ra")
+        decl = body.get("decl")
+        active = body.get("active", True)
+        cnx = db.connect()
+        if ra is None or decl is None:
+            cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
+            if not cat:
+                cnx.close()
+                abort(400, message="Name not found in catalog; provide ra and dec to create project.")
+            ra, decl = cat[0][2], cat[0][3]
+        scope_exists = db.run_query(cnx, "SELECT 1 FROM telescopes WHERE scope_id = %s", (scope_id,))
+        if not scope_exists:
+            cnx.close()
+            abort(400, message="Invalid scope_id: telescope not found.")
+        db.run_query(cnx, "INSERT INTO projects (name, description, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s)",
+                     (name, description, scope_id, ra, decl, active))
+        row = db.run_query(cnx, """SELECT project_id, name, description, scope_id, ra, decl, active
+                                   FROM projects
+                                   WHERE name=%s AND scope_id=%s
+                                   ORDER BY project_id DESC LIMIT 1""",
+                           (name, scope_id))
+        project_id = row[0][0]
+        sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
+                   ps.exposure_time, ps.goal_count, ps.active
+                   FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                   WHERE ps.project_id = %s""", (project_id,))
+        user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
+        cnx.close()
+        subframes = [
+            {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
+             "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
+             "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]}
+            for sr in (sub_rows or [])
+        ]
+        user_ids = [ur[0] for ur in (user_rows or [])]
+        project = _project_row_to_dict(row[0], subframes=subframes, user_ids=user_ids)
+        return {"status": True, "project_id": project_id, "project": project, "msg": "Created"}, 201
 
 
 @blp.route("/projects/<int:project_id>")
@@ -1708,13 +1799,13 @@ class ProjectDetailResource(MethodView):
     def get(self, project_id):
         """Get single project with subframes and user IDs"""
         cnx = db.connect()
-        row = db.run_query(cnx, "SELECT project_id, name, description, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
         if not row:
             cnx.close()
             return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
         r = row[0]
         sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+                   ps.exposure_time, ps.goal_count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
         sub_rows = db.run_query(cnx, sub_q, (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
@@ -1722,16 +1813,142 @@ class ProjectDetailResource(MethodView):
             {
                 "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                 "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                "exposure_time": sr[8], "count": sr[9], "active": sr[10]
+                "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]
             }
             for sr in (sub_rows or [])
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
-        project = {
-            "project_id": r[0], "name": r[1], "description": r[2], "ra": r[3], "decl": r[4], "active": r[5],
-            "subframes": subframes, "user_ids": user_ids
-        }
+        project = _project_row_to_dict(r, subframes=subframes, user_ids=user_ids)
         return {"status": True, "project": project, "msg": "OK"}
+
+    @jwt_required()
+    @blp.arguments(ProjectUpdateSchema, location="json")
+    @blp.response(200)
+    def patch(self, body, project_id):
+        """Update project fields."""
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        if not row:
+            cnx.close()
+            abort(404, message=f"Project {project_id} not found")
+        updates = []
+        args = []
+        for key in ("name", "description", "scope_id", "ra", "decl", "active"):
+            if key in body and body[key] is not None:
+                updates.append(f"{key} = %s")
+                args.append(body[key])
+        if updates:
+            args.append(project_id)
+            db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
+        row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
+                   ps.exposure_time, ps.goal_count, ps.active
+                   FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
+        user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
+        cnx.close()
+        subframes = [
+            {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
+             "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
+             "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]}
+            for sr in (sub_rows or [])
+        ]
+        user_ids = [ur[0] for ur in (user_rows or [])]
+        project = _project_row_to_dict(row[0], subframes=subframes, user_ids=user_ids)
+        return {"status": True, "project": project, "msg": "Updated"}
+
+
+def _resolve_filter_id(cnx, body, require_one=True):
+    """Resolve filter_id from body: either filter (short name) or filter_id. Forbid both. Return (filter_id, error_msg)."""
+    has_filter = body.get("filter") is not None and str(body.get("filter", "")).strip()
+    has_filter_id = body.get("filter_id") is not None
+    if has_filter and has_filter_id:
+        return None, "Specify only one of filter (short name) or filter_id."
+    if require_one and not has_filter and not has_filter_id:
+        return None, "Specify either filter (short name) or filter_id."
+    if has_filter_id:
+        return body["filter_id"], None
+    short_name = str(body["filter"]).strip()
+    row = db.run_query(cnx, "SELECT filter_id FROM filters WHERE short_name = %s", (short_name,))
+    if not row:
+        return None, f"Filter short name '{short_name}' not found."
+    return row[0][0], None
+
+
+@blp.route("/projects/<int:project_id>/subframes")
+class ProjectSubframesResource(MethodView):
+    @jwt_required()
+    @blp.arguments(ProjectSubframeCreateSchema, location="json")
+    @blp.response(201)
+    def post(self, body, project_id):
+        """Add a subframe to a project."""
+        cnx = db.connect()
+        proj = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        if not proj:
+            cnx.close()
+            abort(404, message=f"Project {project_id} not found")
+        filter_id, err = _resolve_filter_id(cnx, body, require_one=True)
+        if err:
+            cnx.close()
+            abort(400, message=err)
+        exposure_time = body["exposure_time"]
+        goal_count = body.get("goal_count")
+        active = body.get("active", True)
+        db.run_query(cnx, "INSERT INTO project_subframes (project_id, filter_id, exposure_time, goal_count, active) VALUES (%s, %s, %s, %s, %s)",
+                     (project_id, filter_id, exposure_time, goal_count, active))
+        row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s ORDER BY id DESC LIMIT 1", (project_id,))
+        subframe_id = row[0][0]
+        cnx.close()
+        return {"status": True, "subframe_id": subframe_id, "msg": "Created"}, 201
+
+
+@blp.route("/projects/<int:project_id>/subframes/<int:subframe_id>")
+class ProjectSubframeDetailResource(MethodView):
+    @jwt_required()
+    @blp.arguments(ProjectSubframeUpdateSchema, location="json")
+    @blp.response(200)
+    def patch(self, body, project_id, subframe_id):
+        """Update a subframe."""
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+        if not row:
+            cnx.close()
+            abort(404, message="Project or subframe not found")
+        if body.get("filter") is not None and body.get("filter_id") is not None:
+            cnx.close()
+            abort(400, message="Specify only one of filter (short name) or filter_id.")
+        filter_id = None
+        if "filter" in body and body["filter"] is not None and str(body["filter"]).strip():
+            filter_id, err = _resolve_filter_id(cnx, body, require_one=False)
+            if err:
+                cnx.close()
+                abort(400, message=err)
+        elif body.get("filter_id") is not None:
+            filter_id = body["filter_id"]
+        updates = []
+        args = []
+        for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")), ("goal_count", body.get("goal_count")),
+                         ("active", body.get("active"))]:
+            if val is not None:
+                updates.append(f"{key} = %s")
+                args.append(val)
+        if updates:
+            args.extend([project_id, subframe_id])
+            db.run_query(cnx, "UPDATE project_subframes SET " + ", ".join(updates) + " WHERE project_id = %s AND id = %s", tuple(args))
+        cnx.close()
+        return {"status": True, "msg": "Updated"}
+
+    @jwt_required()
+    @blp.response(200)
+    def delete(self, project_id, subframe_id):
+        """Remove a subframe from a project."""
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+        if not row:
+            cnx.close()
+            abort(404, message="Project or subframe not found")
+        db.run_query(cnx, "DELETE FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+        cnx.close()
+        return {"status": True, "msg": "Deleted"}
 
 
 @blp.route("/catalogs/search")

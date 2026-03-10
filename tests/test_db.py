@@ -1,6 +1,17 @@
 import os
 from hevelius import db
-from hevelius.cmd_equipment import add_filter, edit_filter, set_filter_active, add_sensor, edit_sensor
+from hevelius.cmd_equipment import (
+    add_filter,
+    edit_filter,
+    set_filter_active,
+    add_sensor,
+    edit_sensor,
+    add_project,
+    edit_project,
+    add_project_subframe,
+    remove_project_subframe,
+    get_filter_id_by_short_name,
+)
 import unittest
 from tests.dbtest import use_repository
 
@@ -15,7 +26,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 15)
+        self.assertEqual(version, 16)
 
     @use_repository
     def test_sensor(self, config):
@@ -204,12 +215,12 @@ class DbTest(unittest.TestCase):
     def test_projects_and_subframes(self, config):
         """Test that projects, project_subframes, project_users, task_projects exist and have data."""
         conn = db.connect(config)
-        projects = db.run_query(conn, "SELECT project_id, name, description, ra, decl, active FROM projects ORDER BY project_id")
+        projects = db.run_query(conn, "SELECT project_id, name, description, ra, decl, active, scope_id FROM projects ORDER BY project_id")
         conn.close()
         self.assertGreaterEqual(len(projects), 1)
         self.assertEqual(projects[0][1], 'Z Peg campaign')
         conn = db.connect(config)
-        sub = db.run_query(conn, "SELECT project_id, filter_id, exposure_time, count, active FROM project_subframes ORDER BY id")
+        sub = db.run_query(conn, "SELECT project_id, filter_id, exposure_time, goal_count, active FROM project_subframes ORDER BY id")
         conn.close()
         self.assertGreaterEqual(len(sub), 1)
         self.assertEqual(sub[0][2], 20)
@@ -281,5 +292,46 @@ class DbTest(unittest.TestCase):
             conn.close()
             self.assertEqual(rows[0][0], "CLI Test Sensor Updated")
             self.assertEqual(rows[0][1], "CLI-edit")
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)
+
+    @use_repository
+    def test_project_add_edit_subframe_cli(self, config):
+        """CLI backend: add project (with ra/dec), edit project, add subframe by filter short name, remove subframe."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            pid = add_project("CLI Test Project", scope_id=1, description="Desc", ra=1.5, dec=20.0)
+            self.assertIsNotNone(pid)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT project_id, name, scope_id, ra, decl FROM projects WHERE name = 'CLI Test Project'")
+            conn.close()
+            self.assertEqual(len(rows), 1)
+            self.assertEqual(rows[0][2], 1)
+            self.assertEqual(float(rows[0][3]), 1.5)
+            self.assertEqual(float(rows[0][4]), 20.0)
+            ok = edit_project(pid, name="CLI Test Project Updated", description="Updated desc")
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT name, description FROM projects WHERE project_id = %s", (pid,))
+            conn.close()
+            self.assertEqual(rows[0][0], "CLI Test Project Updated")
+            self.assertEqual(rows[0][1], "Updated desc")
+            fid = get_filter_id_by_short_name("SG")
+            self.assertIsNotNone(fid)
+            sid = add_project_subframe(pid, filter_id=fid, exposure_time=90.0, goal_count=10)
+            self.assertIsNotNone(sid)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT id, project_id, filter_id, exposure_time, goal_count FROM project_subframes WHERE project_id = %s", (pid,))
+            conn.close()
+            self.assertGreaterEqual(len(rows), 1)
+            self.assertEqual(rows[0][2], fid)
+            self.assertEqual(float(rows[0][3]), 90.0)
+            self.assertEqual(rows[0][4], 10)
+            ok = remove_project_subframe(pid, sid)
+            self.assertTrue(ok)
+            conn = db.connect()
+            rows = db.run_query(conn, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (pid, sid))
+            conn.close()
+            self.assertEqual(len(rows), 0)
         finally:
             os.environ.pop('HEVELIUS_DB_NAME', None)

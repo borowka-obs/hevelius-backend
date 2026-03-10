@@ -1496,5 +1496,224 @@ class TestTelescopeOperations(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestProjectOperations(unittest.TestCase):
+    """Tests for project and subframe CRUD: add (catalog lookup), edit, subframe add/edit/remove."""
+
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,
+                additional_claims={'permissions': 1, 'username': 'test_user'}
+            )
+            self.headers = {
+                'Authorization': f'Bearer {self.test_token}',
+                'Content-Type': 'application/json'
+            }
+
+    @use_repository
+    def test_projects_list_has_scope_id_and_goal_count(self, config):
+        """List projects returns scope_id and subframes have goal_count."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('projects', data)
+        if data['projects']:
+            p = data['projects'][0]
+            self.assertIn('scope_id', p)
+            for sf in p.get('subframes', []):
+                self.assertIn('goal_count', sf)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_with_ra_dec(self, config):
+        """Create project with name, scope_id, ra, dec."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Test Project", "scope_id": 1, "ra": 0.5, "decl": 25.0, "description": "Desc"}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(data['status'])
+        self.assertIn('project_id', data)
+        self.assertEqual(data['project']['name'], 'Test Project')
+        self.assertEqual(data['project']['scope_id'], 1)
+        self.assertEqual(data['project']['ra'], 0.5)
+        self.assertEqual(data['project']['decl'], 25.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_from_catalog(self, config):
+        """Create project with name and scope_id only; ra/dec resolved from catalog (objects table)."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "C19", "scope_id": 1}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(data['status'])
+        self.assertIn('project_id', data)
+        self.assertEqual(data['project']['name'], 'C19')
+        self.assertIsNotNone(data['project']['ra'])
+        self.assertIsNotNone(data['project']['decl'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_name_not_in_catalog_fails(self, config):
+        """Create project without ra/dec and name not in catalog returns 400."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "NonexistentObjectXYZ", "scope_id": 1}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('catalog', data.get('message', '').lower())
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch(self, config):
+        """Update project via PATCH."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Updated Z Peg", "description": "Updated desc"}
+        response = self.app.patch('/api/projects/1', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['project']['name'], 'Updated Z Peg')
+        self.assertEqual(data['project']['description'], 'Updated desc')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add(self, config):
+        """Add subframe to project."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter_id": 1, "exposure_time": 60.0, "goal_count": 20, "active": True}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(data['status'])
+        self.assertIn('subframe_id', data)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_patch(self, config):
+        """Update subframe via PATCH."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        # Get first subframe id from project 1
+        get_resp = self.app.get('/api/projects/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        subframes = get_data['project']['subframes']
+        self.assertGreater(len(subframes), 0)
+        subframe_id = subframes[0]['id']
+        body = {"exposure_time": 99.0, "goal_count": 15}
+        response = self.app.patch(f'/api/projects/1/subframes/{subframe_id}', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_delete(self, config):
+        """Remove subframe from project."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        get_resp = self.app.get('/api/projects/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        subframes = get_data['project']['subframes']
+        self.assertGreater(len(subframes), 0)
+        subframe_id = subframes[-1]['id']
+        response = self.app.delete(f'/api/projects/1/subframes/{subframe_id}', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        get_resp2 = self.app.get('/api/projects/1', headers=self.headers)
+        get_data2 = json.loads(get_resp2.data)
+        ids = [s['id'] for s in get_data2['project']['subframes']]
+        self.assertNotIn(subframe_id, ids)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_get_one(self, config):
+        """GET single project returns project with scope_id, subframes, user_ids."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        p = data['project']
+        self.assertIn('project_id', p)
+        self.assertIn('scope_id', p)
+        self.assertIn('subframes', p)
+        self.assertIn('user_ids', p)
+        self.assertEqual(p['project_id'], 1)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add_by_filter_short_name(self, config):
+        """Add subframe using filter short name (not filter_id)."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter": "SG", "exposure_time": 120.0, "goal_count": 5}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(data['status'])
+        self.assertIn('subframe_id', data)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add_both_filter_and_filter_id_fails(self, config):
+        """Adding subframe with both filter and filter_id returns 400."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter": "SG", "filter_id": 1, "exposure_time": 60.0}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('only one', data.get('message', '').lower())
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add_neither_filter_nor_filter_id_fails(self, config):
+        """Adding subframe with neither filter nor filter_id returns 400."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"exposure_time": 60.0}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('filter', data.get('message', '').lower())
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add_unknown_filter_short_name_fails(self, config):
+        """Adding subframe with unknown filter short name returns 400."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter": "NoSuchFilter", "exposure_time": 60.0}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 400)
+        data = json.loads(response.data)
+        self.assertIn('not found', data.get('message', '').lower())
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_not_found(self, config):
+        """GET and PATCH non-existent project return 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects/99999', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('not found', data.get('msg', '').lower())
+        response = self.app.patch('/api/projects/99999', data=json.dumps({"name": "X"}), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_not_found(self, config):
+        """PATCH and DELETE non-existent subframe return 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch('/api/projects/1/subframes/99999', data=json.dumps({"exposure_time": 1.0}), headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        response = self.app.delete('/api/projects/1/subframes/99999', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 if __name__ == '__main__':
     unittest.main()
