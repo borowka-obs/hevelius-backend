@@ -231,10 +231,13 @@ def list_sensors(active_only=False, sort_by="sensor_id", sort_order="asc"):
         print(f"{r[0]:<6} {(r[1] or '')[:26]:<28} {res:<12} {px:<14} {bits_val:<4} {size:<14} {vendor:<12} {active_val}")
 
 
-def list_projects():
-    """List all projects from the database."""
+def list_projects(scope_id=None):
+    """List all projects from the database. If scope_id is set, only projects for that telescope."""
     cnx = db.connect()
-    rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id")
+    if scope_id is not None:
+        rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE scope_id = %s ORDER BY project_id", (scope_id,))
+    else:
+        rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id")
     cnx.close()
     if not rows:
         print("No projects found.")
@@ -372,6 +375,59 @@ def remove_project_subframe(project_id, subframe_id):
         cnx.close()
         return False
     db.run_query(cnx, "DELETE FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
+    cnx.close()
+    return True
+
+
+# Task state 6 = DONE (complete)
+TASK_STATE_DONE = 6
+
+
+def project_stats(project_id):
+    """Print task statistics for a project (total, incomplete, done). Returns 0 on success."""
+    cnx = db.connect()
+    proj = db.run_query(cnx, "SELECT project_id, name FROM projects WHERE project_id = %s", (project_id,))
+    if not proj:
+        cnx.close()
+        print(f"Project {project_id} not found.")
+        return 1
+    total = db.run_query(cnx, "SELECT COUNT(*) FROM task_projects WHERE project_id = %s", (project_id,))[0][0]
+    incomplete = db.run_query(cnx, """SELECT COUNT(*) FROM task_projects tp JOIN tasks t ON tp.task_id = t.task_id
+        WHERE tp.project_id = %s AND t.state != %s""", (project_id, TASK_STATE_DONE))[0][0]
+    done = db.run_query(cnx, """SELECT COUNT(*) FROM task_projects tp JOIN tasks t ON tp.task_id = t.task_id
+        WHERE tp.project_id = %s AND t.state = %s""", (project_id, TASK_STATE_DONE))[0][0]
+    cnx.close()
+    print(f"Project {project_id} ({proj[0][1]}): total_tasks={total}, tasks_incomplete={incomplete}, tasks_done={done}")
+    return 0
+
+
+def add_task_to_project(project_id, task_id):
+    """Assign a task to a project. Returns True on success."""
+    cnx = db.connect()
+    task_row = db.run_query(cnx, "SELECT task_id FROM tasks WHERE task_id = %s", (task_id,))
+    if not task_row:
+        cnx.close()
+        print(f"Task {task_id} not found.")
+        return False
+    proj = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+    if not proj:
+        cnx.close()
+        print(f"Project {project_id} not found.")
+        return False
+    db.run_query(cnx, "INSERT INTO task_projects (task_id, project_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (task_id, project_id))
+    cnx.close()
+    return True
+
+
+def remove_task_from_project(project_id, task_id):
+    """Remove a task from a project. Returns True on success."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT 1 FROM task_projects WHERE task_id = %s AND project_id = %s", (task_id, project_id))
+    if not row:
+        cnx.close()
+        print(f"Task {task_id} is not assigned to project {project_id}.")
+        return False
+    db.run_query(cnx, "DELETE FROM task_projects WHERE task_id = %s AND project_id = %s", (task_id, project_id))
     cnx.close()
     return True
 

@@ -26,6 +26,9 @@ from hevelius.cmd_equipment import (
     add_project_subframe,
     edit_project_subframe,
     remove_project_subframe,
+    project_stats,
+    add_task_to_project,
+    remove_task_from_project,
     add_filter,
     edit_filter,
     add_sensor,
@@ -151,6 +154,7 @@ def run():
 
     projects_parser = subparsers.add_parser('projects', help="List projects")
     projects_parser.add_argument('project_id', nargs='?', type=int, help="If given, show single project by ID")
+    projects_parser.add_argument('--scope-id', type=int, default=None, help="Filter by telescope (scope) ID")
     projects_parser.add_argument('--active-only', action='store_true', help="(Reserved for future use)")
 
     project_parser = subparsers.add_parser('project', help="Add, edit, show project or manage subframes")
@@ -196,6 +200,14 @@ def run():
     subframe_remove = subframe_sub.add_parser('remove', help="Remove a subframe from a project")
     subframe_remove.add_argument('project_id', type=int, help="Project ID")
     subframe_remove.add_argument('subframe_id', type=int, help="Subframe ID to remove")
+    project_stats_parser = project_sub.add_parser('stats', help="Show task statistics for a project")
+    project_stats_parser.add_argument('project_id', type=int, help="Project ID")
+    project_task_add = project_sub.add_parser('task-add', help="Assign a task to a project")
+    project_task_add.add_argument('project_id', type=int, help="Project ID")
+    project_task_add.add_argument('task_id', type=int, help="Task ID to add to the project")
+    project_task_remove = project_sub.add_parser('task-remove', help="Remove a task from a project")
+    project_task_remove.add_argument('project_id', type=int, help="Project ID")
+    project_task_remove.add_argument('task_id', type=int, help="Task ID to remove from the project")
 
     telescopes_parser = subparsers.add_parser('telescopes', help="List telescopes")
     telescopes_parser.add_argument('--sort-by', choices=['scope_id', 'name', 'focal', 'active'], default='scope_id', help="Sort by field")
@@ -328,7 +340,7 @@ def run():
     if args.command == "projects":
         if args.project_id is not None:
             return show_project(args.project_id) or 0
-        list_projects()
+        list_projects(scope_id=getattr(args, 'scope_id', None))
         return 0
     if args.command == "project":
         if args.project_command == "add":
@@ -364,6 +376,12 @@ def run():
             return 0 if ok else 1
         if args.project_command == "show":
             return show_project(args.project_id) or 0
+        if args.project_command == "stats":
+            return project_stats(args.project_id) or 0
+        if args.project_command == "task-add":
+            return 0 if add_task_to_project(args.project_id, args.task_id) else 1
+        if args.project_command == "task-remove":
+            return 0 if remove_task_from_project(args.project_id, args.task_id) else 1
         if args.project_command == "subframe":
             if args.subframe_command == "add":
                 has_filter = bool(getattr(args, 'filter', None) and str(getattr(args, 'filter', '')).strip())
