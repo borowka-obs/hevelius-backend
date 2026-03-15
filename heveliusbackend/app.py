@@ -182,6 +182,11 @@ class TaskAddRequestSchema(Schema):
     max_sun_alt = fields.Integer(
         metadata={"description": "Maximum sun altitude"}
     )
+    project_ids = fields.List(
+        fields.Integer(),
+        load_default=lambda: [],
+        metadata={"description": "Project IDs this task belongs to (default: none)"}
+    )
 
 
 class TaskAddResponseSchema(Schema):
@@ -233,6 +238,7 @@ class TasksRequestSchema(Schema):
     exposure = fields.Float(metadata={"description": "Filter by exposure time"})
     descr = fields.String(metadata={"description": "Filter by description"})
     state = fields.Integer(metadata={"description": "Filter by state"})
+    project_id = fields.Integer(metadata={"description": "Filter by project ID (tasks assigned to this project)"})
     performed_after = fields.DateTime(metadata={"description": "Filter tasks performed after this time"})
     performed_before = fields.DateTime(metadata={"description": "Filter tasks performed before this time"})
 
@@ -335,6 +341,10 @@ class TaskUpdateRequestSchema(Schema):
     comment = fields.String(metadata={"description": "Comment"})
     max_moon_phase = fields.Integer(metadata={"description": "Maximum moon phase"})
     max_sun_alt = fields.Integer(metadata={"description": "Maximum sun altitude"})
+    project_ids = fields.List(
+        fields.Integer(),
+        metadata={"description": "Project IDs this task belongs to (replaces current list when provided)"}
+    )
 
 
 class TaskUpdateResponseSchema(Schema):
@@ -698,19 +708,20 @@ class TaskAddResource(MethodView):
                 'msg': 'Unauthorized: token user_id does not match request user_id'
             }
 
-        # Prepare fields for SQL query
-        fields = []
+        # Prepare fields for SQL query (project_ids is not a tasks column; handled separately)
+        project_ids = task_data.pop('project_ids', None) or []
+        insert_fields = []
         values = []
         for key, value in task_data.items():
             if value is not None:
-                fields.append(key)
+                insert_fields.append(key)
                 values.append(value)
         if 'state' not in task_data.keys():
-            fields.append('state')
+            insert_fields.append('state')
             values.append(1)
 
         # Create SQL query
-        fields_str = ", ".join(fields)
+        fields_str = ", ".join(insert_fields)
         placeholders = ", ".join(["%s"] * len(values))  # Use SQL placeholders
         # The default state is 1 (new)
         query = f"""INSERT INTO tasks ({fields_str}) VALUES ({placeholders}) RETURNING task_id"""
@@ -720,18 +731,24 @@ class TaskAddResource(MethodView):
 
             cnx = db.connect(cfg)
             result = db.run_query(cnx, query, values)
+            if result is None:
+                cnx.close()
+                return {'status': False, 'msg': 'Failed to create task'}
+            task_id = result if isinstance(result, int) else result[0] if result else None
+            if not task_id:
+                cnx.close()
+                return {'status': False, 'msg': 'Failed to create task'}
+            # Assign task to projects
+            for pid in (project_ids or []):
+                proj = db.run_query(cnx, "SELECT 1 FROM projects WHERE project_id = %s", (pid,))
+                if proj:
+                    db.run_query(cnx, "INSERT INTO task_projects (task_id, project_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (task_id, pid))
             cnx.close()
 
-            if result and isinstance(result, int):
-                return {
-                    'status': True,
-                    'task_id': result,
-                    'msg': f'Task {result} created successfully'
-                }
-
             return {
-                'status': False,
-                'msg': 'Failed to create task'
+                'status': True,
+                'task_id': task_id,
+                'msg': f'Task {task_id} created successfully'
             }
 
         except Exception as e:
@@ -817,6 +834,10 @@ class TasksResource(MethodView):
         if args.get('state') is not None:
             where_clauses.append("state = %s")
             params.append(args['state'])
+
+        if args.get('project_id'):
+            where_clauses.append("task_id IN (SELECT task_id FROM task_projects WHERE project_id = %s)")
+            params.append(args['project_id'])
 
         if args.get('performed_after'):
             where_clauses.append("performed >= %s")
@@ -1016,30 +1037,23 @@ class TaskUpdateResource(MethodView):
         """Update existing astronomical observation task"""
         current_user_id = get_jwt_identity()
         task_id = task_data.pop('task_id')  # Remove task_id from update fields
+        project_ids = task_data.pop('project_ids', None)  # Not a tasks column; handled below
 
         # First check if the task exists and get its user_id
         query = "SELECT user_id FROM tasks WHERE task_id = %s"
 
         cnx = db.connect()
         result = db.run_query(cnx, query, (task_id,))
-        cnx.close()
-
         if not result:
-            return {
-                'status': False,
-                'msg': f'Task {task_id} not found'
-            }
+            cnx.close()
+            return {'status': False, 'msg': f'Task {task_id} not found'}
 
         task_user_id = result[0][0]
-
-        # Check if the current user owns the task
         if task_user_id != current_user_id:
-            return {
-                'status': False,
-                'msg': 'Unauthorized: you can only update your own tasks'
-            }
+            cnx.close()
+            return {'status': False, 'msg': 'Unauthorized: you can only update your own tasks'}
 
-        # Prepare fields for SQL query
+        # Prepare fields for SQL query (only tasks table columns)
         update_parts = []
         values = []
         for key, value in task_data.items():
@@ -1047,41 +1061,24 @@ class TaskUpdateResource(MethodView):
                 update_parts.append(f"{key} = %s")
                 values.append(value)
 
-        if not update_parts:
-            return {
-                'status': False,
-                'msg': 'No fields to update'
-            }
-
-        # Add task_id as the last parameter
-        values.append(task_id)
-
-        # Create SQL query
-        query = f"""UPDATE tasks SET {", ".join(update_parts)} WHERE task_id = %s"""
-
         try:
             cfg = hevelius_config.config_db_get()
-
             cnx = db.connect(cfg)
-            result = db.run_query(cnx, query, values)
+            if update_parts:
+                values.append(task_id)
+                db.run_query(cnx, f"""UPDATE tasks SET {", ".join(update_parts)} WHERE task_id = %s""", values)
+            # Update project assignments if project_ids was provided (replace entire list)
+            if project_ids is not None:
+                db.run_query(cnx, "DELETE FROM task_projects WHERE task_id = %s", (task_id,))
+                for pid in project_ids:
+                    proj = db.run_query(cnx, "SELECT 1 FROM projects WHERE project_id = %s", (pid,))
+                    if proj:
+                        db.run_query(cnx, "INSERT INTO task_projects (task_id, project_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (task_id, pid))
             cnx.close()
-
-            if result:
-                return {
-                    'status': True,
-                    'msg': f'Task {task_id} updated successfully'
-                }
-            return {
-                'status': True,
-                'msg': f'Task {task_id} updated successfully'
-            }
-
+            return {'status': True, 'msg': f'Task {task_id} updated successfully'}
         except Exception as e:
             print(f"ERROR: Exception while handling /task-update call: {e}")
-            return {
-                'status': False,
-                'msg': f'Error updating task: {str(e)}'
-            }
+            return {'status': False, 'msg': f'Error updating task: {str(e)}'}
 
 
 @blp.route("/night-plan")
@@ -1700,24 +1697,40 @@ class ProjectsResource(MethodView):
     @jwt_required()
     @blp.response(200, ProjectsListSchema)
     def get(self):
-        """Get list of projects with paging"""
+        """Get list of projects with paging. Filter by user_id and/or scope_id (telescope)."""
         page = request.args.get("page", 1, type=int)
         per_page = min(request.args.get("per_page", 100, type=int), 1000)
         user_id = request.args.get("user_id", type=int)
+        scope_id = request.args.get("scope_id", type=int)
         offset = (page - 1) * per_page
         cnx = db.connect()
         if user_id is not None:
             count_q = "SELECT COUNT(*) FROM projects p JOIN project_users pu ON p.project_id = pu.project_id WHERE pu.user_id = %s"
             list_q = """SELECT p.project_id, p.name, p.description, p.scope_id, p.ra, p.decl, p.active
                        FROM projects p JOIN project_users pu ON p.project_id = pu.project_id
-                       WHERE pu.user_id = %s ORDER BY p.project_id LIMIT %s OFFSET %s"""
-            total = db.run_query(cnx, count_q, (user_id,))[0][0]
-            rows = db.run_query(cnx, list_q, (user_id, per_page, offset))
+                       WHERE pu.user_id = %s"""
+            count_params, list_params = [user_id], [user_id]
+            if scope_id is not None:
+                count_q += " AND p.scope_id = %s"
+                list_q += " AND p.scope_id = %s"
+                count_params.append(scope_id)
+                list_params.extend([scope_id, per_page, offset])
+            else:
+                list_params.extend([per_page, offset])
+            list_q += " ORDER BY p.project_id LIMIT %s OFFSET %s"
+            total = db.run_query(cnx, count_q, count_params)[0][0]
+            rows = db.run_query(cnx, list_q, list_params)
         else:
-            count_q = "SELECT COUNT(*) FROM projects"
-            list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
-            total = db.run_query(cnx, count_q)[0][0]
-            rows = db.run_query(cnx, list_q, (per_page, offset))
+            if scope_id is not None:
+                count_q = "SELECT COUNT(*) FROM projects WHERE scope_id = %s"
+                list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE scope_id = %s ORDER BY project_id LIMIT %s OFFSET %s"
+                total = db.run_query(cnx, count_q, (scope_id,))[0][0]
+                rows = db.run_query(cnx, list_q, (scope_id, per_page, offset))
+            else:
+                count_q = "SELECT COUNT(*) FROM projects"
+                list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
+                total = db.run_query(cnx, count_q)[0][0]
+                rows = db.run_query(cnx, list_q, (per_page, offset))
         projects = []
         for r in (rows or []):
             pid, name, descr, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
@@ -1949,6 +1962,75 @@ class ProjectSubframeDetailResource(MethodView):
         db.run_query(cnx, "DELETE FROM project_subframes WHERE project_id = %s AND id = %s", (project_id, subframe_id))
         cnx.close()
         return {"status": True, "msg": "Deleted"}
+
+
+# Task state 6 = DONE (complete) per task_states
+TASK_STATE_DONE = 6
+
+
+@blp.route("/projects/<int:project_id>/stats")
+class ProjectStatsResource(MethodView):
+    @jwt_required()
+    def get(self, project_id):
+        """Get project statistics: total tasks, incomplete (state != 6), done (state = 6)."""
+        cnx = db.connect()
+        proj = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        if not proj:
+            cnx.close()
+            return {"status": False, "msg": f"Project {project_id} not found", "total_tasks": 0, "tasks_incomplete": 0, "tasks_done": 0}
+        total = db.run_query(cnx, "SELECT COUNT(*) FROM task_projects WHERE project_id = %s", (project_id,))[0][0]
+        incomplete = db.run_query(cnx, """SELECT COUNT(*) FROM task_projects tp JOIN tasks t ON tp.task_id = t.task_id
+            WHERE tp.project_id = %s AND t.state != %s""", (project_id, TASK_STATE_DONE))[0][0]
+        done = db.run_query(cnx, """SELECT COUNT(*) FROM task_projects tp JOIN tasks t ON tp.task_id = t.task_id
+            WHERE tp.project_id = %s AND t.state = %s""", (project_id, TASK_STATE_DONE))[0][0]
+        cnx.close()
+        return {
+            "status": True,
+            "project_id": project_id,
+            "total_tasks": total,
+            "tasks_incomplete": incomplete,
+            "tasks_done": done,
+            "msg": "OK"
+        }
+
+
+@blp.route("/projects/<int:project_id>/tasks/<int:task_id>")
+class ProjectTaskResource(MethodView):
+    @jwt_required()
+    def post(self, project_id, task_id):
+        """Add a task to a project. Task must exist and be owned by the current user."""
+        current_user_id = get_jwt_identity()
+        cnx = db.connect()
+        task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
+        if not task_row:
+            cnx.close()
+            return {"status": False, "msg": f"Task {task_id} not found"}
+        if task_row[0][0] != current_user_id:
+            cnx.close()
+            return {"status": False, "msg": "Unauthorized: you can only add your own tasks to a project"}
+        proj = db.run_query(cnx, "SELECT 1 FROM projects WHERE project_id = %s", (project_id,))
+        if not proj:
+            cnx.close()
+            return {"status": False, "msg": f"Project {project_id} not found"}
+        db.run_query(cnx, "INSERT INTO task_projects (task_id, project_id) VALUES (%s, %s) ON CONFLICT DO NOTHING", (task_id, project_id))
+        cnx.close()
+        return {"status": True, "msg": f"Task {task_id} added to project {project_id}"}
+
+    @jwt_required()
+    def delete(self, project_id, task_id):
+        """Remove a task from a project. Task must exist and be owned by the current user."""
+        current_user_id = get_jwt_identity()
+        cnx = db.connect()
+        task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
+        if not task_row:
+            cnx.close()
+            return {"status": False, "msg": f"Task {task_id} not found"}
+        if task_row[0][0] != current_user_id:
+            cnx.close()
+            return {"status": False, "msg": "Unauthorized: you can only remove your own tasks from a project"}
+        deleted = db.run_query(cnx, "DELETE FROM task_projects WHERE task_id = %s AND project_id = %s", (task_id, project_id))
+        cnx.close()
+        return {"status": True, "msg": f"Task {task_id} removed from project {project_id}"}
 
 
 @blp.route("/catalogs/search")
