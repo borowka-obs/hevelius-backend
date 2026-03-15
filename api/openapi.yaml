@@ -558,6 +558,25 @@ components:
           type: integer
         pages:
           type: integer
+    ProjectStats:
+      type: object
+      description: Task statistics for a project
+      properties:
+        status:
+          type: boolean
+        project_id:
+          type: integer
+        total_tasks:
+          type: integer
+          description: Total number of tasks assigned to the project
+        tasks_incomplete:
+          type: integer
+          description: Tasks with state != 6 (not done)
+        tasks_done:
+          type: integer
+          description: Tasks with state == 6 (done)
+        msg:
+          type: string
     Telescope:
       type: object
       properties:
@@ -949,6 +968,11 @@ paths:
                   description: Task state (0 - disabled, 1 - new)
                   enum: [0, 1]
                   default: 1
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Project IDs this task belongs to (optional; default none)
       responses:
         '200':
           description: Task creation response
@@ -1068,6 +1092,12 @@ paths:
           required: false
           schema:
             type: integer
+        - name: project_id
+          in: query
+          description: Filter by project ID (tasks assigned to this project)
+          required: false
+          schema:
+            type: integer
         - name: performed_after
           in: query
           description: Filter tasks performed after this time (ISO 8601)
@@ -1144,6 +1174,9 @@ paths:
                   type: string
                 state:
                   type: integer
+                project_id:
+                  type: integer
+                  description: Filter by project ID (tasks assigned to this project)
                 performed_after:
                   type: string
                   format: date-time
@@ -1280,6 +1313,11 @@ paths:
                 max_sun_alt:
                   type: integer
                   description: Maximum sun altitude
+                project_ids:
+                  type: array
+                  items:
+                    type: integer
+                  description: Project IDs this task belongs to (replaces current list when provided)
       responses:
         '200':
           description: Task update response
@@ -1758,6 +1796,11 @@ paths:
           schema:
             type: integer
           description: Filter by user ID (projects the user belongs to)
+        - name: scope_id
+          in: query
+          schema:
+            type: integer
+          description: Filter by telescope ID (projects associated with this telescope)
       responses:
         '200':
           description: List of projects
@@ -1854,6 +1897,88 @@ paths:
                     type: string
         '404':
           description: Project not found
+      security:
+        - bearerAuth: []
+  /api/projects/{project_id}/stats:
+    get:
+      summary: Get project statistics
+      description: Returns task counts for the project (total, incomplete, done). Done = state 6.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Project statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectStats'
+        '404':
+          description: Project not found
+      security:
+        - bearerAuth: []
+  /api/projects/{project_id}/tasks/{task_id}:
+    post:
+      summary: Add task to project
+      description: Assign a task to a project. Task must exist and be owned by the current user.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task added to project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Task or project not found
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Remove task from project
+      description: Remove a task from a project. Task must exist and be owned by the current user.
+      parameters:
+        - name: project_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: task_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Task removed from project
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: boolean
+                  msg:
+                    type: string
+        '404':
+          description: Task or project not found
       security:
         - bearerAuth: []
   /api/projects/{project_id}/subframes:
