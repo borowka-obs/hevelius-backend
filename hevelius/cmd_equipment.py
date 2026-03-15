@@ -235,7 +235,8 @@ def list_projects(scope_id=None):
     """List all projects from the database. If scope_id is set, only projects for that telescope."""
     cnx = db.connect()
     if scope_id is not None:
-        rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE scope_id = %s ORDER BY project_id", (scope_id,))
+        rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE scope_id = %s ORDER BY project_id",
+                            (scope_id,))
     else:
         rows = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id")
     cnx.close()

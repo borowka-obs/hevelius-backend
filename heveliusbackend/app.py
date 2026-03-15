@@ -1723,7 +1723,8 @@ class ProjectsResource(MethodView):
         else:
             if scope_id is not None:
                 count_q = "SELECT COUNT(*) FROM projects WHERE scope_id = %s"
-                list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE scope_id = %s ORDER BY project_id LIMIT %s OFFSET %s"
+                list_q = """SELECT project_id, name, description, scope_id, ra, decl, active FROM projects
+                            WHERE scope_id = %s ORDER BY project_id LIMIT %s OFFSET %s"""
                 total = db.run_query(cnx, count_q, (scope_id,))[0][0]
                 rows = db.run_query(cnx, list_q, (scope_id, per_page, offset))
             else:
@@ -2028,7 +2029,7 @@ class ProjectTaskResource(MethodView):
         if task_row[0][0] != current_user_id:
             cnx.close()
             return {"status": False, "msg": "Unauthorized: you can only remove your own tasks from a project"}
-        deleted = db.run_query(cnx, "DELETE FROM task_projects WHERE task_id = %s AND project_id = %s", (task_id, project_id))
+        db.run_query(cnx, "DELETE FROM task_projects WHERE task_id = %s AND project_id = %s", (task_id, project_id))
         cnx.close()
         return {"status": True, "msg": f"Task {task_id} removed from project {project_id}"}
 
