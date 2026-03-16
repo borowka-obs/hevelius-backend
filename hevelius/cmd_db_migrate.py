@@ -13,6 +13,72 @@ from hevelius import db
 from hevelius.config import config_db_get
 
 
+def generate_consolidated_schema(output_path="db/schema-consolidated.psql"):
+    """
+    Generate a consolidated PostgreSQL schema file for testing.
+
+    This creates a fresh temporary database, runs all migrations to bring it
+    to the latest schema version, and then dumps the schema (no data) to
+    ``output_path`` using ``pg_dump --schema-only``.
+    """
+
+    cfg = config_db_get()
+    if cfg["type"] != "pgsql":
+        print("Consolidated schema generation is only supported for PostgreSQL.")
+        sys.exit(1)
+
+    base_db = cfg["database"]
+    temp_db = base_db + "_consolidated_tmp"
+
+    # Connect to the management database (postgres) to create/drop the temp db.
+    mgmt_cfg = {**cfg, "database": "postgres"}
+
+    conn = db.connect(mgmt_cfg)
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"DROP DATABASE IF EXISTS {temp_db};")
+        cur.execute(f"CREATE DATABASE {temp_db} OWNER {cfg['user']};")
+    finally:
+        cur.close()
+        conn.close()
+
+    # Run migrations against the temporary database.
+    migrate_pgsql({"dry_run": False}, cfg={**cfg, "database": temp_db})
+
+    # Dump schema only from the temporary database.
+    my_env = environ.copy()
+    my_env["PGPASSWORD"] = cfg["password"]
+
+    with open(output_path, "w") as out:
+        proc = subprocess.Popen(
+            [
+                "pg_dump",
+                "--schema-only",
+                "-U",
+                cfg["user"],
+                "-h",
+                cfg["host"],
+                "-p",
+                str(cfg["port"]),
+                temp_db,
+            ],
+            stdout=out,
+            env=my_env,
+        )
+        proc.wait()
+
+    # Drop the temporary database.
+    conn = db.connect(mgmt_cfg)
+    conn.set_session(autocommit=True)
+    cur = conn.cursor()
+    try:
+        cur.execute(f"DROP DATABASE IF EXISTS {temp_db};")
+    finally:
+        cur.close()
+        conn.close()
+
+
 def migrate(args):
     """
     Conducts database migration to the newest schema.
