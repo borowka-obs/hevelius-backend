@@ -19,6 +19,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - API: edit existing project (`PATCH /api/projects/{project_id}`)
   - API: add new subframes to a project (`POST /api/projects/{project_id}/subframes`)
   - API: edit or delete existing frames in a project (`PATCH/DELETE subframes`)
+  - API: (`POST /api/task-update`) now accepts optional project_ids
+  - API: (`POST /api/task-add`) now accepts optional projects_ids
+  - API: (`DELETE /api/projects/{project_id}/tasks/{task_id}`) can now remove a task from a project.
+  - CLI: (`hevelius project task-remove <project_id> <task_id>`) can now remove a task from a project.
+- Project statistics added
+  - API: (`GET /api/projects/{project_id}/stats`) added, it lists total tasks, number of incomplete and
+    complete tasks.
+  - CLI: (`hevelius project stats <project_id>`) added, shows statistics for a project.
 - Filters support added
   - CLI: list filters (`hevelius filters`)
   - CLI: add, edit filters (`hevelius filter`)
