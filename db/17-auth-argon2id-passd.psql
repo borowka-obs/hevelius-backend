@@ -1,0 +1,5 @@
+-- Upgrade `users.pass_d` to TEXT so it can store modern argon2id hashes.
+ALTER TABLE users ALTER COLUMN pass_d TYPE TEXT;
+
+UPDATE schema_version SET version = 17;
+

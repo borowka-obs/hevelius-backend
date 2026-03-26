@@ -8,4 +8,6 @@ flask-cors
 flask-smorest
 flask-jwt-extended
 
+argon2-cffi
+
 PyJWT==2.9.0
