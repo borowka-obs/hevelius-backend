@@ -851,7 +851,7 @@ paths:
                   description: Username
                 password:
                   type: string
-                  description: Password MD5 hash
+                  description: Password in plaintext (sent over HTTPS)
               required:
                 - username
                 - password

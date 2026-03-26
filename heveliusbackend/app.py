@@ -3,7 +3,10 @@ Flask application that provides a REST API to the Hevelius backend.
 """
 
 import logging
+import hashlib
+import hmac
 import os
+import re
 from flask import Flask, render_template, request
 
 from flask_cors import CORS
@@ -15,6 +18,8 @@ from marshmallow import Schema, fields, ValidationError, validate
 from flask.views import MethodView
 from datetime import datetime, timedelta
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from argon2 import PasswordHasher, Type  # type: ignore[import-not-found]
+from argon2.exceptions import VerifyMismatchError, InvalidHashError  # type: ignore[import-not-found]
 
 from hevelius import cmd_stats, db, config as hevelius_config
 from hevelius.version import VERSION
@@ -76,7 +81,7 @@ class LoginRequestSchema(Schema):
     )
     password = fields.String(
         required=True,
-        metadata={"description": "Password MD5 hash"}
+        metadata={"description": "Password (plaintext, sent over HTTPS)"}
     )
 
 
@@ -94,6 +99,18 @@ class LoginResponseSchema(Schema):
     ftp_login = fields.String()
     ftp_pass = fields.String()
     msg = fields.String()
+
+
+# `password` in /api/login is plaintext. Legacy DB values may still be MD5 hex;
+# those are verified once and immediately replaced with argon2id.
+password_hasher = PasswordHasher(
+    time_cost=2,
+    memory_cost=65536,  # KiB
+    parallelism=1,
+    type=Type.ID,
+)
+
+_MD5_HEX_RE = re.compile(r"^[a-fA-F0-9]{32}$")
 
 
 class TaskAddRequestSchema(Schema):
@@ -629,11 +646,11 @@ class LoginResource(MethodView):
         Returns user information and JWT token if credentials are valid
         """
         user = login_data.get('username')
-        md5pass = login_data.get('password')
+        password = login_data.get('password')
 
         if user is None:
             return {'status': False, 'msg': 'Username not provided'}
-        if md5pass is None:
+        if password is None:
             return {'status': False, 'msg': 'Password not provided'}
 
         query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
@@ -658,10 +675,45 @@ class LoginResource(MethodView):
         user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id, \
             ftp_login, ftp_pass = db_resp[0]
 
-        if md5pass.lower() != pass_db.lower():
-            print(f"Login: Invalid password for user ({user})")
-            # Password's MD5 did not match
+        # Legacy: `pass_d` stored as MD5 hex (case-insensitive). Upgrade to argon2id lazily
+        # after successful login.
+        if pass_db is None:
+            print(f"Login: Missing pass_d for user ({user})")
             return {'status': False, 'msg': 'Invalid credentials'}
+
+        if isinstance(pass_db, str) and _MD5_HEX_RE.fullmatch(pass_db):
+            legacy_md5 = hashlib.md5(password.encode("utf-8")).hexdigest()
+            if not hmac.compare_digest(legacy_md5.lower(), pass_db.lower()):
+                print(f"Login: Invalid legacy MD5 password for user ({user})")
+                return {'status': False, 'msg': 'Invalid credentials'}
+
+            # Successful legacy verification: replace with argon2id hash.
+            pass_d_new = password_hasher.hash(password)
+            cnx = db.connect()
+            db.run_query(cnx, "UPDATE users SET pass_d=%s WHERE user_id=%s", (pass_d_new, user_id))
+            cnx.close()
+        else:
+            # New format: argon2id hash string (stored format is self-describing).
+            if not (isinstance(pass_db, str) and pass_db.startswith("$argon2")):
+                print(f"Login: Unsupported pass_d format for user ({user})")
+                return {'status': False, 'msg': 'Invalid credentials'}
+
+            try:
+                password_hasher.verify(pass_db, password)
+            except (VerifyMismatchError, InvalidHashError):
+                print(f"Login: Invalid argon2id password for user ({user})")
+                return {'status': False, 'msg': 'Invalid credentials'}
+
+            # Future re-hashing: upgrade transparently if params are weak/changed.
+            try:
+                if password_hasher.check_needs_rehash(pass_db):
+                    pass_d_new = password_hasher.hash(password)
+                    cnx = db.connect()
+                    db.run_query(cnx, "UPDATE users SET pass_d=%s WHERE user_id=%s", (pass_d_new, user_id))
+                    cnx.close()
+            except InvalidHashError:
+                print(f"Login: Invalid argon2id hash for user ({user})")
+                return {'status': False, 'msg': 'Invalid credentials'}
 
         # Create JWT access token
         access_token = create_access_token(

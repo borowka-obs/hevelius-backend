@@ -85,3 +85,5 @@ werkzeug==3.1.6
     #   flask-cors
     #   flask-jwt-extended
     #   flask-smorest
+
+argon2-cffi
