@@ -1,7 +1,6 @@
 import json
 import os
 import unittest
-import hashlib
 
 from argon2 import PasswordHasher, Type
 
@@ -21,7 +20,8 @@ class TestLoginArgon2id(unittest.TestCase):
         os.environ["HEVELIUS_DB_NAME"] = config["database"]
 
         plaintext_password = "correct horse battery staple"
-        legacy_md5 = hashlib.md5(plaintext_password.encode("utf-8")).hexdigest()
+        # Precomputed MD5 hash of "correct horse battery staple"
+        legacy_md5 = "1c53a89c8db7a2bd840beba496839cdf"
         login = "legacy_user"
 
         cnx = db.connect(config)
