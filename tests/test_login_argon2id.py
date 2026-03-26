@@ -21,7 +21,7 @@ class TestLoginArgon2id(unittest.TestCase):
 
         plaintext_password = "correct horse battery staple"
         # Precomputed MD5 hash of "correct horse battery staple"
-        legacy_md5 = "1c53a89c8db7a2bd840beba496839cdf"
+        legacy_md5 = "9cc2ae8a1ba7a93da39b46fc1019c481"
         login = "legacy_user"
 
         cnx = db.connect(config)
