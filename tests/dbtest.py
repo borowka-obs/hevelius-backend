@@ -159,7 +159,9 @@ def setup_database_test_case(*, load_test_data: str = None):
         raise
 
     if load_test_data is not None:
-        print(f"Loading test data from file {load_test_data}")
+        if os.environ.get("HEVELIUS_DEBUG") == "1":
+            print(f"Loading test data from file {load_test_data}")
+
         run_file(test_config, load_test_data)
         # Reset sequences so next INSERT gets a new id (test data uses explicit ids)
         _reset_sequences_after_load(test_config)

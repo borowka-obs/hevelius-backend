@@ -1,13 +1,7 @@
 import json
 import os
-import sys
 import unittest
 import hashlib
-from pathlib import Path
-
-# Ensure repo root is on PYTHONPATH so `tests.*` and `heveliusbackend.*` imports work
-# consistently under different test runners.
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from argon2 import PasswordHasher, Type
 
@@ -128,9 +122,7 @@ class TestLoginArgon2id(unittest.TestCase):
         self.assertTrue(data["status"])
 
         cnx = db.connect(config)
-        pass_d_after = db.run_query(
-            cnx, "SELECT pass_d FROM users WHERE user_id=%s", (201,)
-        )[0][0]
+        pass_d_after = db.run_query(cnx, "SELECT pass_d FROM users WHERE user_id=%s", (201,))[0][0]
         cnx.close()
 
         self.assertTrue(isinstance(pass_d_after, str))
@@ -138,4 +130,3 @@ class TestLoginArgon2id(unittest.TestCase):
         self.assertNotEqual(pass_d_after, weak_hash)
 
         os.environ.pop("HEVELIUS_DB_NAME")
-
