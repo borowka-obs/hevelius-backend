@@ -1,0 +1,48 @@
+-- Schema 18: unique logins, remove legacy FTP columns, admin audit log, password-reset tokens.
+--
+-- Resolves empty-string logins to NULL so they do not collide with UNIQUE.
+UPDATE users SET login = NULL WHERE login IS NOT NULL AND btrim(login) = '';
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM users
+    WHERE login IS NOT NULL
+    GROUP BY login
+    HAVING COUNT(*) > 1
+  ) THEN
+    RAISE EXCEPTION 'Migration 18: duplicate login values in users; resolve manually before migrating';
+  END IF;
+END $$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS users_login_unique ON users (login) WHERE login IS NOT NULL;
+
+ALTER TABLE users DROP COLUMN IF EXISTS ftp_login;
+ALTER TABLE users DROP COLUMN IF EXISTS ftp_pass;
+
+CREATE TABLE IF NOT EXISTS user_admin_audit (
+  id BIGSERIAL PRIMARY KEY,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  channel VARCHAR(16) NOT NULL,
+  actor_user_id INT REFERENCES users (user_id) ON DELETE SET NULL,
+  action VARCHAR(96) NOT NULL,
+  target_user_id INT REFERENCES users (user_id) ON DELETE SET NULL,
+  details JSONB
+);
+
+CREATE INDEX IF NOT EXISTS user_admin_audit_created_at_idx ON user_admin_audit (created_at DESC);
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id BIGSERIAL PRIMARY KEY,
+  user_id INT NOT NULL REFERENCES users (user_id) ON DELETE CASCADE,
+  token_hash TEXT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  consumed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS password_reset_tokens_lookup_idx
+  ON password_reset_tokens (token_hash)
+  WHERE consumed_at IS NULL;
+
+UPDATE schema_version SET version = 18;

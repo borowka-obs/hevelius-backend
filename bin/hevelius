@@ -15,6 +15,7 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
+from hevelius.cmd_users import list_users, add_user, disable_user, enable_user
 from hevelius.cmd_equipment import (
     list_filters,
     list_sensors,
@@ -255,6 +256,26 @@ def run():
     t_remfilter.add_argument('scope_id', type=int, help="Telescope scope_id")
     t_remfilter.add_argument('filter_id', type=int, help="Filter ID to remove")
 
+    subparsers.add_parser('users', help="List all users")
+
+    user_parser = subparsers.add_parser('user', help="Add, enable, or disable a user")
+    user_sub = user_parser.add_subparsers(dest='user_command', help="User subcommand")
+    user_add = user_sub.add_parser('add', help="Add a new user (login + password)")
+    user_add.add_argument('login', help="Login name (unique)")
+    user_add.add_argument('--password', required=True, help="Initial password (stored as argon2id in pass_d)")
+    user_add.add_argument('--firstname', default=None, help="First name")
+    user_add.add_argument('--lastname', default=None, help="Last name")
+    user_add.add_argument('--email', default=None, help="Email")
+    user_add.add_argument('--phone', default=None, help="Phone")
+    user_add.add_argument('--share', type=float, default=None, help="Share value")
+    user_add.add_argument('--permissions', type=int, default=0, help="Permissions bitmask (default 0)")
+    user_add.add_argument('--aavso-id', default=None, dest='aavso_id', help="AAVSO id")
+    user_disable = user_sub.add_parser('disable', help="Disable user (clear password; cannot log in)")
+    user_disable.add_argument('login_or_id', help="Login name or numeric user_id")
+    user_enable = user_sub.add_parser('enable', help="Enable user (set password)")
+    user_enable.add_argument('login_or_id', help="Login name or numeric user_id")
+    user_enable.add_argument('--password', required=True, help="New password")
+
     args = parser.parse_args()
 
     # db commands: version, migrate, backup, stats
@@ -490,6 +511,28 @@ def run():
         if args.telescope_command == "remove-filter":
             return 0 if remove_telescope_filter(args.scope_id, args.filter_id) else 1
         return telescope_parser.print_help() or 1
+    if args.command == "users":
+        list_users()
+        return 0
+    if args.command == "user":
+        if args.user_command == "add":
+            uid = add_user(
+                args.login,
+                args.password,
+                firstname=getattr(args, 'firstname', None),
+                lastname=getattr(args, 'lastname', None),
+                share=getattr(args, 'share', None),
+                phone=getattr(args, 'phone', None),
+                email=getattr(args, 'email', None),
+                permissions=getattr(args, 'permissions', 0),
+                aavso_id=getattr(args, 'aavso_id', None),
+            )
+            return 0 if uid is not None else 1
+        if args.user_command == "disable":
+            return 0 if disable_user(args.login_or_id) else 1
+        if args.user_command == "enable":
+            return 0 if enable_user(args.login_or_id, args.password) else 1
+        return user_parser.print_help() or 1
     return parser.print_help()
 
 

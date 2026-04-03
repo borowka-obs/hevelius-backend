@@ -33,8 +33,8 @@ INSERT INTO telescopes (scope_id, name, descr, min_dec, max_dec) VALUES (2, 'cdk
 --
 -- Data for Name: users; Type: TABLE DATA; Schema:  Owner: hevelius
 --
-INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass, pass_d) VALUES (1, 'user1', 'pass1', 'Jan', 'Kowalski', 85580, '', 'jan.kowalski@example.com', 1, 'ABCD', 'ABCD', '1234abcd', '1234567890abcdef');
-INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass, pass_d) VALUES (3, 'tomek', 'pass2', 'Tomek', 'Mrugalski', 0, '', 'tomasz.mrugalski@gmail.com', 1, 'MTOA', 'MTOA', '123456789abc', '64A47777E97C1E777779240ED7777362');
+INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, pass_d) VALUES (1, 'user1', 'pass1', 'Jan', 'Kowalski', 85580, '', 'jan.kowalski@example.com', 1, 'ABCD', '1234567890abcdef');
+INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, pass_d) VALUES (3, 'tomek', 'pass2', 'Tomek', 'Mrugalski', 0, '', 'tomasz.mrugalski@gmail.com', 1, 'MTOA', '64A47777E97C1E777779240ED7777362');
 
 --
 -- Data for Name: tasks; Type: TABLE DATA; Schema:  Owner: hevelius

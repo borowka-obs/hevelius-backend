@@ -1,5 +1,5 @@
-INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass, pass_d) VALUES (1, 'user1', 'pass1', 'Jan', 'Kowalski', 85580, '', 'jan.kowalski@example.com', 1, 'ABCD', 'ABCD', '1234abcd', '1234567890abcdef');
-INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, ftp_login, ftp_pass, pass_d) VALUES (2, 'user2', 'pass2', 'John', 'Doe', 85580, '', 'john.doe@example.com', 1, 'ABCD', 'ABCD', '1234abcd', '1234567890abcdef');
+INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, pass_d) VALUES (1, 'user1', 'pass1', 'Jan', 'Kowalski', 85580, '', 'jan.kowalski@example.com', 1, 'ABCD', '1234567890abcdef');
+INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email, permissions, aavso_id, pass_d) VALUES (2, 'user2', 'pass2', 'John', 'Doe', 85580, '', 'john.doe@example.com', 1, 'ABCD', '1234567890abcdef');
 
 
 INSERT INTO task_states (id, name, descr) VALUES (0, 'TEMPLATE', 'template');

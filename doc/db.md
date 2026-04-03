@@ -20,6 +20,12 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 18 (users cleanup, audit, password reset)
+
+- **users** – **ftp_login** and **ftp_pass** removed. Non-empty **login** values are unique (partial unique index where `login IS NOT NULL`). Empty-string logins are normalized to NULL before the constraint is applied.
+- **user_admin_audit** – Append-only log: `channel` (`api` / `cli`), `actor_user_id`, `action`, `target_user_id`, `details` (JSONB), `created_at`.
+- **password_reset_tokens** – One-time hashed tokens for password reset; `expires_at`, `consumed_at`.
+
 ### Schema version 16 (projects scope, subframe goal_count)
 
 - **projects** – Added **scope_id** (integer NOT NULL, FK to telescopes). Each project is tied to one telescope.
