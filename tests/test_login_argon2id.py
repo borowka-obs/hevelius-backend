@@ -29,8 +29,8 @@ class TestLoginArgon2id(unittest.TestCase):
             cnx,
             """
             INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email,
-                                permissions, aavso_id, ftp_login, ftp_pass, pass_d)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                permissions, aavso_id, pass_d)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 200,
@@ -43,8 +43,6 @@ class TestLoginArgon2id(unittest.TestCase):
                 "legacy@example.com",
                 1,
                 "AAVSO",
-                "ftp_login",
-                "ftp_pass",
                 legacy_md5.upper(),  # ensure case-insensitive compare
             ),
         )
@@ -88,8 +86,8 @@ class TestLoginArgon2id(unittest.TestCase):
             cnx,
             """
             INSERT INTO users (user_id, login, pass, firstname, lastname, share, phone, email,
-                                permissions, aavso_id, ftp_login, ftp_pass, pass_d)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                                permissions, aavso_id, pass_d)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """,
             (
                 201,
@@ -102,8 +100,6 @@ class TestLoginArgon2id(unittest.TestCase):
                 "weak@example.com",
                 1,
                 "AAVSO",
-                "ftp_login",
-                "ftp_pass",
                 weak_hash,
             ),
         )

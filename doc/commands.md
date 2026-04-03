@@ -8,47 +8,47 @@ way:
 $ python bin/hevelius
 Hevelius
 
-usage: hevelius [-h] {stats,migrate,version,config,backup,repo,distrib,groups,catalog,filters,sensors,projects} ...
+usage: hevelius [-h]
+  {db,config,version,data,repo,filters,filter,sensors,sensor,projects,project,telescopes,telescope,users,user} ...
 
 positional arguments:
-  {stats,migrate,version,config,backup,repo,distrib,groups,catalog,filters,sensors,projects}
-                        commands
-    stats               Show database statistics
-    migrate             Migrate to the latest DB schema
-    version             Shows the current DB schema version.
-    config              Shows current DB configuration.
-    backup              Generates DB backup.
-    repo                Manages files repository on local storage.
-    distrib             Shows photos distribution
-    groups              Shows frames' groups
-    catalog             Finds astronomical objects in a catalog
-    filters             List optical filters
-    sensors             List sensors (cameras)
-    projects            List or show projects
+  db                    Manages database (version, migrate, backup, stats)
+  config                Shows current Hevelius (DB, file repository) configuration
+  version               Shows the current Hevelius package version
+  data                  Data mining (distrib, groups, catalog)
+  repo                  Manages files repository on local storage
+  filters               List optical filters
+  filter                Add or edit a filter
+  sensors               List sensors (cameras)
+  sensor                Add or edit a sensor
+  projects              List projects or show one by ID
+  project               Add, edit, show project; subframes; task assignment; stats
+  telescopes            List telescopes
+  telescope             Add, edit, show telescope; sensor and filter associations
+  users                 List all users (summary, no passwords)
+  user                  Add, enable, or disable a user (see below)
 
 options:
   -h, --help            show this help message and exit
 ```
 
-Help for specific commands is available, e.g.
-```
-$ python bin/hevelius catalog --help
-Hevelius
+Run `python bin/hevelius COMMAND --help` for subcommands (e.g. `hevelius db migrate --help`).
 
-usage: hevelius catalog [-h] [-r RA] [-d DECL] [-p PROXIMITY] [-f FORMAT] [-o OBJECT]
+### User management (CLI)
 
-options:
-  -h, --help            show this help message and exit
-  -r RA, --ra RA        Right Ascension (HH MM [SS] format)
-  -d DECL, --decl DECL  Declination of the image searched (+DD MM SS format)
-  -p PROXIMITY, --proximity PROXIMITY
-                        radius of an area to look at (in degrees)
-  -f FORMAT, --format FORMAT
-                        format of the frames list output: none, filenames, csv, brief, full
-  -o OBJECT, --object OBJECT
-                        catalog object to look for
-```
+- **users** – Lists users: id, login, name, email, permissions, whether web login is allowed (`pass_d` set), AAVSO id.
+- **user add** – `hevelius user add LOGIN --password PASSWORD [--firstname …] [--lastname …] [--email …] [--phone …] [--share …] [--permissions N] [--aavso-id …]`. Stores **argon2id** in `pass_d`. Login must be unique.
+- **user disable** – `hevelius user disable LOGIN_OR_USER_ID` clears `pass` and `pass_d` so the account cannot log in.
+- **user enable** – `hevelius user enable LOGIN_OR_USER_ID --password NEW_PASSWORD` sets `pass_d` (argon2id).
 
+User add / enable / disable actions are recorded in the **user_admin_audit** table (schema 18+).
+
+### Database
+
+- **db version** – Current schema version from `schema_version`.
+- **db migrate** – Apply pending `db/*.psql` migrations (PostgreSQL).
+- **db backup** – Database backup.
+- **db stats** – Database statistics.
 
 ### Catalog - searching for catalog objects and associated frames
 
@@ -93,3 +93,7 @@ python bin/hevelius sensors --active-only
 python bin/hevelius projects
 python bin/hevelius projects 1
 ```
+
+### REST API (user-related)
+
+Authenticated clients can use **GET /api/users/me** for the current user profile (no passwords). Administrators (permissions bit 0) can **GET /api/users**, **GET /api/users/audit-log**, and **POST /api/users/{user_id}/password-reset-token**. Anyone with a valid reset token can call **POST /api/auth/password-reset** (no JWT). See `api/openapi.yaml` for full contracts.

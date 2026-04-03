@@ -1715,5 +1715,137 @@ class TestProjectOperations(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+class TestUsersAPI(unittest.TestCase):
+    """GET /api/users/logins and GET /api/users (admin)."""
+
+    def setUp(self):
+        self.app = app.test_client()
+        self.app.testing = True
+        with app.app_context():
+            self.token_no_admin = create_access_token(
+                identity=1,
+                additional_claims={"permissions": 0, "username": "user1"},
+            )
+            self.token_admin = create_access_token(
+                identity=1,
+                additional_claims={"permissions": 1, "username": "user1"},
+            )
+        self.headers_no_admin = {
+            "Authorization": f"Bearer {self.token_no_admin}",
+            "Content-Type": "application/json",
+        }
+        self.headers_admin = {
+            "Authorization": f"Bearer {self.token_admin}",
+            "Content-Type": "application/json",
+        }
+
+    def test_users_logins_requires_auth(self):
+        response = self.app.get("/api/users/logins")
+        self.assertEqual(response.status_code, 401)
+
+    def test_users_admin_requires_auth(self):
+        response = self.app.get("/api/users")
+        self.assertEqual(response.status_code, 401)
+
+    @use_repository
+    def test_users_logins_ok_for_authenticated(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users/logins", headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn("users", data)
+        self.assertGreaterEqual(len(data["users"]), 1)
+        u0 = data["users"][0]
+        self.assertIn("user_id", u0)
+        self.assertIn("login", u0)
+        self.assertNotIn("pass_d", u0)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_full_list_forbidden_without_admin_bit(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users", headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 403)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_full_list_ok_with_admin_bit(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users", headers=self.headers_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn("users", data)
+        self.assertGreaterEqual(len(data["users"]), 1)
+        u = next(x for x in data["users"] if x.get("user_id") == 1)
+        self.assertEqual(u.get("login"), "user1")
+        self.assertIn("permissions", u)
+        self.assertIn("login_enabled", u)
+        for forbidden in ("pass", "pass_d", "ftp_login", "ftp_pass"):
+            self.assertNotIn(forbidden, u)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_ok(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users/me", headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data.get("user_id"), 1)
+        self.assertEqual(data.get("login"), "user1")
+        self.assertIn("login_enabled", data)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_audit_log_forbidden_without_admin(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users/audit-log", headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 403)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_audit_log_lists_entries(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        self.app.get("/api/users", headers=self.headers_admin)
+        response = self.app.get("/api/users/audit-log?page=1&per_page=20", headers=self.headers_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn("entries", data)
+        self.assertIn("total", data)
+        actions = [e["action"] for e in data["entries"]]
+        self.assertIn("users.list_full", actions)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_password_reset_issue_and_complete(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        r = self.app.post("/api/users/1/password-reset-token", headers=self.headers_admin)
+        self.assertEqual(r.status_code, 200)
+        issue = json.loads(r.data)
+        self.assertTrue(issue.get("status"))
+        token = issue.get("token")
+        self.assertIsInstance(token, str)
+        self.assertGreater(len(token), 10)
+        r2 = self.app.post(
+            "/api/auth/password-reset",
+            data=json.dumps({"token": token, "new_password": "freshpass123"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(r2.status_code, 200)
+        done = json.loads(r2.data)
+        self.assertTrue(done.get("status"))
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT pass_d FROM users WHERE user_id = 1", ())
+        cnx.close()
+        self.assertTrue(str(row[0][0]).startswith("$argon2"))
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_password_reset_token_requires_admin(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.post("/api/users/1/password-reset-token", headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 403)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+
 if __name__ == '__main__':
     unittest.main()

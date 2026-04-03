@@ -7,6 +7,7 @@ import hashlib
 import hmac
 import os
 import re
+import secrets
 from flask import Flask, render_template, request
 
 from flask_cors import CORS
@@ -16,12 +17,13 @@ import json
 import plotly
 from marshmallow import Schema, fields, ValidationError, validate
 from flask.views import MethodView
-from datetime import datetime, timedelta
-from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from datetime import datetime, timedelta, timezone
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from argon2 import PasswordHasher, Type  # type: ignore[import-not-found]
 from argon2.exceptions import VerifyMismatchError, InvalidHashError  # type: ignore[import-not-found]
 
 from hevelius import cmd_stats, db, config as hevelius_config
+from hevelius.user_admin_audit import log_user_admin_action
 from hevelius.version import VERSION
 
 
@@ -96,8 +98,6 @@ class LoginResponseSchema(Schema):
     email = fields.String()
     permissions = fields.Integer()
     aavso_id = fields.String()
-    ftp_login = fields.String()
-    ftp_pass = fields.String()
     msg = fields.String()
 
 
@@ -111,6 +111,20 @@ password_hasher = PasswordHasher(
 )
 
 _MD5_HEX_RE = re.compile(r"^[a-fA-F0-9]{32}$")
+
+PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
+
+
+def _password_reset_token_hash(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _jwt_user_id_int():
+    ident = get_jwt_identity()
+    try:
+        return int(ident)
+    except (TypeError, ValueError):
+        return None
 
 
 class TaskAddRequestSchema(Schema):
@@ -620,6 +634,83 @@ class ObjectSearchResponseSchema(Schema):
     objects = fields.List(fields.Nested(ObjectSchema))
 
 
+class PasswordResetCompleteBodySchema(Schema):
+    token = fields.String(required=True, metadata={"description": "One-time reset token"})
+    new_password = fields.String(
+        required=True,
+        validate=validate.Length(min=8, error="Password must be at least 8 characters"),
+        metadata={"description": "New password"},
+    )
+
+
+class StatusMsgSchema(Schema):
+    status = fields.Boolean()
+    msg = fields.String()
+
+
+class PasswordResetTokenIssueResponseSchema(Schema):
+    status = fields.Boolean()
+    token = fields.String(metadata={"description": "Plain token; shown only once"})
+    expires_at = fields.DateTime(metadata={"description": "Token expiry (UTC)"})
+    user_id = fields.Integer()
+    msg = fields.String()
+
+
+class UserLoginMapEntrySchema(Schema):
+    user_id = fields.Integer(metadata={"description": "User ID"})
+    login = fields.String(allow_none=True, metadata={"description": "Login name"})
+
+
+class UsersLoginsResponseSchema(Schema):
+    users = fields.List(fields.Nested(UserLoginMapEntrySchema))
+
+
+class UserAdminDetailSchema(Schema):
+    user_id = fields.Integer()
+    login = fields.String(allow_none=True)
+    firstname = fields.String(allow_none=True)
+    lastname = fields.String(allow_none=True)
+    share = fields.Float(allow_none=True)
+    phone = fields.String(allow_none=True)
+    email = fields.String(allow_none=True)
+    permissions = fields.Integer()
+    aavso_id = fields.String(allow_none=True)
+    login_enabled = fields.Boolean(metadata={"description": "True if pass_d is set"})
+
+
+class UsersAdminListResponseSchema(Schema):
+    users = fields.List(fields.Nested(UserAdminDetailSchema))
+
+
+class AuditLogEntrySchema(Schema):
+    id = fields.Integer()
+    created_at = fields.DateTime()
+    channel = fields.String()
+    actor_user_id = fields.Integer(allow_none=True)
+    action = fields.String()
+    target_user_id = fields.Integer(allow_none=True)
+    details = fields.Raw(allow_none=True)
+
+
+class UsersAuditLogResponseSchema(Schema):
+    entries = fields.List(fields.Nested(AuditLogEntrySchema))
+    total = fields.Integer()
+    page = fields.Integer()
+    per_page = fields.Integer()
+    pages = fields.Integer()
+
+
+def _jwt_permissions_int():
+    claims = get_jwt()
+    p = claims.get("permissions")
+    if p is None:
+        return 0
+    try:
+        return int(p)
+    except (TypeError, ValueError):
+        return 0
+
+
 @app.route('/')
 def root():
     """Just a stub API homepage."""
@@ -654,7 +745,7 @@ class LoginResource(MethodView):
             return {'status': False, 'msg': 'Password not provided'}
 
         query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
-                aavso_id, ftp_login, ftp_pass FROM users WHERE login=%s"""
+                aavso_id FROM users WHERE login=%s"""
 
         cnx = db.connect()
         db_resp = db.run_query(cnx, query, (user,))
@@ -664,16 +755,7 @@ class LoginResource(MethodView):
             print(f"Login: No such username ({user})")
             return {'status': False, 'msg': 'Invalid credentials'}
 
-        query = """SELECT user_id, pass_d, login, firstname, lastname, share, phone, email, permissions,
-            aavso_id, ftp_login, ftp_pass FROM users WHERE login=%s"""
-        params = [user]
-
-        cnx = db.connect()
-        db_resp = db.run_query(cnx, query, params)
-        cnx.close()
-
-        user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id, \
-            ftp_login, ftp_pass = db_resp[0]
+        user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id = db_resp[0]
 
         # Legacy: `pass_d` stored as MD5 hex (case-insensitive). Upgrade to argon2id lazily
         # after successful login.
@@ -736,10 +818,221 @@ class LoginResource(MethodView):
             'email': email,
             'permissions': permissions,
             'aavso_id': aavso_id,
-            'ftp_login': ftp_login,
-            'ftp_pass': ftp_pass,
             'msg': 'Welcome'
         }
+
+
+@blp.route("/auth/password-reset")
+class AuthPasswordResetResource(MethodView):
+    @blp.arguments(PasswordResetCompleteBodySchema)
+    @blp.response(200, StatusMsgSchema)
+    def post(self, body):
+        """Apply password reset using a token issued by an administrator."""
+        token_hash = _password_reset_token_hash(body["token"])
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            """SELECT id, user_id FROM password_reset_tokens
+               WHERE token_hash = %s AND consumed_at IS NULL AND expires_at > now()""",
+            (token_hash,),
+        )
+        if not rows:
+            cnx.close()
+            return {"status": False, "msg": "Invalid or expired reset token"}
+        rid, user_id = rows[0]
+        new_hash = password_hasher.hash(body["new_password"])
+        db.run_query(cnx, "UPDATE users SET pass = NULL, pass_d = %s WHERE user_id = %s", (new_hash, user_id))
+        db.run_query(
+            cnx,
+            "UPDATE password_reset_tokens SET consumed_at = now() WHERE id = %s",
+            (rid,),
+        )
+        cnx.close()
+        log_user_admin_action(
+            "api",
+            "auth.password_reset_complete",
+            actor_user_id=None,
+            target_user_id=user_id,
+            details={},
+        )
+        return {"status": True, "msg": "Password updated"}
+
+
+@blp.route("/users/me")
+class UsersMeResource(MethodView):
+    @jwt_required()
+    @blp.response(200, UserAdminDetailSchema)
+    def get(self):
+        """Current user profile (from JWT); no password fields."""
+        uid = _jwt_user_id_int()
+        if uid is None:
+            abort(401, message="Invalid token identity")
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            """SELECT user_id, login, firstname, lastname, share, phone, email, permissions,
+                      aavso_id, pass_d
+               FROM users WHERE user_id = %s""",
+            (uid,),
+        )
+        cnx.close()
+        if not rows:
+            abort(404, message="User not found")
+        r = rows[0]
+        row_uid, login, fn, ln, share, phone, email, perm, aavso, pass_d = r
+        return {
+            "user_id": row_uid,
+            "login": login,
+            "firstname": fn,
+            "lastname": ln,
+            "share": float(share) if share is not None else None,
+            "phone": phone,
+            "email": email,
+            "permissions": perm,
+            "aavso_id": aavso,
+            "login_enabled": bool(pass_d and str(pass_d).strip()),
+        }
+
+
+@blp.route("/users/audit-log")
+class UsersAuditLogResource(MethodView):
+    @jwt_required()
+    @blp.response(200, UsersAuditLogResponseSchema)
+    def get(self):
+        """Recent user-administration audit entries (administrators only)."""
+        if (_jwt_permissions_int() & 1) == 0:
+            abort(403, message="Administrator permission required (permissions bit 0).")
+        page = max(1, int(request.args.get("page", 1)))
+        per_page = min(500, max(1, int(request.args.get("per_page", 50))))
+        offset = (page - 1) * per_page
+        cnx = db.connect()
+        total = db.run_query(cnx, "SELECT count(*) FROM user_admin_audit")[0][0]
+        rows = db.run_query(
+            cnx,
+            """SELECT id, created_at, channel, actor_user_id, action, target_user_id, details
+               FROM user_admin_audit ORDER BY id DESC LIMIT %s OFFSET %s""",
+            (per_page, offset),
+        )
+        cnx.close()
+        entries = []
+        for row in rows or []:
+            rid, created_at, channel, actor_uid, action, target_uid, details = row
+            entries.append({
+                "id": rid,
+                "created_at": created_at,
+                "channel": channel,
+                "actor_user_id": actor_uid,
+                "action": action,
+                "target_user_id": target_uid,
+                "details": details if isinstance(details, dict) else None,
+            })
+        pages = (total + per_page - 1) // per_page if total else 0
+        return {
+            "entries": entries,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": pages,
+        }
+
+
+@blp.route("/users/logins")
+class UsersLoginsResource(MethodView):
+    @jwt_required()
+    @blp.response(200, UsersLoginsResponseSchema)
+    def get(self):
+        """Compact user_id → login mapping for any authenticated user."""
+        cnx = db.connect()
+        rows = db.run_query(cnx, "SELECT user_id, login FROM users ORDER BY user_id")
+        cnx.close()
+        users = [{"user_id": r[0], "login": r[1]} for r in (rows or [])]
+        return {"users": users}
+
+
+@blp.route("/users/<int:user_id>/password-reset-token")
+class UserPasswordResetTokenResource(MethodView):
+    @jwt_required()
+    @blp.response(200, PasswordResetTokenIssueResponseSchema)
+    def post(self, user_id):
+        """Issue a one-time password reset token for a user (administrators only)."""
+        if (_jwt_permissions_int() & 1) == 0:
+            abort(403, message="Administrator permission required (permissions bit 0).")
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT user_id FROM users WHERE user_id = %s", (user_id,))
+        if not row:
+            cnx.close()
+            abort(404, message="User not found")
+        db.run_query(
+            cnx,
+            "DELETE FROM password_reset_tokens WHERE user_id = %s AND consumed_at IS NULL",
+            (user_id,),
+        )
+        raw = secrets.token_urlsafe(32)
+        th = _password_reset_token_hash(raw)
+        expires_at = datetime.now(timezone.utc) + PASSWORD_RESET_TOKEN_TTL
+        db.run_query(
+            cnx,
+            """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
+               VALUES (%s, %s, %s)""",
+            (user_id, th, expires_at),
+        )
+        cnx.close()
+        actor = _jwt_user_id_int()
+        log_user_admin_action(
+            "api",
+            "users.password_reset_token_issue",
+            actor_user_id=actor,
+            target_user_id=user_id,
+            details={},
+        )
+        return {
+            "status": True,
+            "token": raw,
+            "expires_at": expires_at,
+            "user_id": user_id,
+            "msg": "Deliver this token to the user securely; it is not stored in plaintext.",
+        }
+
+
+@blp.route("/users")
+class UsersAdminListResource(MethodView):
+    @jwt_required()
+    @blp.response(200, UsersAdminListResponseSchema)
+    def get(self):
+        """Full user list without passwords; requires permissions bit 0 (administrator)."""
+        if (_jwt_permissions_int() & 1) == 0:
+            abort(403, message="Administrator permission required (permissions bit 0).")
+        log_user_admin_action(
+            "api",
+            "users.list_full",
+            actor_user_id=_jwt_user_id_int(),
+            target_user_id=None,
+            details={},
+        )
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            """SELECT user_id, login, firstname, lastname, share, phone, email, permissions,
+                      aavso_id, pass_d
+               FROM users ORDER BY user_id""",
+        )
+        cnx.close()
+        users = []
+        for r in rows or []:
+            uid, login, fn, ln, share, phone, email, perm, aavso, pass_d = r
+            users.append({
+                "user_id": uid,
+                "login": login,
+                "firstname": fn,
+                "lastname": ln,
+                "share": float(share) if share is not None else None,
+                "phone": phone,
+                "email": email,
+                "permissions": perm,
+                "aavso_id": aavso,
+                "login_enabled": bool(pass_d and str(pass_d).strip()),
+            })
+        return {"users": users}
 
 
 @blp.route("/task-add")

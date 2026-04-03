@@ -35,10 +35,6 @@ components:
           type: integer
         aavso_id:
           type: string
-        ftp_login:
-          type: string
-        ftp_pass:
-          type: string
         msg:
           type: string
     Task:
@@ -823,6 +819,136 @@ components:
         pages:
           type: integer
           description: Total number of pages
+    UserLoginMapEntry:
+      type: object
+      description: Compact user_id to login mapping for resolving task owners without repeating usernames in large task lists
+      properties:
+        user_id:
+          type: integer
+        login:
+          type: string
+          nullable: true
+          description: Login name (may be null for legacy rows)
+    UsersLoginsResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserLoginMapEntry'
+    UserAdminDetail:
+      type: object
+      description: Full user row without password fields; requires administrator permission (permissions bit 0)
+      properties:
+        user_id:
+          type: integer
+        login:
+          type: string
+          nullable: true
+        firstname:
+          type: string
+          nullable: true
+        lastname:
+          type: string
+          nullable: true
+        share:
+          type: number
+          format: float
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        email:
+          type: string
+          nullable: true
+        permissions:
+          type: integer
+        aavso_id:
+          type: string
+          nullable: true
+        login_enabled:
+          type: boolean
+          description: True if pass_d is set (user can authenticate)
+    UsersAdminListResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserAdminDetail'
+    PasswordResetComplete:
+      type: object
+      required:
+        - token
+        - new_password
+      properties:
+        token:
+          type: string
+          description: One-time token from administrator
+        new_password:
+          type: string
+          minLength: 8
+          description: New password (argon2id stored in pass_d)
+    StatusMsg:
+      type: object
+      properties:
+        status:
+          type: boolean
+        msg:
+          type: string
+    PasswordResetTokenIssue:
+      type: object
+      properties:
+        status:
+          type: boolean
+        token:
+          type: string
+          description: Plain token; deliver securely to the user; not stored in DB
+        expires_at:
+          type: string
+          format: date-time
+        user_id:
+          type: integer
+        msg:
+          type: string
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        channel:
+          type: string
+          description: api or cli
+        actor_user_id:
+          type: integer
+          nullable: true
+        action:
+          type: string
+        target_user_id:
+          type: integer
+          nullable: true
+        details:
+          type: object
+          nullable: true
+          additionalProperties: true
+    UsersAuditLogResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        pages:
+          type: integer
 paths:
   /api/version:
     get:
@@ -835,6 +961,137 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionResponse'
+  /api/auth/password-reset:
+    post:
+      summary: Complete password reset with admin-issued token
+      description: |
+        Sets pass_d from new_password using a one-time token returned by
+        POST /api/users/{user_id}/password-reset-token. Does not require authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetComplete'
+      responses:
+        '200':
+          description: Success or generic failure (same shape; check status field)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
+  /api/users/me:
+    get:
+      summary: Current user profile
+      description: Returns the authenticated user's profile (no password fields).
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAdminDetail'
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: User row missing
+      security:
+        - bearerAuth: []
+  /api/users/audit-log:
+    get:
+      summary: User administration audit log
+      description: |
+        Paginated audit entries (CLI and API user-admin actions). Administrators only (permissions bit 0).
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 500
+      responses:
+        '200':
+          description: Audit entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersAuditLogResponse'
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Not an administrator
+      security:
+        - bearerAuth: []
+  /api/users/logins:
+    get:
+      summary: User ID to login mapping
+      description: |
+        Returns all users as compact {user_id, login} pairs for resolving task user_id values
+        without embedding usernames in large task payloads. Available to any authenticated user.
+      responses:
+        '200':
+          description: Mapping of user IDs to logins
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersLoginsResponse'
+        '401':
+          description: Missing or invalid JWT
+      security:
+        - bearerAuth: []
+  /api/users/{user_id}/password-reset-token:
+    post:
+      summary: Issue password reset token
+      description: |
+        Creates a one-time token (valid 1 hour). The plaintext token is returned only in this response.
+        Administrators only (permissions bit 0).
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PasswordResetTokenIssue'
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Not an administrator
+        '404':
+          description: User not found
+      security:
+        - bearerAuth: []
+  /api/users:
+    get:
+      summary: List users (administrators)
+      description: |
+        Returns full user records except password fields (pass, pass_d). Requires JWT with
+        permissions bit 0 set (administrator).
+      responses:
+        '200':
+          description: Full user list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UsersAdminListResponse'
+        '401':
+          description: Missing or invalid JWT
+        '403':
+          description: Caller does not have administrator permission (bit 0)
+      security:
+        - bearerAuth: []
   /api/login:
     post:
       summary: Login endpoint
