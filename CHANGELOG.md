@@ -3,6 +3,13 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.5.0 (not released yet)
+ - API: /api/task-find-by-filename call to attempt to find a task by its
+   filename
+ - API: /api/tasks-filename-list paginated list of tasks with barebones
+   info (task id, filename)
+
+
 ## 0.4.0 (2026-03-21)
 
 - Projects support added

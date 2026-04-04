@@ -127,6 +127,16 @@ def _jwt_user_id_int():
         return None
 
 
+def _escape_sql_like_suffix_pattern(filename: str) -> str:
+    """Build LIKE pattern for paths ending with filename; escape %, _, \\ for ESCAPE E'\\\\'."""
+    escaped = (
+        filename.replace("\\", "\\\\")
+        .replace("%", "\\%")
+        .replace("_", "\\_")
+    )
+    return "%" + escaped
+
+
 class TaskAddRequestSchema(Schema):
     user_id = fields.Integer(
         required=True,
@@ -317,6 +327,48 @@ class TasksList(Schema):
     page = fields.Integer(required=True, metadata={"description": "Current page number"})
     per_page = fields.Integer(required=True, metadata={"description": "Items per page"})
     pages = fields.Integer(required=True, metadata={"description": "Total number of pages"})
+
+
+class TaskFindByFilenameQuerySchema(Schema):
+    filename = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=256),
+        metadata={"description": "Filename suffix to match against stored path (API name; DB column imagename)"},
+    )
+
+
+class TaskFindByFilenameMatchItem(Schema):
+    task_id = fields.Integer(required=True)
+    filename = fields.String(
+        allow_none=True,
+        metadata={"description": "Stored path (DB imagename)"},
+    )
+
+
+class TaskFindByFilenameResponseSchema(Schema):
+    found = fields.Boolean(required=True)
+    matches = fields.List(fields.Nested(TaskFindByFilenameMatchItem), required=True)
+
+
+class TasksFilenameListQuerySchema(Schema):
+    page = fields.Integer(missing=1, validate=validate.Range(min=1))
+    per_page = fields.Integer(
+        missing=2000,
+        validate=validate.Range(min=1, max=5000),
+        metadata={"description": "Rows per page (max 5000)"},
+    )
+
+
+class TasksFilenameListResponseSchema(Schema):
+    rows = fields.List(
+        fields.Tuple((fields.Integer(), fields.String(allow_none=True))),
+        required=True,
+        metadata={"description": "Compact [task_id, filename] rows"},
+    )
+    total = fields.Integer(required=True)
+    page = fields.Integer(required=True)
+    per_page = fields.Integer(required=True)
+    pages = fields.Integer(required=True)
 
 
 class VersionResponseSchema(Schema):
@@ -1279,6 +1331,54 @@ class TasksResource(MethodView):
             "page": page,
             "per_page": per_page,
             "pages": total_pages
+        }
+
+
+@blp.route("/task-find-by-filename")
+class TaskFindByFilenameResource(MethodView):
+    @jwt_required()
+    @blp.arguments(TaskFindByFilenameQuerySchema, location="query")
+    @blp.response(200, TaskFindByFilenameResponseSchema)
+    def get(self, args):
+        """Find tasks whose stored path (imagename) ends with the given filename string."""
+        pattern = _escape_sql_like_suffix_pattern(args["filename"])
+        query = (
+            "SELECT task_id, imagename FROM tasks WHERE imagename IS NOT NULL "
+            "AND imagename LIKE %s ESCAPE E'\\\\' ORDER BY task_id"
+        )
+        cnx = db.connect()
+        rows = db.run_query(cnx, query, (pattern,))
+        cnx.close()
+        matches = [{"task_id": r[0], "filename": r[1]} for r in (rows or [])]
+        return {"found": bool(matches), "matches": matches}
+
+
+@blp.route("/tasks-filename-list")
+class TasksFilenameListResource(MethodView):
+    @jwt_required()
+    @blp.arguments(TasksFilenameListQuerySchema, location="query")
+    @blp.response(200, TasksFilenameListResponseSchema)
+    def get(self, args):
+        """Paginated compact [task_id, filename] list for all tasks (filename maps from imagename)."""
+        page = args["page"]
+        per_page = args["per_page"]
+        offset = (page - 1) * per_page
+        cnx = db.connect()
+        total = db.run_query(cnx, "SELECT COUNT(*) FROM tasks")[0][0]
+        data_rows = db.run_query(
+            cnx,
+            "SELECT task_id, imagename FROM tasks ORDER BY task_id LIMIT %s OFFSET %s",
+            (per_page, offset),
+        )
+        cnx.close()
+        rows = [[r[0], r[1]] for r in (data_rows or [])]
+        total_pages = (total + per_page - 1) // per_page if per_page else 0
+        return {
+            "rows": rows,
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+            "pages": total_pages,
         }
 
 
