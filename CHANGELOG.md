@@ -4,6 +4,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## 0.5.0 (not released yet)
+ - CLI: User management implemented
+ - API: Argon2id password hashing implemented
  - API: /api/task-find-by-filename call to attempt to find a task by its
    filename
  - API: /api/tasks-filename-list paginated list of tasks with barebones
