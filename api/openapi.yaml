@@ -173,6 +173,67 @@ components:
         pages:
           type: integer
           description: Total number of pages
+    TaskFindByFilenameMatch:
+      type: object
+      required:
+        - task_id
+        - filename
+      properties:
+        task_id:
+          type: integer
+          description: Task ID
+        filename:
+          type: string
+          nullable: true
+          description: Stored file path (maps from DB column imagename)
+    TaskFindByFilenameResponse:
+      type: object
+      required:
+        - found
+        - matches
+      description: >
+        Lookup result. Additional top-level properties may be added in future API versions;
+        clients should ignore unknown fields.
+      properties:
+        found:
+          type: boolean
+          description: True if at least one task matched
+        matches:
+          type: array
+          description: >
+            Tasks whose stored path ends with the requested filename string (DB imagename).
+            Multiple rows are returned when more than one task shares the same suffix.
+          items:
+            $ref: '#/components/schemas/TaskFindByFilenameMatch'
+    TasksFilenameListResponse:
+      type: object
+      required:
+        - rows
+        - total
+        - page
+        - per_page
+        - pages
+      properties:
+        rows:
+          type: array
+          description: >
+            Compact rows as [task_id, filename]. filename is the stored path (DB imagename) and may be null.
+          items:
+            type: array
+            minItems: 2
+            maxItems: 2
+        total:
+          type: integer
+          description: Total number of tasks
+        page:
+          type: integer
+          description: Current page (1-based)
+        per_page:
+          type: integer
+          description: Rows in this page
+        pages:
+          type: integer
+          description: Total pages for the current per_page
     TaskGetResponse:
       type: object
       properties:
@@ -1447,6 +1508,64 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TasksList'
+      security:
+        - bearerAuth: []
+
+  /api/task-find-by-filename:
+    get:
+      summary: Find tasks by filename suffix
+      description: >
+        Returns tasks whose stored file path (DB imagename) ends with the given filename string.
+        For example, filename `omega-centauri.fits` matches `celestron/2025/08/omega-centauri.fits`.
+        SQL LIKE wildcards in the input are treated as literals.
+      parameters:
+        - name: filename
+          in: query
+          required: true
+          description: Filename or suffix to match (1–256 characters)
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 256
+      responses:
+        '200':
+          description: Lookup result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskFindByFilenameResponse'
+      security:
+        - bearerAuth: []
+
+  /api/tasks-filename-list:
+    get:
+      summary: List task id and filename for all tasks (compact, paginated)
+      description: >
+        Returns every task as a compact [task_id, filename] row. filename is the stored path (DB imagename)
+        and may be null. Ordered by task_id. Use pagination for large databases.
+      parameters:
+        - name: page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 2000
+            minimum: 1
+            maximum: 5000
+      responses:
+        '200':
+          description: Paginated compact rows
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasksFilenameListResponse'
       security:
         - bearerAuth: []
 

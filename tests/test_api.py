@@ -993,6 +993,142 @@ class TestTasks(unittest.TestCase):
         self.assertEqual(response.status_code, 401)  # Unauthorized
 
 
+class TestTaskFilenameEndpoints(unittest.TestCase):
+    def setUp(self):
+        self.app = app.test_client()
+        app.testing = True
+        with app.app_context():
+            self.test_token = create_access_token(
+                identity=1,
+                additional_claims={"permissions": 1, "username": "test_user"},
+            )
+            self.headers = {
+                "Authorization": f"Bearer {self.test_token}",
+                "Content-Type": "application/json",
+            }
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_task_find_by_filename_suffix_and_like_escaping(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.post(
+            "/api/task-add",
+            data=json.dumps(
+                {
+                    "user_id": 1,
+                    "scope_id": 1,
+                    "object": "M31",
+                    "ra": 0.712,
+                    "decl": 41.27,
+                    "exposure": 300.0,
+                    "state": 1,
+                }
+            ),
+            headers=self.headers,
+        )
+        task_id = json.loads(response.data)["task_id"]
+        cnx = db.connect()
+        path = "celestron/2025/08/omega-centauri.fits"
+        db.run_query(cnx, "UPDATE tasks SET imagename = %s WHERE task_id = %s", (path, task_id))
+        cnx.close()
+        r_weird = self.app.post(
+            "/api/task-add",
+            data=json.dumps(
+                {
+                    "user_id": 1,
+                    "scope_id": 1,
+                    "object": "WEIRD",
+                    "ra": 1.0,
+                    "decl": 1.0,
+                    "exposure": 1.0,
+                    "state": 1,
+                }
+            ),
+            headers=self.headers,
+        )
+        weird_id = json.loads(r_weird.data)["task_id"]
+        weird = "prefix/x%y_z.fits"
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE tasks SET imagename = %s WHERE task_id = %s", (weird, weird_id))
+        cnx.close()
+
+        r = self.app.get(
+            "/api/task-find-by-filename?filename=omega-centauri.fits",
+            headers=self.headers,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertTrue(data["found"])
+        self.assertEqual(len(data["matches"]), 1)
+        self.assertEqual(data["matches"][0]["task_id"], task_id)
+        self.assertEqual(data["matches"][0]["filename"], path)
+
+        r2 = self.app.get(
+            "/api/task-find-by-filename?filename=x%y_z.fits",
+            headers=self.headers,
+        )
+        self.assertEqual(r2.status_code, 200)
+        d2 = json.loads(r2.data)
+        self.assertTrue(d2["found"])
+        self.assertEqual(len(d2["matches"]), 1)
+        self.assertEqual(d2["matches"][0]["filename"], weird)
+
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_tasks_filename_list_compact_and_paging(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.post(
+            "/api/task-add",
+            data=json.dumps(
+                {
+                    "user_id": 1,
+                    "scope_id": 1,
+                    "object": "M31",
+                    "ra": 0.712,
+                    "decl": 41.27,
+                    "exposure": 300.0,
+                    "state": 1,
+                }
+            ),
+            headers=self.headers,
+        )
+        task_id = json.loads(response.data)["task_id"]
+        cnx = db.connect()
+        db.run_query(
+            cnx,
+            "UPDATE tasks SET imagename = %s WHERE task_id = %s",
+            ("only-one.fits", task_id),
+        )
+        cnx.close()
+
+        r = self.app.get(
+            "/api/tasks-filename-list?page=1&per_page=10",
+            headers=self.headers,
+        )
+        self.assertEqual(r.status_code, 200)
+        data = json.loads(r.data)
+        self.assertIn("rows", data)
+        self.assertEqual(data["page"], 1)
+        self.assertEqual(data["per_page"], 10)
+        self.assertGreaterEqual(data["total"], 1)
+        self.assertGreaterEqual(data["pages"], 1)
+        pair = next((row for row in data["rows"] if row[0] == task_id), None)
+        self.assertIsNotNone(pair)
+        self.assertEqual(len(pair), 2)
+        self.assertEqual(pair[0], task_id)
+        self.assertEqual(pair[1], "only-one.fits")
+
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    def test_task_find_by_filename_requires_auth(self):
+        r = self.app.get("/api/task-find-by-filename?filename=x.fits")
+        self.assertEqual(r.status_code, 401)
+
+    def test_tasks_filename_list_requires_auth(self):
+        r = self.app.get("/api/tasks-filename-list")
+        self.assertEqual(r.status_code, 401)
+
+
 class TestScopes(unittest.TestCase):
     def setUp(self):
         """Set up test client before each test"""
