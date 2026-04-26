@@ -593,6 +593,7 @@ class ProjectSubframeSchema(Schema):
     filter_id = fields.Integer()
     filter = fields.Nested(FilterSchema, allow_none=True)
     exposure_time = fields.Float()
+    count = fields.Integer()
     goal_count = fields.Integer()
     active = fields.Boolean()
 
@@ -601,6 +602,7 @@ class ProjectSchema(Schema):
     project_id = fields.Integer()
     name = fields.String()
     description = fields.String()
+    regexps = fields.String(allow_none=True)
     scope_id = fields.Integer()
     ra = fields.Float()
     decl = fields.Float()
@@ -613,6 +615,7 @@ class ProjectCreateSchema(Schema):
     name = fields.String(required=True)
     scope_id = fields.Integer(required=True)
     description = fields.String(load_default="")
+    regexps = fields.String(load_default=None)
     ra = fields.Float(load_default=None)
     decl = fields.Float(load_default=None)
     active = fields.Boolean(load_default=True)
@@ -621,6 +624,7 @@ class ProjectCreateSchema(Schema):
 class ProjectUpdateSchema(Schema):
     name = fields.String()
     description = fields.String()
+    regexps = fields.String(allow_none=True)
     scope_id = fields.Integer()
     ra = fields.Float()
     decl = fields.Float()
@@ -631,6 +635,7 @@ class ProjectSubframeCreateSchema(Schema):
     filter = fields.String(load_default=None)  # short name; mutually exclusive with filter_id
     filter_id = fields.Integer(load_default=None)
     exposure_time = fields.Float(required=True)
+    count = fields.Integer(load_default=None)
     goal_count = fields.Integer(load_default=None)
     active = fields.Boolean(load_default=True)
 
@@ -639,6 +644,7 @@ class ProjectSubframeUpdateSchema(Schema):
     filter = fields.String(load_default=None)  # short name; mutually exclusive with filter_id
     filter_id = fields.Integer(load_default=None)
     exposure_time = fields.Float()
+    count = fields.Integer()
     goal_count = fields.Integer()
     active = fields.Boolean()
 
@@ -2214,11 +2220,20 @@ class SensorDetailResource(MethodView):
 
 
 def _project_row_to_dict(r, subframes=None, user_ids=None):
-    """Build project dict from projects row (project_id, name, description, scope_id, ra, decl, active)."""
+    """Build project dict from projects row (project_id, name, description, regexps, scope_id, ra, decl, active)."""
     return {
-        "project_id": r[0], "name": r[1], "description": r[2], "scope_id": r[3], "ra": r[4], "decl": r[5], "active": r[6],
+        "project_id": r[0], "name": r[1], "description": r[2], "regexps": r[3], "scope_id": r[4], "ra": r[5], "decl": r[6], "active": r[7],
         "subframes": subframes or [], "user_ids": user_ids or []
     }
+
+
+def _project_subframe_count(goal_count, count):
+    """Prefer explicit count; otherwise keep backward-compatible goal_count value; default 0."""
+    if count is not None:
+        return int(count)
+    if goal_count is not None:
+        return int(goal_count)
+    return 0
 
 
 @blp.route("/projects")
@@ -2235,7 +2250,7 @@ class ProjectsResource(MethodView):
         cnx = db.connect()
         if user_id is not None:
             count_q = "SELECT COUNT(*) FROM projects p JOIN project_users pu ON p.project_id = pu.project_id WHERE pu.user_id = %s"
-            list_q = """SELECT p.project_id, p.name, p.description, p.scope_id, p.ra, p.decl, p.active
+            list_q = """SELECT p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active
                        FROM projects p JOIN project_users pu ON p.project_id = pu.project_id
                        WHERE pu.user_id = %s"""
             count_params, list_params = [user_id], [user_id]
@@ -2252,20 +2267,20 @@ class ProjectsResource(MethodView):
         else:
             if scope_id is not None:
                 count_q = "SELECT COUNT(*) FROM projects WHERE scope_id = %s"
-                list_q = """SELECT project_id, name, description, scope_id, ra, decl, active FROM projects
+                list_q = """SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects
                             WHERE scope_id = %s ORDER BY project_id LIMIT %s OFFSET %s"""
                 total = db.run_query(cnx, count_q, (scope_id,))[0][0]
                 rows = db.run_query(cnx, list_q, (scope_id, per_page, offset))
             else:
                 count_q = "SELECT COUNT(*) FROM projects"
-                list_q = "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
+                list_q = "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
                 total = db.run_query(cnx, count_q)[0][0]
                 rows = db.run_query(cnx, list_q, (per_page, offset))
         projects = []
         for r in (rows or []):
-            pid, name, descr, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6]
+            pid, name, descr, regexps, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]
             sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                       ps.exposure_time, ps.goal_count, ps.active
+                       ps.exposure_time, ps.goal_count, ps.count, ps.active
                        FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                        WHERE ps.project_id = %s"""
             sub_rows = db.run_query(cnx, sub_q, (pid,))
@@ -2275,13 +2290,13 @@ class ProjectsResource(MethodView):
                 {
                     "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                     "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                    "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]
+                    "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]
                 }
                 for sr in (sub_rows or [])
             ]
             user_ids = [ur[0] for ur in (user_rows or [])]
             projects.append({
-                "project_id": pid, "name": name, "description": descr, "scope_id": scope_id, "ra": ra, "decl": decl, "active": active,
+                "project_id": pid, "name": name, "description": descr, "regexps": regexps, "scope_id": scope_id, "ra": ra, "decl": decl, "active": active,
                 "subframes": subframes, "user_ids": user_ids
             })
         cnx.close()
@@ -2296,6 +2311,7 @@ class ProjectsResource(MethodView):
         name = body["name"]
         scope_id = body["scope_id"]
         description = body.get("description") or ""
+        regexps = body.get("regexps")
         ra = body.get("ra")
         decl = body.get("decl")
         active = body.get("active", True)
@@ -2310,16 +2326,16 @@ class ProjectsResource(MethodView):
         if not scope_exists:
             cnx.close()
             abort(400, message="Invalid scope_id: telescope not found.")
-        db.run_query(cnx, "INSERT INTO projects (name, description, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s)",
-                     (name, description, scope_id, ra, decl, active))
-        row = db.run_query(cnx, """SELECT project_id, name, description, scope_id, ra, decl, active
+        db.run_query(cnx, "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                     (name, description, regexps, scope_id, ra, decl, active))
+        row = db.run_query(cnx, """SELECT project_id, name, description, regexps, scope_id, ra, decl, active
                                    FROM projects
                                    WHERE name=%s AND scope_id=%s
                                    ORDER BY project_id DESC LIMIT 1""",
                            (name, scope_id))
         project_id = row[0][0]
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.active
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active
                    FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                    WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
@@ -2327,7 +2343,7 @@ class ProjectsResource(MethodView):
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]}
+             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]}
             for sr in (sub_rows or [])
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
@@ -2342,13 +2358,13 @@ class ProjectDetailResource(MethodView):
     def get(self, project_id):
         """Get single project with subframes and user IDs"""
         cnx = db.connect()
-        row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        row = db.run_query(cnx, "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
         if not row:
             cnx.close()
             return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
         r = row[0]
         sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
         sub_rows = db.run_query(cnx, sub_q, (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
@@ -2356,7 +2372,7 @@ class ProjectDetailResource(MethodView):
             {
                 "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                 "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]
+                "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]
             }
             for sr in (sub_rows or [])
         ]
@@ -2376,23 +2392,23 @@ class ProjectDetailResource(MethodView):
             abort(404, message=f"Project {project_id} not found")
         updates = []
         args = []
-        for key in ("name", "description", "scope_id", "ra", "decl", "active"):
+        for key in ("name", "description", "regexps", "scope_id", "ra", "decl", "active"):
             if key in body and body[key] is not None:
                 updates.append(f"{key} = %s")
                 args.append(body[key])
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
-        row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        row = db.run_query(cnx, "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.active
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active
                    FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "active": sr[10]}
+             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]}
             for sr in (sub_rows or [])
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
@@ -2434,10 +2450,18 @@ class ProjectSubframesResource(MethodView):
             cnx.close()
             abort(400, message=err)
         exposure_time = body["exposure_time"]
+        count = body.get("count")
         goal_count = body.get("goal_count")
+        if count is None and goal_count is None:
+            count = 0
+            goal_count = 0
+        elif count is None:
+            count = goal_count
+        elif goal_count is None:
+            goal_count = count
         active = body.get("active", True)
-        db.run_query(cnx, "INSERT INTO project_subframes (project_id, filter_id, exposure_time, goal_count, active) VALUES (%s, %s, %s, %s, %s)",
-                     (project_id, filter_id, exposure_time, goal_count, active))
+        db.run_query(cnx, "INSERT INTO project_subframes (project_id, filter_id, exposure_time, goal_count, count, active) VALUES (%s, %s, %s, %s, %s, %s)",
+                     (project_id, filter_id, exposure_time, goal_count, count, active))
         row = db.run_query(cnx, "SELECT id FROM project_subframes WHERE project_id = %s ORDER BY id DESC LIMIT 1", (project_id,))
         subframe_id = row[0][0]
         cnx.close()
@@ -2469,8 +2493,14 @@ class ProjectSubframeDetailResource(MethodView):
             filter_id = body["filter_id"]
         updates = []
         args = []
-        for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")), ("goal_count", body.get("goal_count")),
-                         ("active", body.get("active"))]:
+        count = body.get("count")
+        goal_count = body.get("goal_count")
+        if count is not None and goal_count is None:
+            goal_count = count
+        if goal_count is not None and count is None:
+            count = goal_count
+        for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")),
+                         ("goal_count", goal_count), ("count", count), ("active", body.get("active"))]:
             if val is not None:
                 updates.append(f"{key} = %s")
                 args.append(val)

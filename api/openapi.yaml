@@ -487,6 +487,9 @@ components:
         exposure_time:
           type: number
           format: float
+        count:
+          type: integer
+          description: Number of captured subframes (optional; defaults to 0)
         goal_count:
           type: integer
           description: Target number of subframes
@@ -496,7 +499,7 @@ components:
       type: object
       required:
         - exposure_time
-      description: Specify exactly one of filter (short name) or filter_id; not both.
+      description: Specify exactly one of filter (short name) or filter_id; not both. count and goal_count are aliases.
       properties:
         filter:
           type: string
@@ -507,14 +510,18 @@ components:
         exposure_time:
           type: number
           format: float
+        count:
+          type: integer
+          description: Optional alias for goal_count; defaults to 0 when omitted with goal_count
         goal_count:
           type: integer
+          description: Optional alias for count; defaults to 0 when omitted with count
         active:
           type: boolean
           default: true
     ProjectSubframeUpdate:
       type: object
-      description: filter and filter_id are mutually exclusive.
+      description: filter and filter_id are mutually exclusive. count and goal_count are aliases.
       properties:
         filter:
           type: string
@@ -525,8 +532,12 @@ components:
         exposure_time:
           type: number
           format: float
+        count:
+          type: integer
+          description: Optional alias for goal_count
         goal_count:
           type: integer
+          description: Optional alias for count
         active:
           type: boolean
     Project:
@@ -538,6 +549,10 @@ components:
           type: string
         description:
           type: string
+        regexps:
+          type: string
+          nullable: true
+          description: Optional regexp patterns for project matching
         scope_id:
           type: integer
           description: Telescope (scope) ID for this project
@@ -572,6 +587,10 @@ components:
           description: Telescope (scope) ID for this project
         description:
           type: string
+        regexps:
+          type: string
+          nullable: true
+          description: Optional regexp patterns for project matching
         ra:
           type: number
           format: float
@@ -590,6 +609,10 @@ components:
           type: string
         description:
           type: string
+        regexps:
+          type: string
+          nullable: true
+          description: Optional regexp patterns for project matching
         scope_id:
           type: integer
         ra:
@@ -1299,6 +1322,38 @@ paths:
                   items:
                     type: integer
                   description: Project IDs this task belongs to (optional; default none)
+            examples:
+              basic:
+                summary: Basic new task
+                value:
+                  user_id: 1
+                  scope_id: 1
+                  object: M31
+                  ra: 0.712
+                  decl: 41.27
+                  exposure: 300
+                  state: 1
+              done_with_filename:
+                summary: Create task directly in DONE state
+                value:
+                  user_id: 1
+                  scope_id: 1
+                  object: M31
+                  ra: 0.712
+                  decl: 41.27
+                  state: 6
+                  imagename: celestron/2026/04/m31.fits
+              aliases_project_and_filter:
+                summary: Use project_id and filter_id aliases (scope inferred from project)
+                value:
+                  user_id: 1
+                  project_id: 42
+                  filter_id: 3
+                  object: M31
+                  ra: 0.712
+                  decl: 41.27
+                  state: 6
+                  imagename: celestron/2026/04/m31.fits
       responses:
         '200':
           description: Task creation response
@@ -1715,6 +1770,27 @@ paths:
                   items:
                     type: integer
                   description: Project IDs this task belongs to (replaces current list when provided)
+            examples:
+              partial_update:
+                summary: Simple partial update
+                value:
+                  task_id: 123
+                  exposure: 600
+                  object: M33
+              mark_done_with_filename:
+                summary: Mark existing task DONE and set filename
+                value:
+                  task_id: 123
+                  state: 6
+                  imagename: celestron/2026/04/m33.fits
+              aliases_project_and_filter:
+                summary: Use project_id and filter_id aliases
+                value:
+                  task_id: 123
+                  project_id: 42
+                  filter_id: 3
+                  state: 6
+                  imagename: celestron/2026/04/m33.fits
       responses:
         '200':
           description: Task update response

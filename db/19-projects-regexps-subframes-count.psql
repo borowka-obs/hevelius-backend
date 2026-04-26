@@ -1,0 +1,14 @@
+-- Schema version 19: add optional projects.regexps and project_subframes.count
+
+ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS regexps varchar(1024) DEFAULT NULL;
+
+ALTER TABLE project_subframes
+  ADD COLUMN IF NOT EXISTS count integer NOT NULL DEFAULT 0;
+
+-- Backfill count from legacy goal_count when present.
+UPDATE project_subframes
+SET count = COALESCE(goal_count, 0)
+WHERE count = 0;
+
+UPDATE schema_version SET version = 19;

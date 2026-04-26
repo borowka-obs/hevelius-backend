@@ -13,6 +13,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
  - API: /api/task-add can now take optional parameters: project-id, filter-id.
    task can be in DONE state, possible to specify a filename.
  - API: /api/task-update supports project_id alias, filter_id, imagename
+ - API: Projects now support optional `regexps`; subframes support optional `count`
+   (backward-compatible with `goal_count`, defaults to 0 when omitted).
+ - DB: Schema bumped to 19: added `projects.regexps` and `project_subframes.count`.
 
 ## 0.4.0 (2026-03-21)
 
