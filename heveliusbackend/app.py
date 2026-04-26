@@ -2364,7 +2364,8 @@ class ProjectDetailResource(MethodView):
             return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
         r = row[0]
         sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s"""
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                   WHERE ps.project_id = %s"""
         sub_rows = db.run_query(cnx, sub_q, (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
