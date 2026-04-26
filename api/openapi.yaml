@@ -1192,7 +1192,6 @@ paths:
               type: object
               required:
                 - user_id
-                - scope_id
                 - ra
                 - decl
               properties:
@@ -1201,7 +1200,7 @@ paths:
                   description: User ID
                 scope_id:
                   type: integer
-                  description: Scope ID
+                  description: Scope ID (optional if project_id is provided)
                 object:
                   type: string
                   maxLength: 64
@@ -1283,9 +1282,18 @@ paths:
                   description: Maximum sun altitude
                 state:
                   type: integer
-                  description: Task state (0 - disabled, 1 - new)
-                  enum: [0, 1]
+                  description: Task state (0 - disabled, 1 - new, 6 - done; if 6 then imagename is required)
+                  enum: [0, 1, 6]
                   default: 1
+                imagename:
+                  type: string
+                  description: Image filename (required when state=6)
+                filter_id:
+                  type: integer
+                  description: Filter ID (optional alias for filter short_name; mutually exclusive with filter)
+                project_id:
+                  type: integer
+                  description: Single project ID alias (mutually exclusive with project_ids)
                 project_ids:
                   type: array
                   items:
@@ -1689,6 +1697,19 @@ paths:
                 max_sun_alt:
                   type: integer
                   description: Maximum sun altitude
+                state:
+                  type: integer
+                  description: Task state (0 - disabled, 1 - new, 6 - done; if resulting state is 6 then imagename must be present)
+                  enum: [0, 1, 6]
+                imagename:
+                  type: string
+                  description: Image filename
+                filter_id:
+                  type: integer
+                  description: Filter ID (optional alias for filter short_name; mutually exclusive with filter)
+                project_id:
+                  type: integer
+                  description: Single project ID alias (mutually exclusive with project_ids)
                 project_ids:
                   type: array
                   items:
