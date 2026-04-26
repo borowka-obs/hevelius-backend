@@ -179,6 +179,54 @@ class TestTaskAdd(unittest.TestCase):
         self.assertFalse(data['status'])
         self.assertEqual(data['msg'], 'Unauthorized: token user_id does not match request user_id')
 
+    def test_task_add_done_requires_imagename(self):
+        """State=6 requires imagename on add."""
+        test_task = {
+            "user_id": 1,
+            "scope_id": 1,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "state": 6
+        }
+        response = self.app.post('/api/task-add', data=json.dumps(test_task), headers=self.headers)
+        self.assertEqual(response.status_code, 422)
+
+    @use_repository
+    def test_task_add_accepts_project_filter_aliases(self, config):
+        """task-add accepts project_id/filter_id aliases and infers scope_id from project."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        db.run_query(cnx, "INSERT INTO filters (filter_id, short_name, full_name, active) VALUES (901, 'FX', 'Filter X', true)")
+        db.run_query(cnx, "INSERT INTO projects (project_id, name, scope_id, active) VALUES (901, 'Project X', 1, true)")
+        cnx.close()
+
+        test_task = {
+            "user_id": 1,
+            "project_id": 901,
+            "filter_id": 901,
+            "object": "M31",
+            "ra": 0.712,
+            "decl": 41.27,
+            "state": 6,
+            "imagename": "m31.fits"
+        }
+        response = self.app.post('/api/task-add', data=json.dumps(test_task), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        task_id = data['task_id']
+
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT scope_id, filter, imagename FROM tasks WHERE task_id = %s", (task_id,))[0]
+        links = db.run_query(cnx, "SELECT project_id FROM task_projects WHERE task_id = %s", (task_id,))
+        cnx.close()
+        self.assertEqual(row[0], 1)
+        self.assertEqual(row[1], "FX")
+        self.assertEqual(row[2], "m31.fits")
+        self.assertEqual([r[0] for r in links], [901])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestVersion(unittest.TestCase):
     def setUp(self):
@@ -468,6 +516,59 @@ class TestTaskUpdate(unittest.TestCase):
         self.assertFalse(data['status'])
         self.assertIn('unauthorized', data['msg'].lower())
 
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_task_update_done_requires_imagename(self, config):
+        """Changing state to done requires imagename if task has none."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.post('/api/task-add', data=json.dumps({
+            "user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27
+        }), headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+        response = self.app.post('/api/task-update', data=json.dumps({
+            "task_id": task_id, "state": 6
+        }), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(data['status'])
+        self.assertIn('imagename is required', data['msg'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_task_update_accepts_project_filter_aliases(self, config):
+        """task-update accepts project_id/filter_id aliases and updates scope/filter/imagename."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        create_resp = self.app.post('/api/task-add', data=json.dumps({
+            "user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27
+        }), headers=self.headers)
+        task_id = json.loads(create_resp.data)['task_id']
+
+        cnx = db.connect()
+        db.run_query(cnx, "INSERT INTO filters (filter_id, short_name, full_name, active) VALUES (902, 'FY', 'Filter Y', true)")
+        db.run_query(cnx, "INSERT INTO projects (project_id, name, scope_id, active) VALUES (902, 'Project Y', 2, true)")
+        cnx.close()
+
+        response = self.app.post('/api/task-update', data=json.dumps({
+            "task_id": task_id,
+            "project_id": 902,
+            "filter_id": 902,
+            "state": 6,
+            "imagename": "done.fits"
+        }), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT scope_id, filter, state, imagename FROM tasks WHERE task_id = %s", (task_id,))[0]
+        links = db.run_query(cnx, "SELECT project_id FROM task_projects WHERE task_id = %s", (task_id,))
+        cnx.close()
+        self.assertEqual(row[0], 2)
+        self.assertEqual(row[1], "FY")
+        self.assertEqual(row[2], 6)
+        self.assertEqual(row[3], "done.fits")
+        self.assertEqual([r[0] for r in links], [902])
         os.environ.pop('HEVELIUS_DB_NAME')
 
 

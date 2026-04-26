@@ -1,4 +1,4 @@
-# Changelog
+# Hevelius Backend Changelog
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -10,7 +10,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
    filename
  - API: /api/tasks-filename-list paginated list of tasks with barebones
    info (task id, filename)
-
+ - API: /api/task-add can now take optional parameters: project-id, filter-id.
+   task can be in DONE state, possible to specify a filename.
+ - API: /api/task-update supports project_id alias, filter_id, imagename
 
 ## 0.4.0 (2026-03-21)
 

@@ -15,7 +15,7 @@ from flask_smorest import Api, Blueprint, abort
 import yaml
 import json
 import plotly
-from marshmallow import Schema, fields, ValidationError, validate
+from marshmallow import Schema, fields, ValidationError, validate, validates_schema
 from flask.views import MethodView
 from datetime import datetime, timedelta, timezone
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
@@ -143,13 +143,12 @@ class TaskAddRequestSchema(Schema):
         metadata={"description": "User ID"}
     )
     scope_id = fields.Integer(
-        required=True,
         metadata={"description": "Scope ID"}
     )
     state = fields.Integer(
-        validate=validate.OneOf([0, 1], error="State must be either 0 or 1"),
+        validate=validate.OneOf([0, 1, 6], error="State must be one of 0, 1, or 6"),
         load_default=1,  # Default to 1 if not specified
-        metadata={"description": "Task state (0 - disabled, 1 - new)"}
+        metadata={"description": "Task state (0 - disabled, 1 - new, 6 - done)"}
     )
     object = fields.String(
         validate=validate.Length(min=1, max=64, error="Object name must be 64 characters or less"),
@@ -223,11 +222,29 @@ class TaskAddRequestSchema(Schema):
     max_sun_alt = fields.Integer(
         metadata={"description": "Maximum sun altitude"}
     )
+    imagename = fields.String(
+        metadata={"description": "Image filename"}
+    )
+    filter_id = fields.Integer(
+        metadata={"description": "Filter ID (resolved to filter short_name)"}
+    )
+    project_id = fields.Integer(
+        metadata={"description": "Single project ID alias"}
+    )
     project_ids = fields.List(
         fields.Integer(),
         load_default=lambda: [],
         metadata={"description": "Project IDs this task belongs to (default: none)"}
     )
+
+    @validates_schema
+    def validate_cross_fields(self, data, **kwargs):
+        if data.get("filter") and data.get("filter_id") is not None:
+            raise ValidationError("Provide either filter or filter_id, not both", field_name="filter_id")
+        if data.get("project_id") is not None and data.get("project_ids"):
+            raise ValidationError("Provide either project_id or project_ids, not both", field_name="project_id")
+        if data.get("state") == 6 and not data.get("imagename"):
+            raise ValidationError("imagename is required when state is 6 (done)", field_name="imagename")
 
 
 class TaskAddResponseSchema(Schema):
@@ -424,10 +441,24 @@ class TaskUpdateRequestSchema(Schema):
     comment = fields.String(metadata={"description": "Comment"})
     max_moon_phase = fields.Integer(metadata={"description": "Maximum moon phase"})
     max_sun_alt = fields.Integer(metadata={"description": "Maximum sun altitude"})
+    state = fields.Integer(
+        validate=validate.OneOf([0, 1, 6], error="State must be one of 0, 1, or 6"),
+        metadata={"description": "Task state (0 - disabled, 1 - new, 6 - done)"}
+    )
+    imagename = fields.String(metadata={"description": "Image filename"})
+    filter_id = fields.Integer(metadata={"description": "Filter ID (resolved to filter short_name)"})
+    project_id = fields.Integer(metadata={"description": "Single project ID alias"})
     project_ids = fields.List(
         fields.Integer(),
         metadata={"description": "Project IDs this task belongs to (replaces current list when provided)"}
     )
+
+    @validates_schema
+    def validate_cross_fields(self, data, **kwargs):
+        if data.get("filter") and data.get("filter_id") is not None:
+            raise ValidationError("Provide either filter or filter_id, not both", field_name="filter_id")
+        if data.get("project_id") is not None and data.get("project_ids"):
+            raise ValidationError("Provide either project_id or project_ids, not both", field_name="project_id")
 
 
 class TaskUpdateResponseSchema(Schema):
@@ -1105,8 +1136,36 @@ class TaskAddResource(MethodView):
                 'msg': 'Unauthorized: token user_id does not match request user_id'
             }
 
-        # Prepare fields for SQL query (project_ids is not a tasks column; handled separately)
+        # Prepare fields for SQL query (project ids are handled via task_projects table)
         project_ids = task_data.pop('project_ids', None) or []
+        project_id = task_data.pop('project_id', None)
+        filter_id = task_data.pop('filter_id', None)
+        if project_id is not None:
+            project_ids.append(project_id)
+
+        cnx = db.connect()
+        if filter_id is not None:
+            frow = db.run_query(cnx, "SELECT short_name FROM filters WHERE filter_id = %s", (filter_id,))
+            if not frow:
+                cnx.close()
+                return {'status': False, 'msg': f'Filter {filter_id} not found'}
+            task_data['filter'] = frow[0][0]
+
+        if task_data.get('scope_id') is None and project_id is not None:
+            prow = db.run_query(cnx, "SELECT scope_id FROM projects WHERE project_id = %s", (project_id,))
+            if not prow:
+                cnx.close()
+                return {'status': False, 'msg': f'Project {project_id} not found'}
+            task_data['scope_id'] = prow[0][0]
+
+        if task_data.get('scope_id') is None:
+            cnx.close()
+            return {'status': False, 'msg': 'scope_id is required unless project_id is provided'}
+
+        if task_data.get('state') == 6 and not task_data.get('imagename'):
+            cnx.close()
+            return {'status': False, 'msg': 'imagename is required when state is 6 (done)'}
+
         insert_fields = []
         values = []
         for key, value in task_data.items():
@@ -1126,6 +1185,7 @@ class TaskAddResource(MethodView):
         try:
             cfg = hevelius_config.config_db_get()
 
+            cnx.close()
             cnx = db.connect(cfg)
             result = db.run_query(cnx, query, values)
             if result is None:
@@ -1483,9 +1543,13 @@ class TaskUpdateResource(MethodView):
         current_user_id = get_jwt_identity()
         task_id = task_data.pop('task_id')  # Remove task_id from update fields
         project_ids = task_data.pop('project_ids', None)  # Not a tasks column; handled below
+        project_id = task_data.pop('project_id', None)
+        filter_id = task_data.pop('filter_id', None)
+        if project_id is not None:
+            project_ids = [project_id]
 
-        # First check if the task exists and get its user_id
-        query = "SELECT user_id FROM tasks WHERE task_id = %s"
+        # First check if the task exists and get current values needed for validation
+        query = "SELECT user_id, scope_id, state, imagename FROM tasks WHERE task_id = %s"
 
         cnx = db.connect()
         result = db.run_query(cnx, query, (task_id,))
@@ -1493,10 +1557,30 @@ class TaskUpdateResource(MethodView):
             cnx.close()
             return {'status': False, 'msg': f'Task {task_id} not found'}
 
-        task_user_id = result[0][0]
+        task_user_id, _existing_scope_id, existing_state, existing_imagename = result[0]
         if task_user_id != current_user_id:
             cnx.close()
             return {'status': False, 'msg': 'Unauthorized: you can only update your own tasks'}
+
+        if filter_id is not None:
+            frow = db.run_query(cnx, "SELECT short_name FROM filters WHERE filter_id = %s", (filter_id,))
+            if not frow:
+                cnx.close()
+                return {'status': False, 'msg': f'Filter {filter_id} not found'}
+            task_data['filter'] = frow[0][0]
+
+        if task_data.get('scope_id') is None and project_id is not None:
+            prow = db.run_query(cnx, "SELECT scope_id FROM projects WHERE project_id = %s", (project_id,))
+            if not prow:
+                cnx.close()
+                return {'status': False, 'msg': f'Project {project_id} not found'}
+            task_data['scope_id'] = prow[0][0]
+
+        resulting_state = task_data.get('state', existing_state)
+        resulting_imagename = task_data.get('imagename', existing_imagename)
+        if resulting_state == 6 and not resulting_imagename:
+            cnx.close()
+            return {'status': False, 'msg': 'imagename is required when state is 6 (done)'}
 
         # Prepare fields for SQL query (only tasks table columns)
         update_parts = []
