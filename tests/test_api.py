@@ -1768,7 +1768,7 @@ class TestProjectOperations(unittest.TestCase):
     def test_project_create_with_ra_dec(self, config):
         """Create project with name, scope_id, ra, dec."""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
-        body = {"name": "Test Project", "scope_id": 1, "ra": 0.5, "decl": 25.0, "description": "Desc"}
+        body = {"name": "Test Project", "scope_id": 1, "ra": 0.5, "decl": 25.0, "description": "Desc", "regexps": "^M31$"}
         response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 201)
@@ -1778,6 +1778,7 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(data['project']['scope_id'], 1)
         self.assertEqual(data['project']['ra'], 0.5)
         self.assertEqual(data['project']['decl'], 25.0)
+        self.assertEqual(data['project']['regexps'], '^M31$')
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
@@ -1829,6 +1830,45 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertTrue(data['status'])
         self.assertIn('subframe_id', data)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_add_defaults_count_to_zero(self, config):
+        """Subframe count defaults to 0 when neither count nor goal_count is provided."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter_id": 1, "exposure_time": 60.0, "active": True}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        subframe_id = json.loads(response.data)['subframe_id']
+
+        get_resp = self.app.get('/api/projects/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        sf = next(s for s in get_data['project']['subframes'] if s['id'] == subframe_id)
+        self.assertEqual(sf['count'], 0)
+        self.assertEqual(sf['goal_count'], 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_count_alias_is_backward_compatible(self, config):
+        """count alias updates both count and goal_count values."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"filter_id": 1, "exposure_time": 60.0, "count": 7, "active": True}
+        response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        subframe_id = json.loads(response.data)['subframe_id']
+
+        patch_resp = self.app.patch(
+            f'/api/projects/1/subframes/{subframe_id}',
+            data=json.dumps({"count": 9}),
+            headers=self.headers
+        )
+        self.assertEqual(patch_resp.status_code, 200)
+
+        get_resp = self.app.get('/api/projects/1', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        sf = next(s for s in get_data['project']['subframes'] if s['id'] == subframe_id)
+        self.assertEqual(sf['count'], 9)
+        self.assertEqual(sf['goal_count'], 9)
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
