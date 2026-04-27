@@ -3,19 +3,23 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.5.0 (not released yet)
- - CLI: User management implemented
- - API: Argon2id password hashing implemented
- - API: /api/task-find-by-filename call to attempt to find a task by its
-   filename
- - API: /api/tasks-filename-list paginated list of tasks with barebones
-   info (task id, filename)
- - API: /api/task-add can now take optional parameters: project-id, filter-id.
-   task can be in DONE state, possible to specify a filename.
- - API: /api/task-update supports project_id alias, filter_id, imagename
- - API: Projects now support optional `regexps`; subframes support optional `count`
-   (backward-compatible with `goal_count`, defaults to 0 when omitted).
- - DB: Schema bumped to 19: added `projects.regexps` and `project_subframes.count`.
+## 0.5.0 (2026-04-27)
+
+- CLI: User management implemented
+- API: Argon2id password hashing implemented
+- API: /api/task-find-by-filename call to attempt to find a task by its
+  filename
+- API: /api/tasks-filename-list paginated list of tasks with barebones
+  info (task id, filename)
+- API: /api/task-add can now take optional parameters: project-id, filter-id.
+  task can be in DONE state, possible to specify a filename.
+- API: /api/task-update supports project_id alias, filter_id, imagename
+- API: Projects now support optional `regexps`; subframes support optional `count`
+  (backward-compatible with `goal_count`, defaults to 0 when omitted).
+- DB: Schema bumped to 19: added `projects.regexps` and `project_subframes.count`.
+- DB: New catalogs available:
+  - Gum (diffuse southern H-alpha nebulae)
+  - RCW (H-alpha emission regions)
 
 ## 0.4.0 (2026-03-21)
 
@@ -61,7 +65,7 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
     active (default true). Many-to-many with telescopes via telescope_filters.
   - sensors: Extended with vendor, url, active (default true). Telescope uses at most one camera;
     same camera can be used on multiple telescopes.
-  - projects: name, description, ra, decl, scope_id; project_subframes 
+  - projects: name, description, ra, decl, scope_id; project_subframes
     (filter, exposure_time, goal_count, active);
     project_users (many-to-many); task_projects (task ↔ project many-to-many).
 - API: fixed catalog sorting by magnitude, constellation

@@ -290,12 +290,88 @@ def parse_barnard():
     return lines
 
 
+def parse_rcw():
+    """VII/216: RCW. rcw.dat bytes 1-3 RCW, 20-21 RAh, 23-26 RAm (B1950), 28 DE-, 29-30 DEd, 32-33 DEm."""
+    lines = []
+    p = DL / "VII_216_rcw.dat"
+    if not p.exists():
+        return lines
+    for line in open(p):
+        if len(line) < 33:
+            continue
+        try:
+            rcw = line[0:3].strip()
+            if not rcw or not rcw.isdigit():
+                continue
+            rah = int(line[19:21].strip() or 0)
+            ram = float(line[22:26].strip() or 0)
+            de_sign = line[27:28] or "+"
+            ded = int(line[28:30].strip() or 0)
+            dem = int(line[31:33].strip() or 0)
+        except (ValueError, IndexError):
+            continue
+        ra_h = rah + ram / 60.0
+        dec_deg = (1 if de_sign == "+" else -1) * (ded + dem / 60.0)
+        name = f"RCW {rcw}"
+        lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="RCW"))
+    return lines
+
+
+def parse_gum():
+    """Gum catalog from gum.xls spreadsheet in _dl/. Uses RA/Dec columns from the sheet."""
+    lines = []
+    p = DL / "gum.xls"
+    if not p.exists():
+        return lines
+    try:
+        import xlrd
+    except ImportError:
+        print("Warning: xlrd is not installed; skipping Gum catalog generation from gum.xls")
+        return lines
+    sheet = xlrd.open_workbook(str(p)).sheet_by_index(0)
+    for r in range(2, sheet.nrows):
+        no_val = sheet.cell_value(r, 0)
+        if no_val in ("", None):
+            continue
+        if isinstance(no_val, float):
+            obj_id = str(int(no_val))
+        else:
+            obj_id = str(no_val).strip()
+        if not obj_id:
+            continue
+        try:
+            rah = float(sheet.cell_value(r, 1) or 0)
+            ram = float(sheet.cell_value(r, 2) or 0)
+            de_sign_raw = sheet.cell_value(r, 3)
+            ded = float(sheet.cell_value(r, 4) or 0)
+            dem = float(sheet.cell_value(r, 5) or 0)
+        except ValueError:
+            continue
+        sign = -1 if str(de_sign_raw).strip().startswith("-") or de_sign_raw == -1 else 1
+        ra_h = rah + ram / 60.0
+        dec_deg = sign * (ded + dem / 60.0)
+        name = f"Gum {obj_id}"
+        lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="Gum"))
+    return lines
+
+
 def write_psql(shortname, title, descr, url, filename, parse_fn):
     """Write a catalog .psql file. COPY must include catalog column for FK."""
     lines = parse_fn()
     out = DL.parent / filename
     copy_cols = "name, ra, decl, descr, comment, type, epoch, const, magn, x, y, catalog"
-    like_pattern = {"Ced": "Ced %", "vdB": "vdB %", "Sh2": "Sh2-%", "LBN": "LBN %", "LDN": "LDN %", "B": "B%", "Col": "Col %", "Mel": "Mel %"}[shortname]
+    like_pattern = {
+        "Ced": "Ced %",
+        "vdB": "vdB %",
+        "Sh2": "Sh2-%",
+        "LBN": "LBN %",
+        "LDN": "LDN %",
+        "B": "B%",
+        "Col": "Col %",
+        "Mel": "Mel %",
+        "RCW": "RCW %",
+        "Gum": "Gum %",
+    }[shortname]
 
     def esc(s):
         return (s or "").replace("'", "''")
@@ -385,6 +461,22 @@ def main():
         "https://in-the-sky.org/data/catalogue.php?cat=Melotte",
         "catalog-melotte.psql",
         parse_melotte,
+    )
+    write_psql(
+        "RCW",
+        "RCW catalogue of H-alpha emission regions",
+        "H-alpha emission regions in the Southern Milky Way (Rodgers, Campbell, Whiteoak 1960).",
+        "https://vizier.cds.unistra.fr/viz-bin/VizieR?-source=VII/216",
+        "catalog-rcw.psql",
+        parse_rcw,
+    )
+    write_psql(
+        "Gum",
+        "Gum catalogue of diffuse southern H-alpha nebulae",
+        "Catalogue of diffuse southern H-alpha nebulae (Gum 1955), from GalaxyMap gum.xls compilation.",
+        "http://galaxymap.org/gum/gum.xls",
+        "catalog-gum.psql",
+        parse_gum,
     )
     print("Done. Run convert_catalogs.py to regenerate SQL from _dl/ data.")
 

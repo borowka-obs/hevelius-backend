@@ -18,7 +18,9 @@ The following catalogs were generated from CDS/VizieR data and can be regenerate
 | LDN | Lynd's Dark Nebulae | VII/7A | 1791 |
 | M   | Messier Catalogue   | | 110 |
 | Mel | Melotte (star clusters) | In-The-Sky.org | 245 |
+| RCW | RCW (H-alpha emission regions) | VII/216 | 181 |
 | Sh2 | Sharpless (H II regions) | VII/20 | 313 |
+| Gum | Gum (diffuse southern H-alpha nebulae) | GalaxyMap gum.xls compilation | 97 |
 | vdB | van den Bergh (reflection nebulae) | VII/21 | 158 |
 
 ### Collinder (Col)
@@ -39,5 +41,7 @@ Place the following files in `catalogs/_dl/` before running `convert_catalogs.py
 - `VII_9_catalog.dat` — https://cdsarc.cds.unistra.fr/ftp/VII/9/catalog.dat
 - `VII_7A_ldn.dat` — https://cdsarc.cds.unistra.fr/ftp/VII/7A/ldn
 - `VII_220A_barnard.dat` — https://cdsarc.cds.unistra.fr/ftp/VII/220A/barnard.dat
+- `VII_216_rcw.dat` — https://cdsarc.cds.unistra.fr/ftp/VII/216/rcw.dat.gz (gunzip and rename)
+- `gum.xls` — http://galaxymap.org/gum/gum.xls
 - `collinder.html` — Save from https://www.cloudynights.com/articles/articles/the-collinder-catalog-updated-r2467/ (for Col catalog)
 - `melotte_p1.html`, `melotte_p2.html`, `melotte_p3.html` — From https://in-the-sky.org/data/catalogue.php?cat=Melotte&view=1&page=1 (and page=2, page=3) for Mel catalog
