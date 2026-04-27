@@ -268,25 +268,26 @@ def parse_barnard():
     p = DL / "VII_220A_barnard.dat"
     if not p.exists():
         return lines
-    for line in open(p):
-        if len(line) < 39:
-            continue
-        try:
-            barn = line[1:5].strip()
-            if not barn:
+    with open(p) as f:
+        for line in f:
+            if len(line) < 39:
                 continue
-            rah = int(line[22:24].strip() or 0)
-            ram = int(line[25:27].strip() or 0)
-            ras = int(line[28:30].strip() or 0)
-            de_sign = line[32:33] or "+"
-            ded = int(line[33:35].strip() or 0)
-            dem = int(line[36:38].strip() or 0)
-        except (ValueError, IndexError):
-            continue
-        ra_h = rah + ram / 60.0 + ras / 3600.0
-        dec_deg = (1 if de_sign == "+" else -1) * (ded + dem / 60.0)
-        name = f"B{barn}"
-        lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Dn", NULL, NULL, NULL, NULL, NULL, catalog="B"))
+            try:
+                barn = line[1:5].strip()
+                if not barn:
+                    continue
+                rah = int(line[22:24].strip() or 0)
+                ram = int(line[25:27].strip() or 0)
+                ras = int(line[28:30].strip() or 0)
+                de_sign = line[32:33] or "+"
+                ded = int(line[33:35].strip() or 0)
+                dem = int(line[36:38].strip() or 0)
+            except (ValueError, IndexError):
+                continue
+            ra_h = rah + ram / 60.0 + ras / 3600.0
+            dec_deg = (1 if de_sign == "+" else -1) * (ded + dem / 60.0)
+            name = f"B{barn}"
+            lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Dn", NULL, NULL, NULL, NULL, NULL, catalog="B"))
     return lines
 
 
@@ -296,24 +297,25 @@ def parse_rcw():
     p = DL / "VII_216_rcw.dat"
     if not p.exists():
         return lines
-    for line in open(p):
-        if len(line) < 33:
-            continue
-        try:
-            rcw = line[0:3].strip()
-            if not rcw or not rcw.isdigit():
+    with open(p) as f:
+        for line in f:
+            if len(line) < 33:
                 continue
-            rah = int(line[19:21].strip() or 0)
-            ram = float(line[22:26].strip() or 0)
-            de_sign = line[27:28] or "+"
-            ded = int(line[28:30].strip() or 0)
-            dem = int(line[31:33].strip() or 0)
-        except (ValueError, IndexError):
-            continue
-        ra_h = rah + ram / 60.0
-        dec_deg = (1 if de_sign == "+" else -1) * (ded + dem / 60.0)
-        name = f"RCW {rcw}"
-        lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="RCW"))
+            try:
+                rcw = line[0:3].strip()
+                if not rcw or not rcw.isdigit():
+                    continue
+                rah = int(line[19:21].strip() or 0)
+                ram = float(line[22:26].strip() or 0)
+                de_sign = line[27:28] or "+"
+                ded = int(line[28:30].strip() or 0)
+                dem = int(line[31:33].strip() or 0)
+            except (ValueError, IndexError):
+                continue
+            ra_h = rah + ram / 60.0
+            dec_deg = (1 if de_sign == "+" else -1) * (ded + dem / 60.0)
+            name = f"RCW {rcw}"
+            lines.append(row(name, ra_h, dec_deg, NULL, NULL, "Nb", NULL, NULL, NULL, NULL, NULL, catalog="RCW"))
     return lines
 
 
