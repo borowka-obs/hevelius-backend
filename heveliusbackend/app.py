@@ -64,9 +64,25 @@ if not jwt_secret:
     print("JWT_SECRET_KEY not found in config or environment variables")
     exit(1)
 
-app.config["JWT_SECRET_KEY"] = jwt_secret
+def _normalize_jwt_secret(secret: str) -> str:
+    # PyJWT>=2.10 warns for HS256 keys shorter than 32 bytes.
+    # Derive a stable 32-byte equivalent from legacy short secrets.
+    secret_bytes = secret.encode("utf-8")
+    if len(secret_bytes) < 32:
+        return hashlib.sha256(secret_bytes).hexdigest()
+    return secret
+
+
+app.config["JWT_SECRET_KEY"] = _normalize_jwt_secret(jwt_secret)
 app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)  # Token expiration time
 jwt = JWTManager(app)
+
+
+@jwt.user_identity_loader
+def _jwt_identity_to_string(identity):
+    # PyJWT>=2.10 requires "sub" (subject) claim to be a string.
+    return str(identity)
+
 
 # Initialize API
 api = Api(app)
@@ -1132,7 +1148,7 @@ class TaskAddResource(MethodView):
     def post(self, task_data):
         """Add new astronomical observation task"""
         # Get user ID from JWT token
-        current_user_id = get_jwt_identity()
+        current_user_id = _jwt_user_id_int()
 
         # Optional: verify that the user_id in the request matches the token
         # Allow adding for other users in testing mode
@@ -1546,7 +1562,7 @@ class TaskUpdateResource(MethodView):
     @blp.response(200, TaskUpdateResponseSchema)
     def post(self, task_data):
         """Update existing astronomical observation task"""
-        current_user_id = get_jwt_identity()
+        current_user_id = _jwt_user_id_int()
         task_id = task_data.pop('task_id')  # Remove task_id from update fields
         project_ids = task_data.pop('project_ids', None)  # Not a tasks column; handled below
         project_id = task_data.pop('project_id', None)
@@ -2560,7 +2576,7 @@ class ProjectTaskResource(MethodView):
     @jwt_required()
     def post(self, project_id, task_id):
         """Add a task to a project. Task must exist and be owned by the current user."""
-        current_user_id = get_jwt_identity()
+        current_user_id = _jwt_user_id_int()
         cnx = db.connect()
         task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
         if not task_row:
@@ -2580,7 +2596,7 @@ class ProjectTaskResource(MethodView):
     @jwt_required()
     def delete(self, project_id, task_id):
         """Remove a task from a project. Task must exist and be owned by the current user."""
-        current_user_id = get_jwt_identity()
+        current_user_id = _jwt_user_id_int()
         cnx = db.connect()
         task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
         if not task_row:
