@@ -11,4 +11,4 @@ paths:
   backup-path: /mnt/volume1/astro/backup
 
 jwt:
-  secret-key: your-secret-key-here  # Change this in production!
+  secret-key: your-secret-key-here  # Change this in production! Make it at least 32 characters long.
