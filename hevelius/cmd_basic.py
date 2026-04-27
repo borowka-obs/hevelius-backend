@@ -54,7 +54,19 @@ def config_show():
     :param args: arguments parsed by argparse
     """
 
-    config = load_config()
+    config, config_metadata = load_config(return_metadata=True)
+
+    print("Configuration source:")
+    if config_metadata['base_source'] == 'file':
+        print(f"Base config file: {config_metadata['base_config_path']}")
+    else:
+        print("Base config file: not found (using built-in defaults)")
+    if config_metadata['environment_overrides']:
+        print("Environment overrides: " + ", ".join(config_metadata['environment_overrides']))
+    else:
+        print("Environment overrides: none")
+
+    print()
 
     print("DB credentials:")
     print(f"Type:     {config['database']['type']}")
