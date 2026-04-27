@@ -9,7 +9,7 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 - API: Argon2id password hashing implemented
 - API: /api/task-find-by-filename call to attempt to find a task by its
   filename
-- API: /api/tasks-filename-list paginated list of tasks with barebones
+- API: /api/tasks-filename-list paginated list of tasks with bare bones
   info (task id, filename)
 - API: /api/task-add can now take optional parameters: project-id, filter-id.
   task can be in DONE state, possible to specify a filename.
