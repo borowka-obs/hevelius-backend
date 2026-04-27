@@ -6,12 +6,18 @@
 #
 apispec[marshmallow]==6.8.1
     # via flask-smorest
+argon2-cffi==25.1.0
+    # via -r requirements.in
+argon2-cffi-bindings==25.1.0
+    # via argon2-cffi
 astropy==7.0.0
     # via -r requirements.in
 astropy-iers-data==0.2025.1.20.0.32.27
     # via astropy
 blinker==1.9.0
     # via flask
+cffi==2.0.0
+    # via argon2-cffi-bindings
 click==8.1.7
     # via flask
 flask==3.1.3
@@ -59,9 +65,11 @@ plotly==5.24.1
     # via -r requirements.in
 psycopg2-binary==2.9.10
     # via -r requirements.in
+pycparser==3.0
+    # via cffi
 pyerfa==2.0.1.5
     # via astropy
-pyjwt==2.9.0
+pyjwt==2.12.1
     # via
     #   -r requirements.in
     #   flask-jwt-extended
@@ -85,5 +93,3 @@ werkzeug==3.1.6
     #   flask-cors
     #   flask-jwt-extended
     #   flask-smorest
-
-argon2-cffi
