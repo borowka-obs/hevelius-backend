@@ -64,6 +64,7 @@ if not jwt_secret:
     print("JWT_SECRET_KEY not found in config or environment variables")
     exit(1)
 
+
 def _normalize_jwt_secret(secret: str) -> str:
     # PyJWT>=2.10 warns for HS256 keys shorter than 32 bytes.
     # Derive a stable 32-byte equivalent from legacy short secrets.
