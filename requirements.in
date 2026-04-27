@@ -10,4 +10,4 @@ flask-jwt-extended
 
 argon2-cffi
 
-PyJWT==2.9.0
+PyJWT

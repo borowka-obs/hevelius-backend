@@ -24,7 +24,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def load_config():
+def load_config(return_metadata=False):
     """
     Load configuration from environment variables with fallback to config files.
     Priority: env vars > config.yml > config.yml.example > defaults
@@ -34,6 +34,11 @@ def load_config():
     #     return loaded_config.copy()
 
     config_dict = DEFAULT_CONFIG.copy()
+    metadata = {
+        'base_source': 'defaults',
+        'base_config_path': None,
+        'environment_overrides': [],
+    }
 
     # Try loading from config files
     config_paths = [
@@ -46,6 +51,8 @@ def load_config():
                 file_config = yaml.safe_load(f)
                 if file_config:
                     config_dict.update(file_config)
+                    metadata['base_source'] = 'file'
+                    metadata['base_config_path'] = str(config_path.resolve())
             break
 
     # Environment variables override file config
@@ -66,8 +73,12 @@ def load_config():
             if section not in config_dict:
                 config_dict[section] = {}
             config_dict[section][key] = os.getenv(env_var)
+            metadata['environment_overrides'].append(env_var)
 
     # loaded_config = config_dict
+
+    if return_metadata:
+        return config_dict.copy(), metadata
 
     return config_dict.copy()
 
