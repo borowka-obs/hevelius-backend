@@ -4,9 +4,10 @@
 
 # hevelius-backend
 
-This is a backend interface for Hevelius, an astronomy processing software and
-observatory management system. It's in the early stages of development, but some
-of the features are usable already.
+This is the backend interface ("server") for Hevelius, an astronomy processing software and
+observatory management system. The other components are [hevelius-web](https://github.com/borowka-obs/hevelius-web) (web
+interface) and [hevelius-runner](https://github.com/borowka-obs/hevelius-runner) (the software you run on Windows on your
+PC that controls the telescope).
 
 ## Current capabilities (command-line)
 
