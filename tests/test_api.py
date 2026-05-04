@@ -6,6 +6,7 @@ import unittest
 import os
 import warnings
 import json
+import time
 from datetime import datetime
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
@@ -1989,6 +1990,105 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(response.status_code, 404)
         response = self.app.delete('/api/projects/1/subframes/99999', headers=self.headers)
         self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_total_integration_matches_subframes(self, config):
+        """Fixture project 1 total_integration_time equals sum of exposure × count."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        r = self.app.get('/api/projects/1', headers=self.headers)
+        p = json.loads(r.data)['project']
+        sub_total = sum(sf['exposure_time'] * sf['count'] for sf in p['subframes'])
+        self.assertAlmostEqual(p['total_integration_time'], sub_total, places=5)
+        lst = self.app.get('/api/projects', headers=self.headers)
+        row = next(x for x in json.loads(lst.data)['projects'] if x['project_id'] == 1)
+        self.assertAlmostEqual(row['total_integration_time'], sub_total, places=5)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_subframe_change_updates_last_updated(self, config):
+        """Patching a subframe bumps parent last_updated (DB trigger)."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        before = json.loads(self.app.get('/api/projects/1', headers=self.headers).data)['project']
+        lu0 = before.get('last_updated')
+        sf = before['subframes'][0]
+        time.sleep(0.05)
+        patch = self.app.patch(
+            f"/api/projects/1/subframes/{sf['id']}",
+            data=json.dumps({'exposure_time': float(sf['exposure_time']) + 1.0}),
+            headers=self.headers,
+        )
+        self.assertEqual(patch.status_code, 200)
+        after = json.loads(self.app.get('/api/projects/1', headers=self.headers).data)['project']
+        self.assertIsNotNone(after.get('last_updated'))
+        if lu0:
+            self.assertNotEqual(lu0, after['last_updated'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_sort_by_total_integration_time(self, config):
+        """List API sort_by=total_integration_time orders projects by stored aggregate."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        suf = datetime.now().strftime('%H%M%S%f')
+        lo = {"name": f"LoInt{suf}", "scope_id": 1, "ra": 0.2, "decl": 2.0}
+        hi = {"name": f"HiInt{suf}", "scope_id": 1, "ra": 0.3, "decl": 3.0}
+        id_lo = json.loads(self.app.post('/api/projects', data=json.dumps(lo), headers=self.headers).data)['project_id']
+        id_hi = json.loads(self.app.post('/api/projects', data=json.dumps(hi), headers=self.headers).data)['project_id']
+        self.app.post(
+            f'/api/projects/{id_lo}/subframes',
+            data=json.dumps({'filter_id': 1, 'exposure_time': 10.0, 'count': 1}),
+            headers=self.headers,
+        )
+        self.app.post(
+            f'/api/projects/{id_hi}/subframes',
+            data=json.dumps({'filter_id': 1, 'exposure_time': 10.0, 'count': 50}),
+            headers=self.headers,
+        )
+        asc = json.loads(
+            self.app.get(
+                '/api/projects?sort_by=total_integration_time&sort_order=asc',
+                headers=self.headers,
+            ).data
+        )['projects']
+        idx_lo = next(i for i, x in enumerate(asc) if x['project_id'] == id_lo)
+        idx_hi = next(i for i, x in enumerate(asc) if x['project_id'] == id_hi)
+        self.assertLess(idx_lo, idx_hi)
+        desc = json.loads(
+            self.app.get(
+                '/api/projects?sort_by=total_integration_time&sort_order=desc',
+                headers=self.headers,
+            ).data
+        )['projects']
+        idx_lo_d = next(i for i, x in enumerate(desc) if x['project_id'] == id_lo)
+        idx_hi_d = next(i for i, x in enumerate(desc) if x['project_id'] == id_hi)
+        self.assertLess(idx_hi_d, idx_lo_d)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_and_patch_optional_dates(self, config):
+        """start_date and end_date optional on create; PATCH can set and clear."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {
+            'name': f'DatedProj{datetime.now().strftime("%H%M%S%f")}',
+            'scope_id': 1,
+            'ra': 0.4,
+            'decl': 4.0,
+            'start_date': '2026-01-15',
+            'end_date': '2026-06-30',
+        }
+        cr = json.loads(self.app.post('/api/projects', data=json.dumps(body), headers=self.headers).data)
+        self.assertEqual(cr['project']['start_date'], '2026-01-15')
+        self.assertEqual(cr['project']['end_date'], '2026-06-30')
+        pid = cr['project_id']
+        clr = self.app.patch(
+            f'/api/projects/{pid}',
+            data=json.dumps({'start_date': None, 'end_date': None}),
+            headers=self.headers,
+        )
+        self.assertEqual(clr.status_code, 200)
+        p = json.loads(clr.data)['project']
+        self.assertIsNone(p.get('start_date'))
+        self.assertIsNone(p.get('end_date'))
         os.environ.pop('HEVELIUS_DB_NAME')
 
 

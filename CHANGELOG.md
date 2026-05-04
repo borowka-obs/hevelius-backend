@@ -16,7 +16,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 - API: /api/task-update supports project_id alias, filter_id, imagename
 - API: Projects now support optional `regexps`; subframes support optional `count`
   (backward-compatible with `goal_count`, defaults to 0 when omitted).
-- DB: Schema bumped to 19: added `projects.regexps` and `project_subframes.count`.
+- DB: Schema bumped to 19: added `regexps` and `count` to projects.
+- DB: Schema bumped to 20: added `last_updated`, `start_date`, `end_date`, `total_integration_time`
+  to projects.
 - DB: New catalogs available:
   - Gum (diffuse southern H-alpha nebulae)
   - RCW (H-alpha emission regions)
