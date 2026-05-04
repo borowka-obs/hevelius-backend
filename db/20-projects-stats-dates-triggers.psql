@@ -1,0 +1,52 @@
+-- Schema version 20: project last_updated, optional date range, total_integration_time (maintained by triggers)
+
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS start_date DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS end_date DATE;
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS total_integration_time double precision NOT NULL DEFAULT 0;
+
+CREATE INDEX IF NOT EXISTS projects_last_updated_idx ON projects (last_updated DESC NULLS LAST);
+CREATE INDEX IF NOT EXISTS projects_total_integration_time_idx ON projects (total_integration_time);
+CREATE INDEX IF NOT EXISTS projects_start_date_idx ON projects (start_date);
+CREATE INDEX IF NOT EXISTS projects_end_date_idx ON projects (end_date);
+
+-- Backfill total integration (seconds): sum of exposure_time * effective subframe count (count preferred over goal_count)
+UPDATE projects p SET total_integration_time = COALESCE((
+  SELECT SUM(ps.exposure_time * COALESCE(ps."count", ps.goal_count, 0)::double precision)
+  FROM project_subframes ps WHERE ps.project_id = p.project_id
+), 0);
+
+CREATE OR REPLACE FUNCTION refresh_project_integration_stats(p_project_id int)
+RETURNS void AS $$
+BEGIN
+  UPDATE projects SET
+    last_updated = NOW(),
+    total_integration_time = COALESCE((
+      SELECT SUM(ps.exposure_time * COALESCE(ps."count", ps.goal_count, 0)::double precision)
+      FROM project_subframes ps WHERE ps.project_id = p_project_id
+    ), 0)
+  WHERE project_id = p_project_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION project_subframes_after_write()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    PERFORM refresh_project_integration_stats(OLD.project_id);
+  ELSIF TG_OP = 'UPDATE' AND OLD.project_id IS DISTINCT FROM NEW.project_id THEN
+    PERFORM refresh_project_integration_stats(OLD.project_id);
+    PERFORM refresh_project_integration_stats(NEW.project_id);
+  ELSE
+    PERFORM refresh_project_integration_stats(NEW.project_id);
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS project_subframes_refresh_parent ON project_subframes;
+CREATE TRIGGER project_subframes_refresh_parent
+  AFTER INSERT OR UPDATE OR DELETE ON project_subframes
+  FOR EACH ROW EXECUTE PROCEDURE project_subframes_after_write();
+
+UPDATE schema_version SET version = 20;

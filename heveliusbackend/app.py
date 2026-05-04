@@ -17,7 +17,7 @@ import json
 import plotly
 from marshmallow import Schema, fields, ValidationError, validate, validates_schema
 from flask.views import MethodView
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity, get_jwt
 from argon2 import PasswordHasher, Type  # type: ignore[import-not-found]
 from argon2.exceptions import VerifyMismatchError, InvalidHashError  # type: ignore[import-not-found]
@@ -624,6 +624,10 @@ class ProjectSchema(Schema):
     ra = fields.Float()
     decl = fields.Float()
     active = fields.Boolean()
+    last_updated = fields.DateTime(allow_none=True)
+    total_integration_time = fields.Float()
+    start_date = fields.String(allow_none=True)
+    end_date = fields.String(allow_none=True)
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
 
@@ -636,6 +640,8 @@ class ProjectCreateSchema(Schema):
     ra = fields.Float(load_default=None)
     decl = fields.Float(load_default=None)
     active = fields.Boolean(load_default=True)
+    start_date = fields.Date(load_default=None, allow_none=True)
+    end_date = fields.Date(load_default=None, allow_none=True)
 
 
 class ProjectUpdateSchema(Schema):
@@ -646,6 +652,8 @@ class ProjectUpdateSchema(Schema):
     ra = fields.Float()
     decl = fields.Float()
     active = fields.Boolean()
+    start_date = fields.Date(allow_none=True)
+    end_date = fields.Date(allow_none=True)
 
 
 class ProjectSubframeCreateSchema(Schema):
@@ -2236,10 +2244,58 @@ class SensorDetailResource(MethodView):
         return {"status": True, "sensor": _row_to_sensor(updated[0]), "msg": "Sensor updated."}
 
 
+_PROJECT_SELECT_COLS = (
+    "project_id, name, description, regexps, scope_id, ra, decl, active, "
+    "last_updated, total_integration_time, start_date, end_date"
+)
+
+_PROJECT_SELECT_COLS_P = (
+    "p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active, "
+    "p.last_updated, p.total_integration_time, p.start_date, p.end_date"
+)
+
+_PROJECT_SORT_COLUMNS = {
+    "project_id": "p.project_id",
+    "name": "p.name",
+    "last_updated": "p.last_updated",
+    "total_integration_time": "p.total_integration_time",
+    "start_date": "p.start_date",
+    "end_date": "p.end_date",
+}
+
+
+def _projects_list_order_clause(sort_by: str, sort_order: str) -> str:
+    if sort_by not in _PROJECT_SORT_COLUMNS:
+        sort_by = "project_id"
+    col = _PROJECT_SORT_COLUMNS[sort_by]
+    if sort_order not in ("ASC", "DESC"):
+        sort_order = "ASC"
+    nulls = ""
+    if sort_by == "last_updated":
+        nulls = " NULLS LAST" if sort_order == "DESC" else " NULLS FIRST"
+    elif sort_by in ("start_date", "end_date"):
+        nulls = " NULLS LAST" if sort_order == "DESC" else " NULLS FIRST"
+    return f"ORDER BY {col} {sort_order}{nulls}, p.project_id ASC"
+
+
+def _sql_date_to_iso(val):
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        return val.date().isoformat()
+    if isinstance(val, date):
+        return val.isoformat()
+    s = str(val)
+    return s[:10] if len(s) >= 10 else s
+
+
 def _project_row_to_dict(r, subframes=None, user_ids=None):
-    """Build project dict from projects row (project_id, name, description, regexps, scope_id, ra, decl, active)."""
+    """Build project dict from a projects SELECT row (includes last_updated, total_integration_time, dates)."""
     return {
         "project_id": r[0], "name": r[1], "description": r[2], "regexps": r[3], "scope_id": r[4], "ra": r[5], "decl": r[6], "active": r[7],
+        "last_updated": r[8], "total_integration_time": float(r[9]) if r[9] is not None else 0.0,
+        "start_date": _sql_date_to_iso(r[10]),
+        "end_date": _sql_date_to_iso(r[11]),
         "subframes": subframes or [], "user_ids": user_ids or []
     }
 
@@ -2263,11 +2319,14 @@ class ProjectsResource(MethodView):
         per_page = min(request.args.get("per_page", 100, type=int), 1000)
         user_id = request.args.get("user_id", type=int)
         scope_id = request.args.get("scope_id", type=int)
+        sort_by = request.args.get("sort_by", "project_id")
+        sort_order = (request.args.get("sort_order") or "asc").upper()
+        order_sql = _projects_list_order_clause(sort_by, sort_order)
         offset = (page - 1) * per_page
         cnx = db.connect()
         if user_id is not None:
             count_q = "SELECT COUNT(*) FROM projects p JOIN project_users pu ON p.project_id = pu.project_id WHERE pu.user_id = %s"
-            list_q = """SELECT p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active
+            list_q = f"""SELECT {_PROJECT_SELECT_COLS_P}
                        FROM projects p JOIN project_users pu ON p.project_id = pu.project_id
                        WHERE pu.user_id = %s"""
             count_params, list_params = [user_id], [user_id]
@@ -2278,24 +2337,24 @@ class ProjectsResource(MethodView):
                 list_params.extend([scope_id, per_page, offset])
             else:
                 list_params.extend([per_page, offset])
-            list_q += " ORDER BY p.project_id LIMIT %s OFFSET %s"
+            list_q += f" {order_sql} LIMIT %s OFFSET %s"
             total = db.run_query(cnx, count_q, count_params)[0][0]
             rows = db.run_query(cnx, list_q, list_params)
         else:
             if scope_id is not None:
-                count_q = "SELECT COUNT(*) FROM projects WHERE scope_id = %s"
-                list_q = """SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects
-                            WHERE scope_id = %s ORDER BY project_id LIMIT %s OFFSET %s"""
+                count_q = "SELECT COUNT(*) FROM projects p WHERE p.scope_id = %s"
+                list_q = f"""SELECT {_PROJECT_SELECT_COLS_P} FROM projects p
+                            WHERE p.scope_id = %s {order_sql} LIMIT %s OFFSET %s"""
                 total = db.run_query(cnx, count_q, (scope_id,))[0][0]
                 rows = db.run_query(cnx, list_q, (scope_id, per_page, offset))
             else:
-                count_q = "SELECT COUNT(*) FROM projects"
-                list_q = "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects ORDER BY project_id LIMIT %s OFFSET %s"
+                count_q = "SELECT COUNT(*) FROM projects p"
+                list_q = f"SELECT {_PROJECT_SELECT_COLS_P} FROM projects p {order_sql} LIMIT %s OFFSET %s"
                 total = db.run_query(cnx, count_q)[0][0]
                 rows = db.run_query(cnx, list_q, (per_page, offset))
         projects = []
         for r in (rows or []):
-            pid, name, descr, regexps, scope_id, ra, decl, active = r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7]
+            pid = r[0]
             sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
                        ps.exposure_time, ps.goal_count, ps.count, ps.active
                        FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
@@ -2312,10 +2371,7 @@ class ProjectsResource(MethodView):
                 for sr in (sub_rows or [])
             ]
             user_ids = [ur[0] for ur in (user_rows or [])]
-            projects.append({
-                "project_id": pid, "name": name, "description": descr, "regexps": regexps, "scope_id": scope_id, "ra": ra, "decl": decl, "active": active,
-                "subframes": subframes, "user_ids": user_ids
-            })
+            projects.append(_project_row_to_dict(r, subframes=subframes, user_ids=user_ids))
         cnx.close()
         pages = (total + per_page - 1) // per_page if total else 0
         return {"projects": projects, "total": total, "page": page, "per_page": per_page, "pages": pages}
@@ -2332,6 +2388,8 @@ class ProjectsResource(MethodView):
         ra = body.get("ra")
         decl = body.get("decl")
         active = body.get("active", True)
+        start_date = body.get("start_date")
+        end_date = body.get("end_date")
         cnx = db.connect()
         if ra is None or decl is None:
             cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
@@ -2343,13 +2401,20 @@ class ProjectsResource(MethodView):
         if not scope_exists:
             cnx.close()
             abort(400, message="Invalid scope_id: telescope not found.")
-        db.run_query(cnx, "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                     (name, description, regexps, scope_id, ra, decl, active))
-        row = db.run_query(cnx, """SELECT project_id, name, description, regexps, scope_id, ra, decl, active
+        db.run_query(
+            cnx,
+            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date),
+        )
+        row = db.run_query(
+            cnx,
+            f"""SELECT {_PROJECT_SELECT_COLS}
                                    FROM projects
                                    WHERE name=%s AND scope_id=%s
                                    ORDER BY project_id DESC LIMIT 1""",
-                           (name, scope_id))
+            (name, scope_id),
+        )
         project_id = row[0][0]
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
                    ps.exposure_time, ps.goal_count, ps.count, ps.active
@@ -2375,7 +2440,11 @@ class ProjectDetailResource(MethodView):
     def get(self, project_id):
         """Get single project with subframes and user IDs"""
         cnx = db.connect()
-        row = db.run_query(cnx, "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        row = db.run_query(
+            cnx,
+            f"SELECT {_PROJECT_SELECT_COLS} FROM projects WHERE project_id = %s",
+            (project_id,),
+        )
         if not row:
             cnx.close()
             return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
@@ -2414,10 +2483,14 @@ class ProjectDetailResource(MethodView):
             if key in body and body[key] is not None:
                 updates.append(f"{key} = %s")
                 args.append(body[key])
+        for key in ("start_date", "end_date"):
+            if key in body:
+                updates.append(f"{key} = %s")
+                args.append(body[key])
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
-        row = db.run_query(cnx, "SELECT project_id, name, description, regexps, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+        row = db.run_query(cnx, f"SELECT {_PROJECT_SELECT_COLS} FROM projects WHERE project_id = %s", (project_id,))
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
                    ps.exposure_time, ps.goal_count, ps.count, ps.active
                    FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
