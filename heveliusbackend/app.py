@@ -321,7 +321,9 @@ class TasksRequestSchema(Schema):
 class Task(Schema):
     task_id = fields.Integer(required=True, metadata={"description": "Task ID"})
     user_id = fields.Integer(required=True, metadata={"description": "User ID"})
+    user_login = fields.String(allow_none=True, metadata={"description": "Task owner login"})
     scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
+    scope_name = fields.String(allow_none=True, metadata={"description": "Telescope name"})
     aavso_id = fields.String(metadata={"description": "AAVSO identifier"})
     object = fields.String(metadata={"description": "Object name"})
     ra = fields.Float(metadata={"description": "Right Ascension"})
@@ -1266,17 +1268,22 @@ class TasksResource(MethodView):
     def _get_tasks(self, args):
         """Helper method to get tasks based on filters, sorting, and paging"""
         # Base query
-        query = """SELECT task_id, tasks.user_id, scope_id, aavso_id, object, ra, decl,
-            exposure, descr, filter, binning, guiding, dither,
-            calibrate, solve, other_cmd,
-            min_alt, moon_distance, skip_before, skip_after,
-            min_interval, comment, state, imagename,
-            created, activated, performed, max_moon_phase,
-            max_sun_alt, auto_center, calibrated, solved,
-            sent FROM tasks, users WHERE tasks.user_id = users.user_id"""
+        query = """SELECT tasks.task_id, tasks.user_id, users.login, tasks.scope_id, telescopes.name,
+            users.aavso_id, tasks.object, tasks.ra, tasks.decl,
+            tasks.exposure, tasks.descr, tasks.filter, tasks.binning, tasks.guiding, tasks.dither,
+            tasks.calibrate, tasks.solve, tasks.other_cmd,
+            tasks.min_alt, tasks.moon_distance, tasks.skip_before, tasks.skip_after,
+            tasks.min_interval, tasks.comment, tasks.state, tasks.imagename,
+            tasks.created, tasks.activated, tasks.performed, tasks.max_moon_phase,
+            tasks.max_sun_alt, tasks.auto_center, tasks.calibrated, tasks.solved, tasks.sent
+            FROM tasks
+            JOIN users ON tasks.user_id = users.user_id
+            LEFT JOIN telescopes ON tasks.scope_id = telescopes.scope_id
+            WHERE 1=1"""
 
-        count_query = """SELECT COUNT(*) FROM tasks, users
-            WHERE tasks.user_id = users.user_id"""
+        count_query = """SELECT COUNT(*) FROM tasks
+            JOIN users ON tasks.user_id = users.user_id
+            WHERE 1=1"""
 
         # Build where clause and parameters
         where_clauses = []
@@ -1288,51 +1295,51 @@ class TasksResource(MethodView):
             params.append(args['user_id'])
 
         if args.get('scope_id'):
-            where_clauses.append("scope_id = %s")
+            where_clauses.append("tasks.scope_id = %s")
             params.append(args['scope_id'])
 
         if args.get('object'):
-            where_clauses.append("object ILIKE %s")
+            where_clauses.append("tasks.object ILIKE %s")
             params.append(f"%{args['object']}%")
 
         if args.get('ra_min') is not None:
-            where_clauses.append("ra >= %s")
+            where_clauses.append("tasks.ra >= %s")
             params.append(args['ra_min'])
 
         if args.get('ra_max') is not None:
-            where_clauses.append("ra <= %s")
+            where_clauses.append("tasks.ra <= %s")
             params.append(args['ra_max'])
 
         if args.get('decl_min') is not None:
-            where_clauses.append("decl >= %s")
+            where_clauses.append("tasks.decl >= %s")
             params.append(args['decl_min'])
 
         if args.get('decl_max') is not None:
-            where_clauses.append("decl <= %s")
+            where_clauses.append("tasks.decl <= %s")
             params.append(args['decl_max'])
 
         if args.get('exposure'):
-            where_clauses.append("exposure = %s")
+            where_clauses.append("tasks.exposure = %s")
             params.append(args['exposure'])
 
         if args.get('descr'):
-            where_clauses.append("descr ILIKE %s")
+            where_clauses.append("tasks.descr ILIKE %s")
             params.append(f"%{args['descr']}%")
 
         if args.get('state') is not None:
-            where_clauses.append("state = %s")
+            where_clauses.append("tasks.state = %s")
             params.append(args['state'])
 
         if args.get('project_id'):
-            where_clauses.append("task_id IN (SELECT task_id FROM task_projects WHERE project_id = %s)")
+            where_clauses.append("tasks.task_id IN (SELECT task_id FROM task_projects WHERE project_id = %s)")
             params.append(args['project_id'])
 
         if args.get('performed_after'):
-            where_clauses.append("performed >= %s")
+            where_clauses.append("tasks.performed >= %s")
             params.append(args['performed_after'])
 
         if args.get('performed_before'):
-            where_clauses.append("performed <= %s")
+            where_clauses.append("tasks.performed <= %s")
             params.append(args['performed_before'])
 
         # Add where clauses to queries
@@ -1343,8 +1350,22 @@ class TasksResource(MethodView):
 
         # Add sorting
         sort_field = args.get('sort_by', 'task_id')
+        sort_field_map = {
+            'task_id': 'tasks.task_id',
+            'state': 'tasks.state',
+            'object': 'tasks.object',
+            'exposure': 'tasks.exposure',
+            'skip_before': 'tasks.skip_before',
+            'skip_after': 'tasks.skip_after',
+            'ra': 'tasks.ra',
+            'decl': 'tasks.decl',
+            'created': 'tasks.created',
+            'performed': 'tasks.performed',
+            'user_id': 'tasks.user_id',
+        }
+        sort_field_sql = sort_field_map.get(sort_field, 'tasks.task_id')
         sort_order = args.get('sort_order', 'desc').upper()
-        query += f" ORDER BY {sort_field} {sort_order}"
+        query += f" ORDER BY {sort_field_sql} {sort_order}"
 
         # Add pagination
         page = args.get('page', 1)
@@ -1354,23 +1375,24 @@ class TasksResource(MethodView):
 
         # Execute queries
         cnx = db.connect()
+        try:
+            # Get total count
+            total_count = db.run_query(cnx, count_query, params)[0][0]
 
-        # Get total count
-        total_count = db.run_query(cnx, count_query, params)[0][0]
-
-        # Get paginated results
-        tasks_list = db.run_query(cnx, query, params)
-        task_ids = [t[0] for t in tasks_list]
-        project_ids_by_task = {}
-        if task_ids:
-            placeholders = ",".join(["%s"] * len(task_ids))
-            tp_rows = db.run_query(cnx, f"SELECT task_id, project_id FROM task_projects WHERE task_id IN ({placeholders})", task_ids)
-            for tr in (tp_rows or []):
-                tid, pid = tr[0], tr[1]
-                if tid not in project_ids_by_task:
-                    project_ids_by_task[tid] = []
-                project_ids_by_task[tid].append(pid)
-        cnx.close()
+            # Get paginated results
+            tasks_list = db.run_query(cnx, query, params)
+            task_ids = [t[0] for t in tasks_list]
+            project_ids_by_task = {}
+            if task_ids:
+                placeholders = ",".join(["%s"] * len(task_ids))
+                tp_rows = db.run_query(cnx, f"SELECT task_id, project_id FROM task_projects WHERE task_id IN ({placeholders})", task_ids)
+                for tr in (tp_rows or []):
+                    tid, pid = tr[0], tr[1]
+                    if tid not in project_ids_by_task:
+                        project_ids_by_task[tid] = []
+                    project_ids_by_task[tid].append(pid)
+        finally:
+            cnx.close()
 
         # Format tasks
         formatted_tasks = []
@@ -1378,37 +1400,39 @@ class TasksResource(MethodView):
             task_dict = {
                 'task_id': task[0],
                 'user_id': task[1],
-                'scope_id': task[2],
-                'aavso_id': task[3],
-                'object': task[4],
-                'ra': task[5],
-                'decl': task[6],
-                'exposure': task[7],
-                'descr': task[8],
-                'filter': task[9],
-                'binning': task[10],
-                'guiding': bool(task[11]),
-                'dither': bool(task[12]),
-                'calibrate': bool(task[13]),
-                'solve': bool(task[14]),
-                'other_cmd': task[15],
-                'min_alt': task[16],
-                'moon_distance': task[17],
-                'skip_before': task[18],
-                'skip_after': task[19],
-                'min_interval': task[20],
-                'comment': task[21],
-                'state': task[22],
-                'imagename': task[23],
-                'created': task[24],
-                'activated': task[25],
-                'performed': task[26],
-                'max_moon_phase': task[27],
-                'max_sun_alt': task[28],
-                'auto_center': bool(task[29]),
-                'calibrated': bool(task[30]),
-                'solved': bool(task[31]),
-                'sent': bool(task[32]),
+                'user_login': task[2],
+                'scope_id': task[3],
+                'scope_name': task[4],
+                'aavso_id': task[5],
+                'object': task[6],
+                'ra': task[7],
+                'decl': task[8],
+                'exposure': task[9],
+                'descr': task[10],
+                'filter': task[11],
+                'binning': task[12],
+                'guiding': bool(task[13]),
+                'dither': bool(task[14]),
+                'calibrate': bool(task[15]),
+                'solve': bool(task[16]),
+                'other_cmd': task[17],
+                'min_alt': task[18],
+                'moon_distance': task[19],
+                'skip_before': task[20],
+                'skip_after': task[21],
+                'min_interval': task[22],
+                'comment': task[23],
+                'state': task[24],
+                'imagename': task[25],
+                'created': task[26],
+                'activated': task[27],
+                'performed': task[28],
+                'max_moon_phase': task[29],
+                'max_sun_alt': task[30],
+                'auto_center': bool(task[31]),
+                'calibrated': bool(task[32]),
+                'solved': bool(task[33]),
+                'sent': bool(task[34]),
                 'project_ids': sorted(project_ids_by_task.get(task[0], []))
             }
             formatted_tasks.append(task_dict)

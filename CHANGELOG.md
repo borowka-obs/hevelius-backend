@@ -22,6 +22,7 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 - DB: New catalogs available:
   - Gum (diffuse southern H-alpha nebulae)
   - RCW (H-alpha emission regions)
+- Tasks list now returns usernames and telescope-id details
 - Dependencies updated
 
 ## 0.4.0 (2026-03-21)
