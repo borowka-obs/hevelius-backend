@@ -46,6 +46,10 @@ components:
         user_id:
           type: integer
           description: User ID
+        user_login:
+          type: string
+          nullable: true
+          description: Task owner login
         aavso_id:
           type: string
           description: AAVSO identifier
@@ -116,6 +120,10 @@ components:
         scope_id:
           type: integer
           description: Telescope ID
+        scope_name:
+          type: string
+          nullable: true
+          description: Telescope name
         imagename:
           type: string
           description: Image filename
@@ -565,6 +573,25 @@ components:
         active:
           type: boolean
           description: Whether the project is active
+        last_updated:
+          type: string
+          format: date-time
+          nullable: true
+          description: Last time project subframes changed (UTC); maintained by the database
+        total_integration_time:
+          type: number
+          format: float
+          description: Total integration seconds (sum of exposure_time × subframe count per row); maintained when subframes change
+        start_date:
+          type: string
+          format: date
+          nullable: true
+          description: Optional project start date (calendar date)
+        end_date:
+          type: string
+          format: date
+          nullable: true
+          description: Optional project end date (calendar date)
         subframes:
           type: array
           items:
@@ -602,6 +629,14 @@ components:
         active:
           type: boolean
           default: true
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
     ProjectUpdate:
       type: object
       properties:
@@ -623,6 +658,14 @@ components:
           format: float
         active:
           type: boolean
+        start_date:
+          type: string
+          format: date
+          nullable: true
+        end_date:
+          type: string
+          format: date
+          nullable: true
     ProjectsList:
       type: object
       properties:
@@ -2274,6 +2317,28 @@ paths:
           schema:
             type: integer
           description: Filter by telescope ID (projects associated with this telescope)
+        - name: sort_by
+          in: query
+          schema:
+            type: string
+            default: project_id
+            enum:
+              - project_id
+              - name
+              - last_updated
+              - total_integration_time
+              - start_date
+              - end_date
+          description: Sort field for the project list
+        - name: sort_order
+          in: query
+          schema:
+            type: string
+            default: asc
+            enum:
+              - asc
+              - desc
+          description: Sort direction
       responses:
         '200':
           description: List of projects
