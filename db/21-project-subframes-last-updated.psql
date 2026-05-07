@@ -1,0 +1,11 @@
+-- Schema version 20: add project_subframes.last_updated and decouple count/goal_count.
+--
+-- The runner reports captured-frame counts via PATCH /api/projects/{id}/subframes/{sid}
+-- and updates only `count`. The server now stamps `last_updated` (UTC) on every change
+-- so callers can detect stale rows and skip no-op writes. `count` and `goal_count` are
+-- no longer mirrored: each PATCH updates exactly the columns supplied in the body.
+
+ALTER TABLE project_subframes
+  ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ NOT NULL DEFAULT now();
+
+UPDATE schema_version SET version = 21;

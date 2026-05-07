@@ -615,6 +615,7 @@ class ProjectSubframeSchema(Schema):
     count = fields.Integer()
     goal_count = fields.Integer()
     active = fields.Boolean()
+    last_updated = fields.DateTime(allow_none=True)
 
 
 class ProjectSchema(Schema):
@@ -2380,7 +2381,7 @@ class ProjectsResource(MethodView):
         for r in (rows or []):
             pid = r[0]
             sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                       ps.exposure_time, ps.goal_count, ps.count, ps.active
+                       ps.exposure_time, ps.goal_count, ps.count, ps.active, ps.last_updated
                        FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                        WHERE ps.project_id = %s"""
             sub_rows = db.run_query(cnx, sub_q, (pid,))
@@ -2390,7 +2391,8 @@ class ProjectsResource(MethodView):
                 {
                     "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                     "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                    "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]
+                    "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+                    "last_updated": sr[12],
                 }
                 for sr in (sub_rows or [])
             ]
@@ -2441,7 +2443,7 @@ class ProjectsResource(MethodView):
         )
         project_id = row[0][0]
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.count, ps.active
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active, ps.last_updated
                    FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                    WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
@@ -2449,7 +2451,8 @@ class ProjectsResource(MethodView):
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]}
+             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+             "last_updated": sr[12]}
             for sr in (sub_rows or [])
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
@@ -2474,7 +2477,7 @@ class ProjectDetailResource(MethodView):
             return {"status": False, "project": None, "msg": f"Project {project_id} not found"}
         r = row[0]
         sub_q = """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.count, ps.active FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active, ps.last_updated FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                    WHERE ps.project_id = %s"""
         sub_rows = db.run_query(cnx, sub_q, (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
@@ -2483,7 +2486,8 @@ class ProjectDetailResource(MethodView):
             {
                 "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                 "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]
+                "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+                "last_updated": sr[12],
             }
             for sr in (sub_rows or [])
         ]
@@ -2516,14 +2520,15 @@ class ProjectDetailResource(MethodView):
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
         row = db.run_query(cnx, f"SELECT {_PROJECT_SELECT_COLS} FROM projects WHERE project_id = %s", (project_id,))
         sub_rows = db.run_query(cnx, """SELECT ps.id, ps.project_id, ps.filter_id, f.filter_id, f.short_name, f.full_name, f.url, f.active,
-                   ps.exposure_time, ps.goal_count, ps.count, ps.active
+                   ps.exposure_time, ps.goal_count, ps.count, ps.active, ps.last_updated
                    FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id WHERE ps.project_id = %s""", (project_id,))
         user_rows = db.run_query(cnx, "SELECT user_id FROM project_users WHERE project_id = %s", (project_id,))
         cnx.close()
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11]}
+             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+             "last_updated": sr[12]}
             for sr in (sub_rows or [])
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
@@ -2608,18 +2613,17 @@ class ProjectSubframeDetailResource(MethodView):
             filter_id = body["filter_id"]
         updates = []
         args = []
-        count = body.get("count")
-        goal_count = body.get("goal_count")
-        if count is not None and goal_count is None:
-            goal_count = count
-        if goal_count is not None and count is None:
-            count = goal_count
+        # Each field is updated independently; count and goal_count are no longer
+        # mirrored. This lets clients (e.g. the runner reporting captured frames)
+        # bump count without disturbing the user-defined goal_count or active flag.
         for key, val in [("filter_id", filter_id), ("exposure_time", body.get("exposure_time")),
-                         ("goal_count", goal_count), ("count", count), ("active", body.get("active"))]:
+                         ("goal_count", body.get("goal_count")), ("count", body.get("count")),
+                         ("active", body.get("active"))]:
             if val is not None:
                 updates.append(f"{key} = %s")
                 args.append(val)
         if updates:
+            updates.append("last_updated = now()")
             args.extend([project_id, subframe_id])
             db.run_query(cnx, "UPDATE project_subframes SET " + ", ".join(updates) + " WHERE project_id = %s AND id = %s", tuple(args))
         cnx.close()
