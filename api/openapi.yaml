@@ -503,6 +503,10 @@ components:
           description: Target number of subframes
         active:
           type: boolean
+        last_updated:
+          type: string
+          format: date-time
+          description: Timestamp of the last update (UTC); set by the server.
     ProjectSubframeCreate:
       type: object
       required:
@@ -529,7 +533,10 @@ components:
           default: true
     ProjectSubframeUpdate:
       type: object
-      description: filter and filter_id are mutually exclusive. count and goal_count are aliases.
+      description: |
+        filter and filter_id are mutually exclusive. Each supplied field is
+        updated independently — count and goal_count are NOT mirrored. The
+        server stamps last_updated on every successful update.
       properties:
         filter:
           type: string
@@ -542,10 +549,10 @@ components:
           format: float
         count:
           type: integer
-          description: Optional alias for goal_count
+          description: Number of captured subframes. Updates only this column.
         goal_count:
           type: integer
-          description: Optional alias for count
+          description: Target number of subframes. Updates only this column.
         active:
           type: boolean
     Project:

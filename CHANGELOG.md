@@ -3,6 +3,16 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+- API: `PATCH /api/projects/{project_id}/subframes/{subframe_id}` now updates only
+  the columns supplied in the body. `count` and `goal_count` are no longer mirrored,
+  so the runner can bump captured-frame counts without disturbing the user-defined
+  goal_count or active flag.
+- API: project subframes now expose `last_updated` (UTC). The server stamps it on
+  every successful PATCH so callers can detect stale rows and skip no-op writes.
+- DB: Schema bumped to 20: added `project_subframes.last_updated`.
+
 ## 0.5.0 (2026-04-27)
 
 - CLI: User management implemented

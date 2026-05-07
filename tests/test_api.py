@@ -1850,10 +1850,10 @@ class TestProjectOperations(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
-    def test_project_subframe_count_alias_is_backward_compatible(self, config):
-        """count alias updates both count and goal_count values."""
+    def test_project_subframe_patch_count_only_does_not_touch_goal_count(self, config):
+        """PATCH with only count must not modify goal_count or active."""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
-        body = {"filter_id": 1, "exposure_time": 60.0, "count": 7, "active": True}
+        body = {"filter_id": 1, "exposure_time": 60.0, "count": 7, "goal_count": 30, "active": True}
         response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
         self.assertEqual(response.status_code, 201)
         subframe_id = json.loads(response.data)['subframe_id']
@@ -1869,7 +1869,10 @@ class TestProjectOperations(unittest.TestCase):
         get_data = json.loads(get_resp.data)
         sf = next(s for s in get_data['project']['subframes'] if s['id'] == subframe_id)
         self.assertEqual(sf['count'], 9)
-        self.assertEqual(sf['goal_count'], 9)
+        self.assertEqual(sf['goal_count'], 30)
+        self.assertTrue(sf['active'])
+        self.assertIn('last_updated', sf)
+        self.assertIsNotNone(sf['last_updated'])
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
