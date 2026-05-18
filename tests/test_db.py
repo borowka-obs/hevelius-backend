@@ -26,7 +26,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 21)
+        self.assertEqual(version, 22)
 
     @use_repository
     def test_sensor(self, config):
@@ -210,6 +210,18 @@ class DbTest(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(len(rows[0]), 5)
         self.assertTrue(rows[0][4])  # active defaults to true
+
+    @use_repository
+    def test_projects_publications_column(self, config):
+        """projects.publications column exists (schema 22)."""
+        conn = db.connect(config)
+        rows = db.run_query(
+            conn,
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_name = 'projects' AND column_name = 'publications'",
+        )
+        conn.close()
+        self.assertEqual(len(rows), 1)
 
     @use_repository
     def test_projects_and_subframes(self, config):

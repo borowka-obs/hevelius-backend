@@ -1,0 +1,6 @@
+-- Schema version 22: optional publication URLs on projects (space-separated).
+
+ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS publications text;
+
+UPDATE schema_version SET version = 22;
