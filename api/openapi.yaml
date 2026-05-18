@@ -599,6 +599,10 @@ components:
           format: date
           nullable: true
           description: Optional project end date (calendar date)
+        publications:
+          type: string
+          nullable: true
+          description: Space-separated URLs of published media (social posts, galleries, etc.)
         subframes:
           type: array
           items:
@@ -644,6 +648,10 @@ components:
           type: string
           format: date
           nullable: true
+        publications:
+          type: string
+          nullable: true
+          description: Space-separated publication URLs
     ProjectUpdate:
       type: object
       properties:
@@ -673,6 +681,10 @@ components:
           type: string
           format: date
           nullable: true
+        publications:
+          type: string
+          nullable: true
+          description: Space-separated publication URLs; send null or empty string to clear
     ProjectsList:
       type: object
       properties:
@@ -1253,6 +1265,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/LoginResponse'
+  /api/login/refresh:
+    post:
+      summary: Refresh JWT access token
+      description: Issues a new access token for the authenticated user (extends session on activity).
+      responses:
+        '200':
+          description: New access token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Missing or invalid JWT
+      security:
+        - bearerAuth: []
   /api/task-add:
     post:
       summary: Add new astronomical observation task

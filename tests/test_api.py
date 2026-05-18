@@ -2094,6 +2094,47 @@ class TestProjectOperations(unittest.TestCase):
         self.assertIsNone(p.get('end_date'))
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    @use_repository
+    def test_project_publications_create_patch_and_list(self, config):
+        """publications stored as normalized space-separated URLs."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {
+            'name': f'PubProj{datetime.now().strftime("%H%M%S%f")}',
+            'scope_id': 1,
+            'ra': 0.5,
+            'decl': 5.0,
+            'publications': '  https://www.astrobin.com/x/1   https://facebook.com/post/2  ',
+        }
+        cr = json.loads(self.app.post('/api/projects', data=json.dumps(body), headers=self.headers).data)
+        self.assertEqual(
+            cr['project']['publications'],
+            'https://www.astrobin.com/x/1 https://facebook.com/post/2',
+        )
+        pid = cr['project_id']
+        patch = json.loads(
+            self.app.patch(
+                f'/api/projects/{pid}',
+                data=json.dumps({'publications': ''}),
+                headers=self.headers,
+            ).data
+        )
+        self.assertIsNone(patch['project'].get('publications'))
+        listed = json.loads(self.app.get('/api/projects', headers=self.headers).data)
+        row = next(p for p in listed['projects'] if p['project_id'] == pid)
+        self.assertIsNone(row.get('publications'))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_login_refresh_returns_new_token(self, config):
+        """POST /api/login/refresh extends session with a new JWT."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.post('/api/login/refresh', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertTrue(data.get('token'))
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestUsersAPI(unittest.TestCase):
     """GET /api/users/logins and GET /api/users (admin)."""

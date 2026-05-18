@@ -38,6 +38,7 @@ class TestOpenAPISpec(unittest.TestCase):
             "/api/version",
             "/api/auth/password-reset",
             "/api/login",
+            "/api/login/refresh",
             "/api/users/me",
             "/api/users/audit-log",
             "/api/users/logins",

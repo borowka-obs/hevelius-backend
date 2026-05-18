@@ -75,7 +75,7 @@ def _normalize_jwt_secret(secret: str) -> str:
 
 
 app.config["JWT_SECRET_KEY"] = _normalize_jwt_secret(jwt_secret)
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=1)  # Token expiration time
+app.config["JWT_ACCESS_TOKEN_EXPIRES"] = timedelta(hours=24)
 jwt = JWTManager(app)
 
 
@@ -631,6 +631,7 @@ class ProjectSchema(Schema):
     total_integration_time = fields.Float()
     start_date = fields.String(allow_none=True)
     end_date = fields.String(allow_none=True)
+    publications = fields.String(allow_none=True)
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
 
@@ -645,6 +646,7 @@ class ProjectCreateSchema(Schema):
     active = fields.Boolean(load_default=True)
     start_date = fields.Date(load_default=None, allow_none=True)
     end_date = fields.Date(load_default=None, allow_none=True)
+    publications = fields.String(load_default=None, allow_none=True)
 
 
 class ProjectUpdateSchema(Schema):
@@ -657,6 +659,7 @@ class ProjectUpdateSchema(Schema):
     active = fields.Boolean()
     start_date = fields.Date(allow_none=True)
     end_date = fields.Date(allow_none=True)
+    publications = fields.String(allow_none=True)
 
 
 class ProjectSubframeCreateSchema(Schema):
@@ -924,19 +927,45 @@ class LoginResource(MethodView):
         )
 
         print(f"User {user} logged in successfully, generated JWT token.")
-        return {
-            'status': True,
-            'token': access_token,  # Add JWT token to response
-            'user_id': user_id,
-            'firstname': firstname,
-            'lastname': lastname,
-            'share': share,
-            'phone': phone,
-            'email': email,
-            'permissions': permissions,
-            'aavso_id': aavso_id,
-            'msg': 'Welcome'
-        }
+        return _login_success_payload(
+            access_token, user_id, firstname, lastname, share, phone, email,
+            permissions, aavso_id, user,
+        )
+
+
+def _login_success_payload(access_token, user_id, firstname, lastname, share, phone, email,
+                           permissions, aavso_id, username):
+    return {
+        'status': True,
+        'token': access_token,
+        'user_id': user_id,
+        'firstname': firstname,
+        'lastname': lastname,
+        'share': share,
+        'phone': phone,
+        'email': email,
+        'permissions': permissions,
+        'aavso_id': aavso_id,
+        'msg': 'Welcome'
+    }
+
+
+@blp.route("/login/refresh")
+class LoginRefreshResource(MethodView):
+    @jwt_required()
+    @blp.response(200, LoginResponseSchema)
+    def post(self):
+        """Issue a new access token for the current user (extends session on activity)."""
+        user_id = get_jwt_identity()
+        claims = get_jwt()
+        access_token = create_access_token(
+            identity=user_id,
+            additional_claims={
+                'permissions': claims.get('permissions'),
+                'username': claims.get('username'),
+            },
+        )
+        return {'status': True, 'token': access_token, 'user_id': int(user_id), 'msg': 'Token refreshed'}
 
 
 @blp.route("/auth/password-reset")
@@ -2271,12 +2300,12 @@ class SensorDetailResource(MethodView):
 
 _PROJECT_SELECT_COLS = (
     "project_id, name, description, regexps, scope_id, ra, decl, active, "
-    "last_updated, total_integration_time, start_date, end_date"
+    "last_updated, total_integration_time, start_date, end_date, publications"
 )
 
 _PROJECT_SELECT_COLS_P = (
     "p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active, "
-    "p.last_updated, p.total_integration_time, p.start_date, p.end_date"
+    "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications"
 )
 
 _PROJECT_SORT_COLUMNS = {
@@ -2314,6 +2343,13 @@ def _sql_date_to_iso(val):
     return s[:10] if len(s) >= 10 else s
 
 
+def _normalize_publications(val):
+    if val is None:
+        return None
+    parts = [p.strip() for p in str(val).split() if p.strip()]
+    return " ".join(parts) if parts else None
+
+
 def _project_row_to_dict(r, subframes=None, user_ids=None):
     """Build project dict from a projects SELECT row (includes last_updated, total_integration_time, dates)."""
     return {
@@ -2321,6 +2357,7 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
         "last_updated": r[8], "total_integration_time": float(r[9]) if r[9] is not None else 0.0,
         "start_date": _sql_date_to_iso(r[10]),
         "end_date": _sql_date_to_iso(r[11]),
+        "publications": _normalize_publications(r[12]),
         "subframes": subframes or [], "user_ids": user_ids or []
     }
 
@@ -2416,6 +2453,7 @@ class ProjectsResource(MethodView):
         active = body.get("active", True)
         start_date = body.get("start_date")
         end_date = body.get("end_date")
+        publications = _normalize_publications(body.get("publications"))
         cnx = db.connect()
         if ra is None or decl is None:
             cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
@@ -2429,9 +2467,9 @@ class ProjectsResource(MethodView):
             abort(400, message="Invalid scope_id: telescope not found.")
         db.run_query(
             cnx,
-            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date),
+            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications),
         )
         row = db.run_query(
             cnx,
@@ -2515,6 +2553,9 @@ class ProjectDetailResource(MethodView):
             if key in body:
                 updates.append(f"{key} = %s")
                 args.append(body[key])
+        if "publications" in body:
+            updates.append("publications = %s")
+            args.append(_normalize_publications(body["publications"]))
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
