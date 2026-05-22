@@ -2334,6 +2334,101 @@ class TestUsersAPI(unittest.TestCase):
         self.assertEqual(response.status_code, 403)
         os.environ.pop("HEVELIUS_DB_NAME")
 
+    @use_repository
+    def test_users_me_patch_profile(self, config):
+        """PATCH /api/users/me updates firstname, lastname, email, and aavso_id."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        body = {"firstname": "Alice", "lastname": "Smith", "email": "alice@example.com", "aavso_id": "AA001"}
+        response = self.app.patch("/api/users/me", data=json.dumps(body), headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data["firstname"], "Alice")
+        self.assertEqual(data["lastname"], "Smith")
+        self.assertEqual(data["email"], "alice@example.com")
+        self.assertEqual(data["aavso_id"], "AA001")
+        self.assertNotIn("pass_d", data)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_patch_clear_email(self, config):
+        """PATCH /api/users/me with null email clears it."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        self.app.patch("/api/users/me", data=json.dumps({"email": "set@example.com"}), headers=self.headers_no_admin)
+        response = self.app.patch("/api/users/me", data=json.dumps({"email": None}), headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIsNone(data.get("email"))
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_patch_requires_auth(self, config):
+        """PATCH /api/users/me without a token returns 401."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.patch("/api/users/me", data=json.dumps({"firstname": "X"}),
+                                  headers={"Content-Type": "application/json"})
+        self.assertEqual(response.status_code, 401)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_password_change_success(self, config):
+        """POST /api/users/me/password changes password when current_password is correct."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        from argon2 import PasswordHasher, Type as ArgonType
+        ph = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=1, type=ArgonType.ID)
+        known_hash = ph.hash("OldPassword123")
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE users SET pass_d = %s WHERE user_id = 1", (known_hash,))
+        cnx.close()
+        body = {"current_password": "OldPassword123", "new_password": "NewPassword456"}
+        response = self.app.post("/api/users/me/password", data=json.dumps(body), headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data["status"])
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT pass_d FROM users WHERE user_id = 1")
+        cnx.close()
+        self.assertTrue(str(row[0][0]).startswith("$argon2"))
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_password_change_wrong_current(self, config):
+        """POST /api/users/me/password with wrong current_password returns 400."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        from argon2 import PasswordHasher, Type as ArgonType
+        ph = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=1, type=ArgonType.ID)
+        known_hash = ph.hash("CorrectPassword123")
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE users SET pass_d = %s WHERE user_id = 1", (known_hash,))
+        cnx.close()
+        body = {"current_password": "WrongPassword999", "new_password": "NewPassword456"}
+        response = self.app.post("/api/users/me/password", data=json.dumps(body), headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 400)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_password_change_too_short(self, config):
+        """POST /api/users/me/password with new_password shorter than 8 chars returns 422."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        body = {"current_password": "anything", "new_password": "short"}
+        response = self.app.post("/api/users/me/password", data=json.dumps(body), headers=self.headers_no_admin)
+        self.assertEqual(response.status_code, 422)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_full_list_has_all_fields(self, config):
+        """GET /api/users returns all non-password fields for every user."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.get("/api/users", headers=self.headers_admin)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        u = next(x for x in data["users"] if x["user_id"] == 1)
+        for field in ("user_id", "login", "firstname", "lastname", "email",
+                      "phone", "permissions", "aavso_id", "share", "login_enabled"):
+            self.assertIn(field, u)
+        for secret in ("pass", "pass_d"):
+            self.assertNotIn(secret, u)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
 
 if __name__ == '__main__':
     unittest.main()

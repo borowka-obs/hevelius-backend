@@ -15,7 +15,7 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
-from hevelius.cmd_users import list_users, add_user, disable_user, enable_user
+from hevelius.cmd_users import list_users, add_user, disable_user, enable_user, edit_user_profile
 from hevelius.cmd_equipment import (
     list_filters,
     list_sensors,
@@ -279,6 +279,12 @@ def run():
     user_enable = user_sub.add_parser('enable', help="Enable user (set password)")
     user_enable.add_argument('login_or_id', help="Login name or numeric user_id")
     user_enable.add_argument('--password', required=True, help="New password")
+    user_profile_edit = user_sub.add_parser('profile-edit', help="Edit user profile (name, email, AAVSO id)")
+    user_profile_edit.add_argument('login_or_id', help="Login name or numeric user_id")
+    user_profile_edit.add_argument('--firstname', default=None, help="First name")
+    user_profile_edit.add_argument('--lastname', default=None, help="Last name")
+    user_profile_edit.add_argument('--email', default=None, help="Email address (empty string to clear)")
+    user_profile_edit.add_argument('--aavso-id', default=None, dest='aavso_id', help="AAVSO observer ID")
 
     args = parser.parse_args()
 
@@ -546,6 +552,15 @@ def run():
             return 0 if disable_user(args.login_or_id) else 1
         if args.user_command == "enable":
             return 0 if enable_user(args.login_or_id, args.password) else 1
+        if args.user_command == "profile-edit":
+            ok = edit_user_profile(
+                args.login_or_id,
+                firstname=getattr(args, 'firstname', None),
+                lastname=getattr(args, 'lastname', None),
+                email=getattr(args, 'email', None),
+                aavso_id=getattr(args, 'aavso_id', None),
+            )
+            return 0 if ok else 1
         return user_parser.print_help() or 1
     return parser.print_help()
 

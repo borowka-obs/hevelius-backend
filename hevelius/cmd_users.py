@@ -141,6 +141,36 @@ def disable_user(login_or_id):
     return True
 
 
+def edit_user_profile(login_or_id, firstname=None, lastname=None, email=None, aavso_id=None):
+    """Update profile fields (firstname, lastname, email, aavso_id) for a user.
+    Pass empty string for email to clear it. Returns True on success."""
+    cnx = db.connect()
+    row = _resolve_user(cnx, login_or_id)
+    if not row:
+        cnx.close()
+        print(f"User not found: {login_or_id!r}")
+        return False
+    uid, login = row
+    updates = []
+    args = []
+    for key, val in (("firstname", firstname), ("lastname", lastname), ("aavso_id", aavso_id)):
+        if val is not None:
+            updates.append(f"{key} = %s")
+            args.append(val or None)
+    if email is not None:
+        updates.append("email = %s")
+        args.append(email if email else None)
+    if not updates:
+        cnx.close()
+        return True
+    args.append(uid)
+    db.run_query(cnx, "UPDATE users SET " + ", ".join(updates) + " WHERE user_id = %s", tuple(args))
+    cnx.close()
+    log_user_admin_action("cli", "user.profile_edit", actor_user_id=None, target_user_id=uid, details={"login": login})
+    print(f"Updated user_id={uid} login={login!r}")
+    return True
+
+
 def enable_user(login_or_id, password):
     """Set pass_d from password; clears legacy pass."""
     if not password:

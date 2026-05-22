@@ -803,6 +803,22 @@ class UsersAdminListResponseSchema(Schema):
     users = fields.List(fields.Nested(UserAdminDetailSchema))
 
 
+class UserProfileUpdateSchema(Schema):
+    firstname = fields.String(allow_none=True, validate=validate.Length(max=32))
+    lastname = fields.String(allow_none=True, validate=validate.Length(max=32))
+    email = fields.String(allow_none=True, validate=validate.Length(max=64))
+    aavso_id = fields.String(allow_none=True, validate=validate.Length(max=5))
+
+
+class UserPasswordChangeSchema(Schema):
+    current_password = fields.String(required=True, metadata={"description": "Current password"})
+    new_password = fields.String(
+        required=True,
+        validate=validate.Length(min=8, error="Password must be at least 8 characters"),
+        metadata={"description": "New password"},
+    )
+
+
 class AuditLogEntrySchema(Schema):
     id = fields.Integer()
     created_at = fields.DateTime()
@@ -1039,6 +1055,84 @@ class UsersMeResource(MethodView):
             "aavso_id": aavso,
             "login_enabled": bool(pass_d and str(pass_d).strip()),
         }
+
+    @jwt_required()
+    @blp.arguments(UserProfileUpdateSchema, location="json")
+    @blp.response(200, UserAdminDetailSchema)
+    def patch(self, body):
+        """Update own profile: firstname, lastname, email (optional, may be empty), aavso_id."""
+        uid = _jwt_user_id_int()
+        if uid is None:
+            abort(401, message="Invalid token identity")
+        cnx = db.connect()
+        if not db.run_query(cnx, "SELECT user_id FROM users WHERE user_id = %s", (uid,)):
+            cnx.close()
+            abort(404, message="User not found")
+        updates = []
+        args = []
+        for key in ("firstname", "lastname", "aavso_id"):
+            if key in body:
+                updates.append(f"{key} = %s")
+                args.append(body[key] or None)
+        if "email" in body:
+            updates.append("email = %s")
+            args.append(body["email"] if body["email"] else None)
+        if updates:
+            args.append(uid)
+            db.run_query(cnx, "UPDATE users SET " + ", ".join(updates) + " WHERE user_id = %s", tuple(args))
+        rows = db.run_query(
+            cnx,
+            """SELECT user_id, login, firstname, lastname, share, phone, email,
+                      permissions, aavso_id, pass_d
+               FROM users WHERE user_id = %s""",
+            (uid,),
+        )
+        cnx.close()
+        r = rows[0]
+        return {
+            "user_id": r[0], "login": r[1], "firstname": r[2], "lastname": r[3],
+            "share": float(r[4]) if r[4] is not None else None,
+            "phone": r[5], "email": r[6], "permissions": r[7], "aavso_id": r[8],
+            "login_enabled": bool(r[9] and str(r[9]).strip()),
+        }
+
+
+@blp.route("/users/me/password")
+class UsersMePasswordResource(MethodView):
+    @jwt_required()
+    @blp.arguments(UserPasswordChangeSchema, location="json")
+    @blp.response(200, StatusMsgSchema)
+    def post(self, body):
+        """Change own password. current_password must match the stored credential."""
+        uid = _jwt_user_id_int()
+        if uid is None:
+            abort(401, message="Invalid token identity")
+        cnx = db.connect()
+        rows = db.run_query(cnx, "SELECT pass_d FROM users WHERE user_id = %s", (uid,))
+        cnx.close()
+        if not rows:
+            abort(404, message="User not found")
+        pass_d = rows[0][0]
+        if not (pass_d and str(pass_d).strip()):
+            abort(400, message="Account has no password set; use the password reset flow.")
+        current = body["current_password"]
+        if isinstance(pass_d, str) and _MD5_HEX_RE.fullmatch(pass_d):
+            legacy_md5 = hashlib.md5(current.encode("utf-8")).hexdigest()
+            if not hmac.compare_digest(legacy_md5.lower(), pass_d.lower()):
+                abort(400, message="Current password is incorrect.")
+        elif isinstance(pass_d, str) and pass_d.startswith("$argon2"):
+            try:
+                password_hasher.verify(pass_d, current)
+            except (VerifyMismatchError, InvalidHashError):
+                abort(400, message="Current password is incorrect.")
+        else:
+            abort(400, message="Unsupported password format; use the password reset flow.")
+        new_hash = password_hasher.hash(body["new_password"])
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE users SET pass = NULL, pass_d = %s WHERE user_id = %s", (new_hash, uid))
+        cnx.close()
+        log_user_admin_action("api", "user.password_change", actor_user_id=uid, target_user_id=uid, details={})
+        return {"status": True, "msg": "Password updated"}
 
 
 @blp.route("/users/audit-log")
