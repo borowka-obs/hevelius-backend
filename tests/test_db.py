@@ -8,6 +8,8 @@ from hevelius.cmd_equipment import (
     edit_sensor,
     add_project,
     edit_project,
+    delete_project,
+    find_similar_project_names,
     add_project_subframe,
     remove_project_subframe,
     get_filter_id_by_short_name,
@@ -345,5 +347,53 @@ class DbTest(unittest.TestCase):
             rows = db.run_query(conn, "SELECT id FROM project_subframes WHERE project_id = %s AND id = %s", (pid, sid))
             conn.close()
             self.assertEqual(len(rows), 0)
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)
+
+    @use_repository
+    def test_delete_project_cli(self, config):
+        """delete_project removes the project and cascades to subframes."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            pid = add_project("Delete Me", scope_id=1, description="temp", ra=1.0, dec=10.0)
+            self.assertIsNotNone(pid)
+            fid = get_filter_id_by_short_name("SG")
+            add_project_subframe(pid, filter_id=fid, exposure_time=30.0)
+            ok = delete_project(pid)
+            self.assertTrue(ok)
+            conn = db.connect()
+            proj_rows = db.run_query(conn, "SELECT project_id FROM projects WHERE project_id = %s", (pid,))
+            sub_rows = db.run_query(conn, "SELECT id FROM project_subframes WHERE project_id = %s", (pid,))
+            conn.close()
+            self.assertEqual(len(proj_rows), 0)
+            self.assertEqual(len(sub_rows), 0)
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)
+
+    @use_repository
+    def test_delete_project_not_found_returns_false(self, config):
+        """delete_project returns False for non-existent project."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            ok = delete_project(999999)
+            self.assertFalse(ok)
+        finally:
+            os.environ.pop('HEVELIUS_DB_NAME', None)
+
+    @use_repository
+    def test_find_similar_project_names(self, config):
+        """find_similar_project_names detects substring overlap."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        try:
+            pid1 = add_project("SimilarBase Alpha", scope_id=1, ra=1.0, dec=10.0)
+            pid2 = add_project("SimilarBase Alpha Extended", scope_id=1, ra=1.0, dec=10.0)
+            self.assertIsNotNone(pid1)
+            self.assertIsNotNone(pid2)
+            similar = find_similar_project_names("SimilarBase Alpha")
+            ids = [s['project_id'] for s in similar]
+            self.assertIn(pid1, ids)
+            self.assertIn(pid2, ids)
+            unique = find_similar_project_names("CompletelyUniqueXYZ999")
+            self.assertEqual(len(unique), 0)
         finally:
             os.environ.pop('HEVELIUS_DB_NAME', None)

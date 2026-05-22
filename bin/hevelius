@@ -23,6 +23,8 @@ from hevelius.cmd_equipment import (
     show_project,
     add_project,
     edit_project,
+    delete_project,
+    find_similar_project_names,
     get_filter_id_by_short_name,
     add_project_subframe,
     edit_project_subframe,
@@ -201,6 +203,8 @@ def run():
     subframe_remove = subframe_sub.add_parser('remove', help="Remove a subframe from a project")
     subframe_remove.add_argument('project_id', type=int, help="Project ID")
     subframe_remove.add_argument('subframe_id', type=int, help="Subframe ID to remove")
+    project_delete = project_sub.add_parser('delete', help="Delete a project and all its associated data")
+    project_delete.add_argument('project_id', type=int, help="Project ID to delete")
     project_stats_parser = project_sub.add_parser('stats', help="Show task statistics for a project")
     project_stats_parser.add_argument('project_id', type=int, help="Project ID")
     project_task_add = project_sub.add_parser('task-add', help="Assign a task to a project")
@@ -365,6 +369,9 @@ def run():
         return 0
     if args.command == "project":
         if args.project_command == "add":
+            similar = find_similar_project_names(args.name)
+            for s in similar:
+                print(f"Warning: project with similar name '{s['name']}' already exists (id={s['project_id']})", file=sys.stderr)
             active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
             pid = add_project(
                 args.name,
@@ -395,6 +402,13 @@ def run():
                 active=active
             )
             return 0 if ok else 1
+        if args.project_command == "delete":
+            ok = delete_project(args.project_id)
+            if not ok:
+                print(f"Project {args.project_id} not found.", file=sys.stderr)
+                return 1
+            print(f"Deleted project {args.project_id}")
+            return 0
         if args.project_command == "show":
             return show_project(args.project_id) or 0
         if args.project_command == "stats":
