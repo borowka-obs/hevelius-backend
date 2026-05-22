@@ -2,6 +2,8 @@
 CLI commands for filters, sensors (cameras), and projects.
 """
 
+import difflib
+
 from hevelius import db
 
 
@@ -322,6 +324,41 @@ def edit_project(project_id, name=None, description=None, scope_id=None, ra=None
         return True
     args.append(project_id)
     db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
+    cnx.close()
+    return True
+
+
+def find_similar_project_names(name, exclude_id=None):
+    """Return list of {project_id, name} dicts for projects with names similar to name."""
+    cnx = db.connect()
+    if exclude_id is not None:
+        rows = db.run_query(cnx, "SELECT project_id, name FROM projects WHERE project_id != %s", (exclude_id,))
+    else:
+        rows = db.run_query(cnx, "SELECT project_id, name FROM projects")
+    cnx.close()
+    if not rows:
+        return []
+    name_lower = name.strip().lower()
+    similar = []
+    for r in rows:
+        pid, pname = r[0], r[1]
+        pname_lower = (pname or "").strip().lower()
+        if name_lower in pname_lower or pname_lower in name_lower:
+            similar.append({"project_id": pid, "name": pname})
+            continue
+        if difflib.SequenceMatcher(None, name_lower, pname_lower).ratio() >= 0.6:
+            similar.append({"project_id": pid, "name": pname})
+    return similar
+
+
+def delete_project(project_id):
+    """Delete a project and all its associated data (cascades via FK). Returns True on success, False if not found."""
+    cnx = db.connect()
+    row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+    if not row:
+        cnx.close()
+        return False
+    db.run_query(cnx, "DELETE FROM projects WHERE project_id = %s", (project_id,))
     cnx.close()
     return True
 

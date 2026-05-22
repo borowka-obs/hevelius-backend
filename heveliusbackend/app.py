@@ -2,6 +2,7 @@
 Flask application that provides a REST API to the Hevelius backend.
 """
 
+import difflib
 import logging
 import hashlib
 import hmac
@@ -2371,6 +2372,27 @@ def _project_subframe_count(goal_count, count):
     return 0
 
 
+def _find_similar_project_names(cnx, name, exclude_id=None):
+    """Return list of existing projects whose names are similar to name (substring or fuzzy match)."""
+    if exclude_id is not None:
+        rows = db.run_query(cnx, "SELECT project_id, name FROM projects WHERE project_id != %s", (exclude_id,))
+    else:
+        rows = db.run_query(cnx, "SELECT project_id, name FROM projects")
+    if not rows:
+        return []
+    name_lower = name.strip().lower()
+    similar = []
+    for r in rows:
+        pid, pname = r[0], r[1]
+        pname_lower = (pname or "").strip().lower()
+        if name_lower in pname_lower or pname_lower in name_lower:
+            similar.append({"project_id": pid, "name": pname})
+            continue
+        if difflib.SequenceMatcher(None, name_lower, pname_lower).ratio() >= 0.6:
+            similar.append({"project_id": pid, "name": pname})
+    return similar
+
+
 @blp.route("/projects")
 class ProjectsResource(MethodView):
     @jwt_required()
@@ -2465,6 +2487,11 @@ class ProjectsResource(MethodView):
         if not scope_exists:
             cnx.close()
             abort(400, message="Invalid scope_id: telescope not found.")
+        similar = _find_similar_project_names(cnx, name)
+        warnings = [
+            f"Project with similar name '{p['name']}' already exists (id={p['project_id']})"
+            for p in similar
+        ]
         db.run_query(
             cnx,
             "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications) "
@@ -2495,7 +2522,7 @@ class ProjectsResource(MethodView):
         ]
         user_ids = [ur[0] for ur in (user_rows or [])]
         project = _project_row_to_dict(row[0], subframes=subframes, user_ids=user_ids)
-        return {"status": True, "project_id": project_id, "project": project, "msg": "Created"}, 201
+        return {"status": True, "project_id": project_id, "project": project, "msg": "Created", "warnings": warnings}, 201
 
 
 @blp.route("/projects/<int:project_id>")
@@ -2575,6 +2602,19 @@ class ProjectDetailResource(MethodView):
         user_ids = [ur[0] for ur in (user_rows or [])]
         project = _project_row_to_dict(row[0], subframes=subframes, user_ids=user_ids)
         return {"status": True, "project": project, "msg": "Updated"}
+
+    @jwt_required()
+    @blp.response(200)
+    def delete(self, project_id):
+        """Delete project (subframes, user associations, and task links cascade automatically)."""
+        cnx = db.connect()
+        row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
+        if not row:
+            cnx.close()
+            abort(404, message=f"Project {project_id} not found")
+        db.run_query(cnx, "DELETE FROM projects WHERE project_id = %s", (project_id,))
+        cnx.close()
+        return {"status": True, "msg": f"Project {project_id} deleted"}
 
 
 def _resolve_filter_id(cnx, body, require_one=True):

@@ -2136,6 +2136,73 @@ class TestProjectOperations(unittest.TestCase):
         os.environ.pop('HEVELIUS_DB_NAME')
 
 
+    @use_repository
+    def test_project_delete(self, config):
+        """DELETE project removes it; subsequent GET returns status=False."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "ToDelete", "scope_id": 1, "ra": 0.5, "decl": 25.0}
+        cr = json.loads(self.app.post('/api/projects', data=json.dumps(body), headers=self.headers).data)
+        pid = cr['project_id']
+        response = self.app.delete(f'/api/projects/{pid}', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['status'])
+        get_resp = self.app.get(f'/api/projects/{pid}', headers=self.headers)
+        get_data = json.loads(get_resp.data)
+        self.assertFalse(get_data['status'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_delete_not_found(self, config):
+        """DELETE non-existent project returns 404."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.delete('/api/projects/99999', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_similar_name_warns(self, config):
+        """Creating project whose name is a substring of an existing one returns warnings."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        suf = datetime.now().strftime('%H%M%S%f')
+        body1 = {"name": f"M31 Campaign {suf}", "scope_id": 1, "ra": 0.5, "decl": 25.0}
+        self.app.post('/api/projects', data=json.dumps(body1), headers=self.headers)
+        body2 = {"name": f"M31 Campaign {suf} extended", "scope_id": 1, "ra": 0.5, "decl": 25.0}
+        response = self.app.post('/api/projects', data=json.dumps(body2), headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        data = json.loads(response.data)
+        self.assertTrue(data['status'])
+        self.assertIn('warnings', data)
+        self.assertGreater(len(data['warnings']), 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_no_similar_name_no_warnings(self, config):
+        """Creating a project with a unique name returns an empty warnings list."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        suf = datetime.now().strftime('%H%M%S%f')
+        body = {"name": f"UniqueXYZ{suf}", "scope_id": 1, "ra": 0.5, "decl": 25.0}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 201)
+        data = json.loads(response.data)
+        self.assertTrue(data['status'])
+        self.assertIn('warnings', data)
+        self.assertEqual(len(data['warnings']), 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_edit_description(self, config):
+        """PATCH can update only the description of a project."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"description": "Brand new description"}
+        response = self.app.patch('/api/projects/1', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['project']['description'], 'Brand new description')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+
 class TestUsersAPI(unittest.TestCase):
     """GET /api/users/logins and GET /api/users (admin)."""
 
