@@ -2135,7 +2135,6 @@ class TestProjectOperations(unittest.TestCase):
         self.assertTrue(data.get('token'))
         os.environ.pop('HEVELIUS_DB_NAME')
 
-
     @use_repository
     def test_project_delete(self, config):
         """DELETE project removes it; subsequent GET returns status=False."""
