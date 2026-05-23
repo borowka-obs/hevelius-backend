@@ -26,7 +26,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 22)
+        self.assertEqual(version, 21)
 
     @use_repository
     def test_sensor(self, config):
@@ -213,7 +213,7 @@ class DbTest(unittest.TestCase):
 
     @use_repository
     def test_projects_publications_column(self, config):
-        """projects.publications column exists (schema 22)."""
+        """projects.publications column exists (schema 21)."""
         conn = db.connect(config)
         rows = db.run_query(
             conn,

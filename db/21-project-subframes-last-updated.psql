@@ -8,4 +8,7 @@
 ALTER TABLE project_subframes
   ADD COLUMN IF NOT EXISTS last_updated TIMESTAMPTZ NOT NULL DEFAULT now();
 
+ALTER TABLE projects
+  ADD COLUMN IF NOT EXISTS publications text;
+
 UPDATE schema_version SET version = 21;
