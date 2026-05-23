@@ -1117,9 +1117,7 @@ class UsersMePasswordResource(MethodView):
             abort(400, message="Account has no password set; use the password reset flow.")
         current = body["current_password"]
         if isinstance(pass_d, str) and _MD5_HEX_RE.fullmatch(pass_d):
-            legacy_md5 = hashlib.md5(current.encode("utf-8")).hexdigest()
-            if not hmac.compare_digest(legacy_md5.lower(), pass_d.lower()):
-                abort(400, message="Current password is incorrect.")
+            abort(400, message="Legacy password format detected; use the password reset flow.")
         elif isinstance(pass_d, str) and pass_d.startswith("$argon2"):
             try:
                 password_hasher.verify(pass_d, current)
