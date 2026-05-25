@@ -11,8 +11,10 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   goal_count or active flag.
 - API: project subframes now expose `last_updated` (UTC). The server stamps it on
   every successful PATCH so callers can detect stale rows and skip no-op writes.
-- DB: Schema bumped to 20: added `project_subframes.last_updated`.
+- DB: Schema bumped to 21: added `project_subframes.last_updated`.
 - API: project publications mechanism added.
+- API: projects can be deleted.
+- CLI: projects can be deleted.
 
 ## 0.5.0 (2026-04-27)
 
