@@ -1,6 +1,5 @@
 import io
 import os
-import sys
 import unittest
 from argparse import Namespace
 from unittest.mock import patch
