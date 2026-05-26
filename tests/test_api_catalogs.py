@@ -129,11 +129,12 @@ class TestCatalogs(unittest.TestCase):
         data = json.loads(response.data)
         self.assertTrue(all(obj['catalog'] == 'ngc' for obj in data['objects']))
 
-        # Test filtering by name
-        response = self.app.get('/api/catalogs/list?name=7000', headers=self.headers)
+        # Test filtering by name (matches name or altname)
+        response = self.app.get('/api/catalogs/list?name=7000&catalog=ngc', headers=self.headers)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
-        self.assertTrue(all('7000' in obj['name'].lower() for obj in data['objects']))
+        self.assertGreaterEqual(data['total'], 1)
+        self.assertIn('NGC7000', {obj['name'] for obj in data['objects']})
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
@@ -264,8 +265,104 @@ class TestCatalogs(unittest.TestCase):
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    @use_repository
+    def test_catalogs_installed_list(self, config):
+        """Test installed catalogs list endpoint"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        cnx = db.connect(config)
+        db.run_query(cnx, """
+            INSERT INTO catalogs (name, shortname, filename, descr, url, version)
+            VALUES
+            ('Test NGC', 'TNGC', 'ngc.dat', 'NGC', 'http://example.com/ngc', '1.0'),
+            ('Test Messier', 'TM', 'm.dat', 'M', 'http://example.com/m', '1.0')
+            RETURNING shortname""")
+        db.run_query(cnx, """
+            INSERT INTO objects (name, ra, decl, descr, type, catalog)
+            VALUES
+            ('TNGC7000', 20.99, 44.37, 'North America Nebula', 'EN', 'TNGC'),
+            ('TNGC7001', 21.00, 44.45, 'Spiral Galaxy', 'G', 'TNGC'),
+            ('TM31', 0.71, 41.27, 'Andromeda Galaxy', 'G', 'TM')
+            RETURNING object_id""")
+        tngc_count = db.run_query(cnx, "SELECT COUNT(*) FROM objects WHERE catalog = 'TNGC'")[0][0]
+        tm_count = db.run_query(cnx, "SELECT COUNT(*) FROM objects WHERE catalog = 'TM'")[0][0]
+        cnx.close()
+
+        response = self.app.get('/api/catalogs?sort=entries', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIn('catalogs', data)
+        by_short = {c['shortname']: c for c in data['catalogs'] if c['shortname'] in ('TNGC', 'TM')}
+        self.assertEqual(len(by_short), 2)
+        self.assertEqual(by_short['TNGC']['object_count'], tngc_count)
+        self.assertEqual(by_short['TM']['object_count'], tm_count)
+
+        response = self.app.get('/api/catalogs?sort=name', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        names = [c['name'].lower() for c in data['catalogs']]
+        self.assertEqual(names, sorted(names))
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_catalog_list_filter_by_coordinates(self, config):
+        """Test catalog list filtering by RA/decl proximity"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        cnx = db.connect(config)
+        db.run_query(cnx, """
+            INSERT INTO catalogs (name, shortname, filename, descr, url, version)
+            VALUES ('Test Messier', 'TM', 'm.dat', 'M', 'http://example.com/m', '1.0')
+            RETURNING shortname""")
+        db.run_query(cnx, """
+            INSERT INTO objects (name, ra, decl, descr, type, catalog)
+            VALUES
+            ('TM31', 0.71, 41.27, 'Andromeda Galaxy', 'G', 'TM'),
+            ('TM8', 18.06, -24.38, 'Lagoon Nebula', 'EN', 'TM')
+            RETURNING object_id""")
+        cnx.close()
+
+        response = self.app.get(
+            '/api/catalogs/list?ra=0.71&decl=41.27&proximity=2.0',
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        names = {obj['name'] for obj in data['objects']}
+        self.assertIn('TM31', names)
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_catalog_list_name_matches_altname(self, config):
+        """Test that name filter matches altname as well as name"""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+
+        cnx = db.connect(config)
+        db.run_query(cnx, """
+            INSERT INTO catalogs (name, shortname, filename, descr, url, version)
+            VALUES ('Test NGC', 'TNGC', 'ngc.dat', 'NGC', 'http://example.com/ngc', '1.0')
+            RETURNING shortname""")
+        db.run_query(cnx, """
+            INSERT INTO objects (name, ra, decl, descr, type, catalog, altname)
+            VALUES ('TNGC7000', 20.99, 44.37, 'North America Nebula', 'EN', 'TNGC', '7000')
+            RETURNING object_id""")
+        cnx.close()
+
+        response = self.app.get('/api/catalogs/list?name=7000', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertGreaterEqual(data['total'], 1)
+        self.assertIn('TNGC7000', {obj['name'] for obj in data['objects']})
+
+        os.environ.pop('HEVELIUS_DB_NAME')
+
     def test_unauthorized_access(self):
         """Test unauthorized access to endpoints"""
+        response = self.app.get('/api/catalogs')
+        self.assertEqual(response.status_code, 401)
+
         # Test search endpoint without token
         response = self.app.get('/api/catalogs/search?query=ngc7')
         self.assertEqual(response.status_code, 401)
@@ -293,6 +390,10 @@ class TestCatalogs(unittest.TestCase):
 
         # Test invalid per_page value
         response = self.app.get('/api/catalogs/list?per_page=0', headers=self.headers)
+        self.assertEqual(response.status_code, 422)
+
+        # ra without decl
+        response = self.app.get('/api/catalogs/list?ra=1.0', headers=self.headers)
         self.assertEqual(response.status_code, 422)
 
         os.environ.pop('HEVELIUS_DB_NAME')

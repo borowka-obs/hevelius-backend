@@ -698,6 +698,24 @@ class CatalogSchema(Schema):
     version = fields.String(metadata={"description": "Catalog version"})
 
 
+class InstalledCatalogSchema(Schema):
+    name = fields.String(required=True, metadata={"description": "Catalog name"})
+    shortname = fields.String(required=True, metadata={"description": "Catalog short name"})
+    object_count = fields.Integer(required=True, metadata={"description": "Number of objects in this catalog"})
+
+
+class CatalogsInstalledRequestSchema(Schema):
+    sort = fields.String(
+        missing='entries',
+        validate=validate.OneOf(['entries', 'name']),
+        metadata={"description": "Sort by object count (entries) or catalog name (name)"},
+    )
+
+
+class CatalogsInstalledResponseSchema(Schema):
+    catalogs = fields.List(fields.Nested(InstalledCatalogSchema))
+
+
 class ObjectSchema(Schema):
     object_id = fields.Integer(metadata={"description": "Object ID"})
     name = fields.String(required=True, metadata={"description": "Object name"})
@@ -740,7 +758,21 @@ class ObjectsListRequestSchema(Schema):
     # Filtering parameters
     catalog = fields.String(metadata={"description": "Filter by catalog short name"})
     constellation = fields.String(metadata={"description": "Filter by constellation code (e.g. Sgr)"})
-    name = fields.String(metadata={"description": "Filter by object name"})
+    name = fields.String(metadata={"description": "Filter by object name (matches name or altname)"})
+    ra = fields.Float(metadata={"description": "Right ascension in hours; requires decl"})
+    decl = fields.Float(metadata={"description": "Declination in degrees; requires ra"})
+    proximity = fields.Float(
+        missing=1.0,
+        validate=validate.Range(min=0.0),
+        metadata={"description": "Search radius in degrees when ra and decl are set"},
+    )
+
+    @validates_schema
+    def validate_ra_decl_pair(self, data, **_kwargs):
+        has_ra = data.get('ra') is not None
+        has_decl = data.get('decl') is not None
+        if has_ra != has_decl:
+            raise ValidationError('ra and decl must both be specified or both omitted')
 
 
 class ObjectsListResponseSchema(Schema):
@@ -2885,6 +2917,46 @@ class ProjectTaskResource(MethodView):
         return {"status": True, "msg": f"Task {task_id} removed from project {project_id}"}
 
 
+def _object_row_to_dict(row):
+    return {
+        'object_id': row[0],
+        'name': row[1],
+        'ra': row[2],
+        'decl': row[3],
+        'descr': row[4],
+        'comment': row[5],
+        'type': row[6],
+        'epoch': row[7],
+        'const': row[8],
+        'magn': row[9],
+        'x': row[10],
+        'y': row[11],
+        'altname': row[12],
+        'distance': row[13],
+        'catalog': row[14],
+    }
+
+
+@blp.route("/catalogs")
+class CatalogsInstalledResource(MethodView):
+    @jwt_required()
+    @blp.arguments(CatalogsInstalledRequestSchema, location="query")
+    @blp.response(200, CatalogsInstalledResponseSchema)
+    def get(self, args):
+        """List installed catalogs with object counts."""
+        sort_by = args.get('sort', 'entries')
+        sort_order = 'desc' if sort_by == 'entries' else 'asc'
+        cnx = db.connect()
+        rows = db.catalogs_installed_list(cnx, sort_by=sort_by, sort_order=sort_order)
+        cnx.close()
+        return {
+            'catalogs': [
+                {'name': row[0], 'shortname': row[1], 'object_count': row[2]}
+                for row in rows
+            ],
+        }
+
+
 @blp.route("/catalogs/search")
 class ObjectSearchResource(MethodView):
     @jwt_required()
@@ -2914,29 +2986,7 @@ class ObjectSearchResource(MethodView):
         results = db.run_query(cnx, search_query, (search_pattern, search_pattern, limit))
         cnx.close()
 
-        # Format the results
-        objects = []
-        for row in results:
-            obj = {
-                'object_id': row[0],
-                'name': row[1],
-                'ra': row[2],
-                'decl': row[3],
-                'descr': row[4],
-                'comment': row[5],
-                'type': row[6],
-                'epoch': row[7],
-                'const': row[8],
-                'magn': row[9],
-                'x': row[10],
-                'y': row[11],
-                'altname': row[12],
-                'distance': row[13],
-                'catalog': row[14]
-            }
-            objects.append(obj)
-
-        return {"objects": objects}
+        return {"objects": [_object_row_to_dict(row) for row in results]}
 
 
 @blp.route("/catalogs/list")
@@ -2957,57 +3007,33 @@ class ObjectsListResource(MethodView):
 
     def _get_objects(self, args):
         """Helper method to get objects based on filters, sorting, and paging"""
-        # Base query
-        query = """
-            SELECT object_id, name, ra, decl, descr, comment, type, epoch, const,
-                   magn, x, y, altname, distance, catalog
-            FROM objects
-        """
-
-        count_query = "SELECT COUNT(*) FROM objects"
-
-        # Build where clause and parameters
-        where_clauses = []
-        params = []
-
-        # Apply filters
-        if args.get('catalog'):
-            where_clauses.append("catalog ILIKE %s")
-            params.append(args['catalog'])
-
-        if args.get('constellation'):
-            where_clauses.append("const ILIKE %s")
-            params.append(args['constellation'])
-
-        if args.get('name'):
-            where_clauses.append("name ILIKE %s")
-            params.append(f"%{args['name']}%")
-
-        # Add where clauses to queries
-        if where_clauses:
-            where_str = " WHERE " + " AND ".join(where_clauses)
-            query += where_str
-            count_query += where_str
-
-        # Add sorting
-        sort_field = args.get('sort_by', 'name')
-        sort_order = args.get('sort_order', 'asc').upper()
-        query += f" ORDER BY {sort_field} {sort_order}"
-
-        # Add pagination
         page = args.get('page', 1)
         per_page = args.get('per_page', 100)
         offset = (page - 1) * per_page
-        query += f" LIMIT {per_page} OFFSET {offset}"
 
-        # Execute queries
         cnx = db.connect()
-
-        # Get total count
-        total_count = db.run_query(cnx, count_query, params)[0][0]
-
-        # Get paginated results
-        objects_list = db.run_query(cnx, query, params)
+        total_count = db.catalog_objects_count(
+            cnx,
+            catalog=args.get('catalog'),
+            constellation=args.get('constellation'),
+            name=args.get('name'),
+            ra_hours=args.get('ra'),
+            decl=args.get('decl'),
+            proximity=args.get('proximity', 1.0),
+        )
+        objects_list = db.catalog_objects_search(
+            cnx,
+            catalog=args.get('catalog'),
+            constellation=args.get('constellation'),
+            name=args.get('name'),
+            ra_hours=args.get('ra'),
+            decl=args.get('decl'),
+            proximity=args.get('proximity', 1.0),
+            sort_by=args.get('sort_by', 'name'),
+            sort_order=args.get('sort_order', 'asc'),
+            limit=per_page,
+            offset=offset,
+        )
         cnx.close()
 
         logger.info(
@@ -3015,37 +3041,14 @@ class ObjectsListResource(MethodView):
             len(objects_list), page, total_count
         )
 
-        # Format objects
-        formatted_objects = []
-        for obj in objects_list:
-            obj_dict = {
-                'object_id': obj[0],
-                'name': obj[1],
-                'ra': obj[2],
-                'decl': obj[3],
-                'descr': obj[4],
-                'comment': obj[5],
-                'type': obj[6],
-                'epoch': obj[7],
-                'const': obj[8],
-                'magn': obj[9],
-                'x': obj[10],
-                'y': obj[11],
-                'altname': obj[12],
-                'distance': obj[13],
-                'catalog': obj[14]
-            }
-            formatted_objects.append(obj_dict)
-
-        # Calculate total pages
-        total_pages = (total_count + per_page - 1) // per_page
+        total_pages = (total_count + per_page - 1) // per_page if per_page else 0
 
         return {
-            "objects": formatted_objects,
+            "objects": [_object_row_to_dict(obj) for obj in objects_list],
             "total": total_count,
             "page": page,
             "per_page": per_page,
-            "pages": total_pages
+            "pages": total_pages,
         }
 
 

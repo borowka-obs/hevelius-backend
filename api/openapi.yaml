@@ -884,6 +884,25 @@ components:
         version:
           type: string
           description: Catalog version
+    InstalledCatalog:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Catalog name
+        shortname:
+          type: string
+          description: Catalog short name
+        object_count:
+          type: integer
+          description: Number of objects loaded for this catalog
+    CatalogsInstalledList:
+      type: object
+      properties:
+        catalogs:
+          type: array
+          items:
+            $ref: '#/components/schemas/InstalledCatalog'
     Object:
       type: object
       properties:
@@ -2650,6 +2669,28 @@ paths:
           description: Project or subframe not found
       security:
         - bearerAuth: []
+  /api/catalogs:
+    get:
+      summary: List installed catalogs
+      description: Returns catalogs loaded in the database with object counts per catalog
+      parameters:
+        - name: sort
+          in: query
+          description: Sort by object count (entries) or catalog name (name)
+          required: false
+          schema:
+            type: string
+            enum: [entries, name]
+            default: entries
+      responses:
+        '200':
+          description: Installed catalogs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CatalogsInstalledList'
+      security:
+        - bearerAuth: []
   /api/catalogs/search:
     get:
       summary: Search for astronomical objects
@@ -2736,10 +2777,33 @@ paths:
             type: string
         - name: name
           in: query
-          description: Filter by object name
+          description: Filter by object name (partial match on name or altname)
           required: false
           schema:
             type: string
+        - name: ra
+          in: query
+          description: Right ascension in hours; requires decl
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: decl
+          in: query
+          description: Declination in degrees; requires ra
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: proximity
+          in: query
+          description: Search radius in degrees when ra and decl are set
+          required: false
+          schema:
+            type: number
+            format: float
+            default: 1.0
+            minimum: 0
       responses:
         '200':
           description: List of objects with pagination info
@@ -2747,6 +2811,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectsList'
+        '422':
+          description: Invalid parameters (e.g. ra without decl)
       security:
         - bearerAuth: []
     post:
@@ -2788,7 +2854,21 @@ paths:
                   description: Filter by constellation code (e.g. Sgr)
                 name:
                   type: string
-                  description: Filter by object name
+                  description: Filter by object name (partial match on name or altname)
+                ra:
+                  type: number
+                  format: float
+                  description: Right ascension in hours; requires decl
+                decl:
+                  type: number
+                  format: float
+                  description: Declination in degrees; requires ra
+                proximity:
+                  type: number
+                  format: float
+                  description: Search radius in degrees when ra and decl are set
+                  default: 1.0
+                  minimum: 0
       responses:
         '200':
           description: List of objects with pagination info
@@ -2796,5 +2876,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectsList'
+        '422':
+          description: Invalid parameters (e.g. ra without decl)
       security:
         - bearerAuth: []

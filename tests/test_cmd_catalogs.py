@@ -158,11 +158,29 @@ class TestCmdCatalogs(unittest.TestCase):
             sort="name",
             sort_order="asc",
             limit=None,
+            radius=None,
         )
         with patch("sys.stdout", new_callable=io.StringIO) as out:
             rc = find_catalog_objects(args)
         self.assertEqual(rc, 0)
         self.assertIn("TM31", out.getvalue())
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_fetch_catalog_objects_radius(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        cnx = db.connect(config)
+        _seed_catalogs(cnx)
+        cnx.close()
+
+        near_m31 = fetch_catalog_objects(ra_hours=0.71, decl=41.27, proximity=1.0)
+        near_m8 = fetch_catalog_objects(ra_hours=18.06, decl=-24.38, proximity=1.0)
+        m31_names = {o["name"] for o in near_m31}
+        m8_names = {o["name"] for o in near_m8}
+        self.assertIn("TM31", m31_names)
+        self.assertIn("TM8", m8_names)
+        self.assertNotIn("TM8", m31_names)
+
         os.environ.pop("HEVELIUS_DB_NAME")
 
     def test_find_catalog_objects_ra_dec_validation(self):
@@ -175,10 +193,27 @@ class TestCmdCatalogs(unittest.TestCase):
             sort="name",
             sort_order="asc",
             limit=None,
+            radius=None,
         )
         with patch("sys.stderr", new_callable=io.StringIO):
             with self.assertRaises(SystemExit):
                 find_catalog_objects(args)
+
+    def test_find_catalog_objects_radius_requires_coords(self):
+        args = Namespace(
+            name=None,
+            catalog=None,
+            const=None,
+            ra=None,
+            dec=None,
+            sort="name",
+            sort_order="asc",
+            limit=None,
+            radius=2.0,
+        )
+        with patch("sys.stderr", new_callable=io.StringIO):
+            rc = find_catalog_objects(args)
+        self.assertEqual(rc, 1)
 
 
 if __name__ == "__main__":

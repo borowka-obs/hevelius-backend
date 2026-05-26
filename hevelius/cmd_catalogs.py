@@ -178,12 +178,25 @@ def find_catalog_objects(args) -> int:
     ra_hours = coords[0] if coords else None
     decl = coords[1] if coords else None
 
+    radius = getattr(args, "radius", None)
+    if coords:
+        proximity = radius if radius is not None else 1.0
+        if proximity <= 0:
+            print("Error: --radius must be a positive number.", file=sys.stderr)
+            return 1
+    elif radius is not None:
+        print("Error: --radius requires --ra and --dec.", file=sys.stderr)
+        return 1
+    else:
+        proximity = 1.0
+
     objects = fetch_catalog_objects(
         catalog=getattr(args, "catalog", None),
         constellation=getattr(args, "const", None),
         name=name,
         ra_hours=ra_hours,
         decl=decl,
+        proximity=proximity,
         sort_by=sort_by,
         sort_order=sort_order,
         limit=limit,

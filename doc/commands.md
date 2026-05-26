@@ -57,8 +57,8 @@ User add / enable / disable actions are recorded in the **user_admin_audit** tab
 - **catalogs** – List catalogs loaded in the database with object counts.
   `hevelius catalogs [--sort entries|name]` (default sort: by object count).
 - **catalog** – Search catalog objects: `hevelius catalog [NAME] [--catalog SHORTNAME]
-  [--const CODE] [--ra HH MM SS] [--dec +DD MM SS] [--sort FIELD] [--sort-order asc|desc]
-  [--limit N]`. See `doc/catalogs.md` for details.
+  [--const CODE] [--ra HH MM SS] [--dec +DD MM SS] [--radius DEG] [--sort FIELD]
+  [--sort-order asc|desc] [--limit N]`. See `doc/catalogs.md` for details.
 
 ### Data catalog – objects near coordinates and matching frames
 

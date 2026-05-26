@@ -133,6 +133,12 @@ def run():
         help="Declination (+DD MM [SS] format); requires --ra",
     )
     catalog_search_parser.add_argument(
+        '--radius',
+        type=float,
+        default=None,
+        help="Search radius in degrees with --ra and --dec (default: 1.0)",
+    )
+    catalog_search_parser.add_argument(
         '--sort',
         choices=['catalog', 'name', 'ra', 'decl', 'const', 'type', 'magn'],
         default='name',
