@@ -3,7 +3,7 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## 0.5.1 (2026-05-26)
 
 - CLI: `hevelius catalogs` lists installed catalogs with object counts (`--sort entries|name`).
 - CLI: `hevelius catalog` searches catalog objects by name, catalog, constellation,
