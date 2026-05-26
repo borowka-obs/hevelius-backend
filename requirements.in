@@ -7,6 +7,7 @@ flask
 flask-cors
 flask-smorest
 flask-jwt-extended
+webargs>=8.7.1
 
 argon2-cffi
 
