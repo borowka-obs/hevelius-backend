@@ -7,7 +7,10 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 - CLI: `hevelius catalogs` lists installed catalogs with object counts (`--sort entries|name`).
 - CLI: `hevelius catalog` searches catalog objects by name, catalog, constellation,
-  and optional coordinates (`--ra`/`--dec`, `--sort`, `--limit`).
+  and optional coordinates (`--ra`/`--dec`, `--radius`, `--sort`, `--limit`).
+- API: `GET /api/catalogs` lists installed catalogs with object counts (`sort=entries|name`).
+- API: `GET/POST /api/catalogs/list` supports coordinate proximity search (`ra`, `decl`,
+  `proximity`) and matches object `name` or `altname` when filtering by `name`.
 - API: `PATCH /api/projects/{project_id}/subframes/{subframe_id}` now updates only
   the columns supplied in the body. `count` and `goal_count` are no longer mirrored,
   so the runner can bump captured-frame counts without disturbing the user-defined

@@ -25,19 +25,28 @@ Search catalog objects (all filters are optional; combine as needed):
 python bin/hevelius catalog M31
 python bin/hevelius catalog --catalog NGC --const Cyg
 python bin/hevelius catalog 7000 --catalog NGC
-python bin/hevelius catalog --ra "0 42 44" --dec "+41 16 09" --limit 5
+python bin/hevelius catalog --ra "0 42 44" --dec "+41 16 09" --radius 2.0 --limit 5
 ```
 
 - Positional `name` — partial match on `name` or `altname`.
 - `--catalog` — catalog short name (e.g. `NGC`, `M`, `C`).
 - `--const` — constellation code (e.g. `Cyg`, `Ori`).
-- `--ra` / `--dec` — coordinates (both required together); objects within 1° are returned.
+- `--ra` / `--dec` — coordinates (both required together).
+- `--radius` — search radius in degrees with `--ra` and `--dec` (default: 1.0).
 - `--sort` — `catalog`, `name`, `ra`, `decl`, `const`, `type`, or `magn` (default: `name`).
 - `--sort-order` — `asc` or `desc` (default: `asc`).
 - `--limit` — cap the number of rows returned.
 
-The REST API exposes similar search under `/api/catalogs/search` and
-`/api/catalogs/list` (see `api/openapi.yaml`).
+The REST API exposes the same capabilities (JWT required):
+
+- `GET /api/catalogs` — installed catalogs with object counts (`sort=entries|name`)
+- `GET /api/catalogs/list` — search/filter objects with pagination; supports
+  `catalog`, `constellation`, `name` (name or altname), `ra`, `decl`, `proximity`,
+  `sort_by`, `sort_order`, `page`, `per_page`
+- `POST /api/catalogs/list` — same filters in JSON body
+- `GET /api/catalogs/search` — quick name/altname search by `query` and `limit`
+
+See `api/openapi.yaml` for request/response schemas.
 
 ## Installing catalog data
 

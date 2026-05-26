@@ -358,29 +358,20 @@ def catalogs_installed_list(conn, sort_by: str = "entries", sort_order: str = "d
     return run_query(conn, query)
 
 
-def catalog_objects_search(
-    conn,
+def catalog_objects_build_where(
     catalog: str = None,
     constellation: str = None,
     name: str = None,
     ra_hours: float = None,
     decl: float = None,
     proximity: float = 1.0,
-    sort_by: str = "name",
-    sort_order: str = "asc",
-    limit: int = None,
-) -> List:
+):
     """
-    Search catalog objects with optional filters.
+    Build WHERE clause and parameters for catalog object queries.
 
+    Returns (where_suffix, params) where where_suffix is '' or ' WHERE ...'.
     RA is in hours (matching objects.ra storage). Declination is in degrees.
-    When ra_hours and decl are both set, objects within proximity degrees are returned.
     """
-    if sort_by not in CATALOG_OBJECT_SORT_FIELDS:
-        sort_by = "name"
-    if sort_order not in ("asc", "desc"):
-        sort_order = "asc"
-
     where_clauses = []
     params = []
 
@@ -408,14 +399,74 @@ def catalog_objects_search(
         )
         params.extend([decl, decl, ra_deg, proximity])
 
-    query = _OBJECT_SELECT
     if where_clauses:
-        query += " WHERE " + " AND ".join(where_clauses)
+        return " WHERE " + " AND ".join(where_clauses), params
+    return "", []
 
+
+def catalog_objects_count(
+    conn,
+    catalog: str = None,
+    constellation: str = None,
+    name: str = None,
+    ra_hours: float = None,
+    decl: float = None,
+    proximity: float = 1.0,
+) -> int:
+    """Return count of objects matching the given filters."""
+    where, params = catalog_objects_build_where(
+        catalog=catalog,
+        constellation=constellation,
+        name=name,
+        ra_hours=ra_hours,
+        decl=decl,
+        proximity=proximity,
+    )
+    query = "SELECT COUNT(*) FROM objects" + where
+    return run_query(conn, query, tuple(params) if params else None)[0][0]
+
+
+def catalog_objects_search(
+    conn,
+    catalog: str = None,
+    constellation: str = None,
+    name: str = None,
+    ra_hours: float = None,
+    decl: float = None,
+    proximity: float = 1.0,
+    sort_by: str = "name",
+    sort_order: str = "asc",
+    limit: int = None,
+    offset: int = None,
+) -> List:
+    """
+    Search catalog objects with optional filters.
+
+    RA is in hours (matching objects.ra storage). Declination is in degrees.
+    When ra_hours and decl are both set, objects within proximity degrees are returned.
+    """
+    if sort_by not in CATALOG_OBJECT_SORT_FIELDS:
+        sort_by = "name"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+
+    where, params = catalog_objects_build_where(
+        catalog=catalog,
+        constellation=constellation,
+        name=name,
+        ra_hours=ra_hours,
+        decl=decl,
+        proximity=proximity,
+    )
+
+    query = _OBJECT_SELECT + where
     query += f" ORDER BY {sort_by} {sort_order.upper()}"
     if limit is not None:
         query += " LIMIT %s"
         params.append(limit)
+    if offset is not None:
+        query += " OFFSET %s"
+        params.append(offset)
 
     return run_query(conn, query, tuple(params) if params else None)
 
