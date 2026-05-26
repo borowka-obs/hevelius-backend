@@ -801,6 +801,72 @@ class StatusMsgSchema(Schema):
     msg = fields.String()
 
 
+class TaskGetQuerySchema(Schema):
+    task_id = fields.Integer(required=True)
+
+
+class ScopesListQuerySchema(Schema):
+    sort_by = fields.String(load_default="scope_id")
+    sort_order = fields.String(load_default="asc")
+
+
+class ScopeCreateResponseSchema(Schema):
+    status = fields.Boolean()
+    scope_id = fields.Integer()
+    scope = fields.Nested(TelescopeSchema)
+    msg = fields.String()
+
+
+class ScopeDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    scope = fields.Nested(TelescopeSchema)
+    msg = fields.String()
+
+
+class ScopeFilterIdBodySchema(Schema):
+    filter_id = fields.Integer(required=True)
+
+
+class FiltersListResponseSchema(Schema):
+    filters = fields.List(fields.Nested(FilterSchema))
+
+
+class FilterCreateResponseSchema(Schema):
+    status = fields.Boolean()
+    filter_id = fields.Integer()
+    filter = fields.Nested(FilterSchema)
+    msg = fields.String()
+
+
+class FilterDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    filter = fields.Nested(FilterSchema)
+    msg = fields.String()
+
+
+class SensorsListResponseSchema(Schema):
+    sensors = fields.List(fields.Nested(SensorSchema))
+
+
+class SensorCreateResponseSchema(Schema):
+    status = fields.Boolean()
+    sensor_id = fields.Integer()
+    sensor = fields.Nested(SensorSchema)
+    msg = fields.String()
+
+
+class SensorDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    sensor = fields.Nested(SensorSchema)
+    msg = fields.String()
+
+
+class ProjectDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    project = fields.Nested(ProjectSchema)
+    msg = fields.String()
+
+
 class PasswordResetTokenIssueResponseSchema(Schema):
     status = fields.Boolean()
     token = fields.String(metadata={"description": "Plain token; shown only once"})
@@ -1665,7 +1731,7 @@ class VersionResource(MethodView):
 @blp.route("/task-get")
 class TaskGetResource(MethodView):
     @jwt_required()
-    @blp.arguments(Schema.from_dict({"task_id": fields.Integer(required=True)}), location="query")
+    @blp.arguments(TaskGetQuerySchema, location="query")
     @blp.response(200, TaskGetResponseSchema)
     def get(self, args):
         """Get single task details
@@ -1956,10 +2022,7 @@ def _fetch_filters_for_scopes(cnx, scope_ids):
 @blp.route("/scopes")
 class ScopesResource(MethodView):
     @jwt_required()
-    @blp.arguments(Schema.from_dict({
-        "sort_by": fields.String(load_default="scope_id"),
-        "sort_order": fields.String(load_default="asc")
-    }), location="query")
+    @blp.arguments(ScopesListQuerySchema, location="query")
     @blp.response(200, TelescopesListSchema)
     def get(self, args):
         """Get list of telescopes with their associated sensors and filters. Supports sorting."""
@@ -1981,12 +2044,7 @@ class ScopesResource(MethodView):
 
     @jwt_required()
     @blp.arguments(ScopeCreateSchema)
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "scope_id": fields.Integer(),
-        "scope": fields.Nested(TelescopeSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, ScopeCreateResponseSchema)
     def post(self, data):
         """Add new telescope. name required; scope_id optional (auto-assigned if omitted)."""
         name = data["name"]
@@ -2033,7 +2091,7 @@ class ScopesResource(MethodView):
 @blp.route("/scopes/<int:scope_id>")
 class ScopeDetailResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "scope": fields.Nested(TelescopeSchema), "msg": fields.String()}))
+    @blp.response(200, ScopeDetailResponseSchema)
     def get(self, scope_id):
         """Get telescope details with sensor and filters."""
         cnx = db.connect()
@@ -2048,7 +2106,7 @@ class ScopeDetailResource(MethodView):
 
     @jwt_required()
     @blp.arguments(ScopeUpdateSchema)
-    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "scope": fields.Nested(TelescopeSchema), "msg": fields.String()}))
+    @blp.response(200, ScopeDetailResponseSchema)
     def patch(self, data, scope_id):
         """Edit telescope. Use sensor_id 0 to remove sensor."""
         cnx = db.connect()
@@ -2079,8 +2137,8 @@ class ScopeDetailResource(MethodView):
 @blp.route("/scopes/<int:scope_id>/filters")
 class ScopeFiltersResource(MethodView):
     @jwt_required()
-    @blp.arguments(Schema.from_dict({"filter_id": fields.Integer(required=True)}))
-    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "msg": fields.String()}))
+    @blp.arguments(ScopeFilterIdBodySchema)
+    @blp.response(200, StatusMsgSchema)
     def post(self, data, scope_id):
         """Add filter to telescope."""
         filter_id = data["filter_id"]
@@ -2102,7 +2160,7 @@ class ScopeFiltersResource(MethodView):
 @blp.route("/scopes/<int:scope_id>/filters/<int:filter_id>")
 class ScopeFilterRemoveResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "msg": fields.String()}))
+    @blp.response(200, StatusMsgSchema)
     def delete(self, scope_id, filter_id):
         """Remove filter from telescope."""
         cnx = db.connect()
@@ -2146,7 +2204,7 @@ def _telescope_row_to_dict(row, filters_list=None):
 @blp.route("/filters")
 class FiltersResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({"filters": fields.List(fields.Nested(FilterSchema))}))
+    @blp.response(200, FiltersListResponseSchema)
     def get(self):
         """Get list of filters. Sortable by filter_id, short_name, full_name, active (default filter_id)."""
         active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
@@ -2170,12 +2228,7 @@ class FiltersResource(MethodView):
 
     @jwt_required()
     @blp.arguments(FilterCreateSchema)
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "filter_id": fields.Integer(),
-        "filter": fields.Nested(FilterSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, FilterCreateResponseSchema)
     def post(self, filter_data):
         """Add new filter"""
         short_name = filter_data["short_name"]
@@ -2216,11 +2269,7 @@ class FiltersResource(MethodView):
 @blp.route("/filters/<int:filter_id>")
 class FilterDetailResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "filter": fields.Nested(FilterSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, FilterDetailResponseSchema)
     def get(self, filter_id):
         """Get single filter"""
         cnx = db.connect()
@@ -2232,11 +2281,7 @@ class FilterDetailResource(MethodView):
 
     @jwt_required()
     @blp.arguments(FilterUpdateSchema)
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "filter": fields.Nested(FilterSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, FilterDetailResponseSchema)
     def patch(self, filter_data, filter_id):
         """Edit filter (partial update). Set active true/false to activate or deactivate."""
         cnx = db.connect()
@@ -2287,7 +2332,7 @@ def _row_to_sensor(r):
 @blp.route("/sensors")
 class SensorsResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({"sensors": fields.List(fields.Nested(SensorSchema))}))
+    @blp.response(200, SensorsListResponseSchema)
     def get(self):
         """Get list of sensors (cameras) with optional sorting"""
         active = request.args.get("active", type=lambda v: v.lower() == "true" if isinstance(v, str) else None)
@@ -2312,12 +2357,7 @@ class SensorsResource(MethodView):
 
     @jwt_required()
     @blp.arguments(SensorCreateSchema)
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "sensor_id": fields.Integer(),
-        "sensor": fields.Nested(SensorSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, SensorCreateResponseSchema)
     def post(self, sensor_data):
         """Add new sensor. width/height computed from resx*px/1000 if not provided. bits defaults to 0."""
         name = sensor_data["name"]
@@ -2376,11 +2416,7 @@ class SensorsResource(MethodView):
 @blp.route("/sensors/<int:sensor_id>")
 class SensorDetailResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "sensor": fields.Nested(SensorSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, SensorDetailResponseSchema)
     def get(self, sensor_id):
         """Get single sensor"""
         cnx = db.connect()
@@ -2393,11 +2429,7 @@ class SensorDetailResource(MethodView):
 
     @jwt_required()
     @blp.arguments(SensorUpdateSchema)
-    @blp.response(200, Schema.from_dict({
-        "status": fields.Boolean(),
-        "sensor": fields.Nested(SensorSchema),
-        "msg": fields.String()
-    }))
+    @blp.response(200, SensorDetailResponseSchema)
     def patch(self, sensor_data, sensor_id):
         """Edit sensor (partial update)"""
         cnx = db.connect()
@@ -2652,7 +2684,7 @@ class ProjectsResource(MethodView):
 @blp.route("/projects/<int:project_id>")
 class ProjectDetailResource(MethodView):
     @jwt_required()
-    @blp.response(200, Schema.from_dict({"status": fields.Boolean(), "project": fields.Nested(ProjectSchema), "msg": fields.String()}))
+    @blp.response(200, ProjectDetailResponseSchema)
     def get(self, project_id):
         """Get single project with subframes and user IDs"""
         cnx = db.connect()
