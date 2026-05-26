@@ -321,6 +321,105 @@ def catalog_get(conn, name: str) -> List:
     return result
 
 
+CATALOG_LIST_SORT_FIELDS = {"name", "entries"}
+CATALOG_OBJECT_SORT_FIELDS = {"catalog", "name", "ra", "decl", "const", "type", "magn"}
+
+_OBJECT_SELECT = """
+    SELECT object_id, name, ra, decl, descr, comment, type, epoch, const,
+           magn, x, y, altname, distance, catalog
+    FROM objects
+"""
+
+
+def catalogs_installed_list(conn, sort_by: str = "entries", sort_order: str = "desc") -> List:
+    """
+    Returns installed catalogs with object counts.
+
+    Each row is (name, shortname, object_count).
+    sort_by: 'entries' (object count) or 'name'.
+    """
+    if sort_by not in CATALOG_LIST_SORT_FIELDS:
+        sort_by = "entries"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "desc"
+
+    if sort_by == "name":
+        order = f"c.name {sort_order.upper()}"
+    else:
+        order = f"object_count {sort_order.upper()}, c.name ASC"
+
+    query = f"""
+        SELECT LEFT(c.name, 64) AS name, c.shortname, COUNT(o.*) AS object_count
+        FROM catalogs c
+        LEFT JOIN objects o ON c.shortname = o.catalog
+        GROUP BY c.name, c.shortname
+        ORDER BY {order}
+    """
+    return run_query(conn, query)
+
+
+def catalog_objects_search(
+    conn,
+    catalog: str = None,
+    constellation: str = None,
+    name: str = None,
+    ra_hours: float = None,
+    decl: float = None,
+    proximity: float = 1.0,
+    sort_by: str = "name",
+    sort_order: str = "asc",
+    limit: int = None,
+) -> List:
+    """
+    Search catalog objects with optional filters.
+
+    RA is in hours (matching objects.ra storage). Declination is in degrees.
+    When ra_hours and decl are both set, objects within proximity degrees are returned.
+    """
+    if sort_by not in CATALOG_OBJECT_SORT_FIELDS:
+        sort_by = "name"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+
+    where_clauses = []
+    params = []
+
+    if catalog:
+        where_clauses.append("catalog ILIKE %s")
+        params.append(catalog)
+
+    if constellation:
+        where_clauses.append("const ILIKE %s")
+        params.append(constellation)
+
+    if name:
+        pattern = f"%{name}%"
+        where_clauses.append("(name ILIKE %s OR altname ILIKE %s)")
+        params.extend([pattern, pattern])
+
+    if ra_hours is not None and decl is not None:
+        ra_deg = ra_hours * 15.0
+        where_clauses.append(
+            "degrees(2 * asin(sqrt("
+            "pow(sin(radians(decl - %s) / 2), 2) + "
+            "cos(radians(%s)) * cos(radians(decl)) * "
+            "pow(sin(radians(ra*15 - %s) / 2), 2)"
+            "))) < %s"
+        )
+        params.extend([decl, decl, ra_deg, proximity])
+
+    query = _OBJECT_SELECT
+    if where_clauses:
+        query += " WHERE " + " AND ".join(where_clauses)
+
+    query += f" ORDER BY {sort_by} {sort_order.upper()}"
+    if limit is not None:
+        query += " LIMIT %s"
+        params.append(limit)
+
+    return run_query(conn, query, tuple(params) if params else None)
+
+
 def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = "", order: str = "") -> List:
     """
     Returns frames (completed tasks) that are close (within radius degrees) to

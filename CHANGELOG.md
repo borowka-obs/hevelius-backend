@@ -5,6 +5,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## Unreleased
 
+- CLI: `hevelius catalogs` lists installed catalogs with object counts (`--sort entries|name`).
+- CLI: `hevelius catalog` searches catalog objects by name, catalog, constellation,
+  and optional coordinates (`--ra`/`--dec`, `--sort`, `--limit`).
 - API: `PATCH /api/projects/{project_id}/subframes/{subframe_id}` now updates only
   the columns supplied in the body. `count` and `goal_count` are no longer mirrored,
   so the runner can bump captured-frame counts without disturbing the user-defined

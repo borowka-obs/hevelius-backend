@@ -9,13 +9,15 @@ $ python bin/hevelius
 Hevelius
 
 usage: hevelius [-h]
-  {db,config,version,data,repo,filters,filter,sensors,sensor,projects,project,telescopes,telescope,users,user} ...
+  {db,config,version,data,repo,catalogs,catalog,filters,filter,sensors,sensor,projects,project,telescopes,telescope,users,user} ...
 
 positional arguments:
   db                    Manages database (version, migrate, backup, stats)
   config                Shows current Hevelius (DB, file repository) configuration
   version               Shows the current Hevelius package version
   data                  Data mining (distrib, groups, catalog)
+  catalogs              List installed astronomical catalogs
+  catalog               Search astronomical catalog objects
   repo                  Manages files repository on local storage
   filters               List optical filters
   filter                Add or edit a filter
@@ -50,28 +52,33 @@ User add / enable / disable actions are recorded in the **user_admin_audit** tab
 - **db backup** – Database backup.
 - **db stats** – Database statistics.
 
-### Catalog - searching for catalog objects and associated frames
+### Catalogs – list and search astronomical objects
 
-There are two ways how objects can be located. First is by using a name from the
-catalog: `--object M1`. If the object is found, its coordinates are then used.
-The alternative way is to specify the coordinates directly:
-`--ra "11 22 33" --decl "-22 33 44"`. In both cases, you can specify the radius
-around the specified object: `--proximity 2.0`. The default being 1 degree.
+- **catalogs** – List catalogs loaded in the database with object counts.
+  `hevelius catalogs [--sort entries|name]` (default sort: by object count).
+- **catalog** – Search catalog objects: `hevelius catalog [NAME] [--catalog SHORTNAME]
+  [--const CODE] [--ra HH MM SS] [--dec +DD MM SS] [--sort FIELD] [--sort-order asc|desc]
+  [--limit N]`. See `doc/catalogs.md` for details.
 
-Hevelius will find catalog objects for you and also list frames that are in the
-database. You can use `--format XXX` to specify the output format. See `--help`
-for details as the formats are being updated frequently. As of time of writing
-this text, the following formats were supported: `none`, `filenames`, `csv`,
-`brief`, `full`, `pixinsight`.
+### Data catalog – objects near coordinates and matching frames
 
-The `pixinsight` format is intended to be used with PixInsight's
-SubframeSelector. To import the list, open PixInsight, menu Process ->
-ImageInspection -> SubframeSelector, then click on the `edit instance source code`
-(square icon at the bottom), then paste the content into `P.subframes`.
+The **data catalog** subcommand finds catalog objects and observation frames near
+a sky position. There are two ways to specify the position. First, use a catalog
+name: `--object M1`. If the object is found, its coordinates are used. Alternatively,
+specify coordinates directly: `--ra "11 22 33" --decl "-22 33 44"`. In both cases,
+set the search radius with `--proximity 2.0` (default 1 degree).
 
-An example command line call:
+Hevelius lists nearby catalog objects and frames in the database. Use
+`--format XXX` for output: `none`, `filenames`, `csv`, `brief`, `full`, `pixinsight`.
 
-```python bin/hevelius catalog --object C38 --proximity 0.5 --format full```
+The `pixinsight` format is for PixInsight SubframeSelector (Process → ImageInspection
+→ SubframeSelector → edit instance source code → paste into `P.subframes`).
+
+Example:
+
+```bash
+python bin/hevelius data catalog --object C38 --proximity 0.5 --format full
+```
 
 ### Filters, sensors, and projects (schema 15+)
 

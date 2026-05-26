@@ -15,6 +15,7 @@ from hevelius.cmd_stats import stats, histogram_show, groups
 from hevelius.cmd_db_migrate import migrate
 from hevelius.cmd_repo import repo
 from hevelius.cmd_catalog import catalog, format_get
+from hevelius.cmd_catalogs import list_catalogs, find_catalog_objects
 from hevelius.cmd_users import list_users, add_user, disable_user, enable_user, edit_user_profile
 from hevelius.cmd_equipment import (
     list_filters,
@@ -96,6 +97,59 @@ def run():
     catalog_parser.add_argument("--resy", help="filtering: y resolution (pixels)", type=int, default=0)
     catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
     catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
+
+    catalogs_parser = subparsers.add_parser('catalogs', help="List installed astronomical catalogs")
+    catalogs_parser.add_argument(
+        '--sort',
+        choices=['entries', 'name'],
+        default='entries',
+        help="Sort by object count (entries, default) or catalog name (name)",
+    )
+
+    catalog_search_parser = subparsers.add_parser('catalog', help="Search astronomical catalog objects")
+    catalog_search_parser.add_argument(
+        'name',
+        nargs='?',
+        default=None,
+        help="Object name to search for (partial match on name or altname)",
+    )
+    catalog_search_parser.add_argument(
+        '--catalog',
+        dest='catalog',
+        metavar='SHORTNAME',
+        help="Filter by catalog short name (e.g. NGC, M, C)",
+    )
+    catalog_search_parser.add_argument(
+        '--const',
+        metavar='CODE',
+        help="Filter by constellation code (e.g. Cyg, Ori)",
+    )
+    catalog_search_parser.add_argument(
+        '-r', '--ra',
+        help="Right Ascension (HH MM [SS] format); requires --dec",
+    )
+    catalog_search_parser.add_argument(
+        '-d', '--dec',
+        help="Declination (+DD MM [SS] format); requires --ra",
+    )
+    catalog_search_parser.add_argument(
+        '--sort',
+        choices=['catalog', 'name', 'ra', 'decl', 'const', 'type', 'magn'],
+        default='name',
+        help="Sort results by field (default: name)",
+    )
+    catalog_search_parser.add_argument(
+        '--sort-order',
+        choices=['asc', 'desc'],
+        default='asc',
+        help="Sort order (default: asc)",
+    )
+    catalog_search_parser.add_argument(
+        '--limit',
+        type=int,
+        default=None,
+        help="Maximum number of objects to return",
+    )
 
     filters_parser = subparsers.add_parser('filters', help="List optical filters")
     filters_parser.add_argument('--active-only', action='store_true', help="Show only active filters")
@@ -307,6 +361,10 @@ def run():
         if args.data_command == "catalog":
             return catalog(args)  # see cmd_catalog.py
         return parser.print_help()
+    if args.command == "catalogs":
+        return list_catalogs(args)
+    if args.command == "catalog":
+        return find_catalog_objects(args)
     if args.command == "config":
         return config_show()  # see cmd_basic.py
     if args.command == "repo":
