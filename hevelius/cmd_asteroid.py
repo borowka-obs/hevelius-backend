@@ -360,6 +360,57 @@ def _get_night_times(location: EarthLocation, obs_time: Time) -> Tuple[Time, Tim
     return times[start_idx], times[end_idx]
 
 
+def _xyz_to_radec(x: float, y: float, z: float) -> Tuple[float, float]:
+    """Convert equatorial Cartesian to RA/Dec in degrees."""
+    r = np.sqrt(x * x + y * y + z * z)
+    if r < 1e-20:
+        return 0.0, 0.0
+    dec = np.degrees(np.arcsin(np.clip(z / r, -1.0, 1.0)))
+    ra = np.degrees(np.arctan2(y, x)) % 360.0
+    return ra, dec
+
+
+def _transit_altitude(dec_deg: float, lat_deg: float) -> float:
+    """Maximum altitude an object ever reaches (at upper transit)."""
+    return 90.0 - abs(lat_deg - dec_deg)
+
+
+def _night_visible(ra_deg: float, dec_deg: float, lat_deg: float,
+                   lst_mid_deg: float, night_half_hours: float,
+                   alt_min_deg: float) -> bool:
+    """
+    Quick test: is the object above alt_min at any moment during the night?
+
+    Uses hour-angle arithmetic to determine whether the window in which the
+    object is above alt_min overlaps with the night window (centred on midnight).
+    """
+    lat = np.radians(lat_deg)
+    dec = np.radians(dec_deg)
+    alt_min = np.radians(alt_min_deg)
+
+    sin_alt_transit = np.sin(dec) * np.sin(lat) + np.cos(dec) * np.cos(lat)
+    if sin_alt_transit < np.sin(alt_min):
+        return False
+
+    cos_ha_thresh = (np.sin(alt_min) - np.sin(dec) * np.sin(lat)) / (
+        np.cos(dec) * np.cos(lat) + 1e-12
+    )
+
+    lst_half_deg = night_half_hours * 15.0
+
+    if cos_ha_thresh <= -1.0:
+        return True  # circumpolar above alt_min
+
+    if cos_ha_thresh >= 1.0:
+        return False  # never reaches alt_min
+
+    ha_thresh_deg = np.degrees(np.arccos(cos_ha_thresh))
+
+    # Angular separation between object RA and LST at midnight
+    center_sep = abs(((ra_deg - lst_mid_deg) + 180.0) % 360.0 - 180.0)
+    return center_sep < (ha_thresh_deg + lst_half_deg)
+
+
 def compute_visibility(
     location: EarthLocation,
     obs_date: str,
@@ -371,6 +422,15 @@ def compute_visibility(
 ) -> List[dict]:
     """
     Compute asteroid visibility for given location and date.
+
+    Uses a staged approach to handle 1M+ asteroids efficiently:
+      1. DB query pre-filters by absolute magnitude (cheap SQL index).
+      2. Per asteroid: compute position at astronomical midnight (one Kepler solve).
+      3. Quick geometric checks eliminate most asteroids without expensive transforms:
+         a. Transit altitude < alt_min  → skip.
+         b. Night hour-angle window check → skip if object never above alt_min at night.
+         c. Apparent magnitude at midnight outside [mag_min, mag_max] → skip.
+      4. Survivors get a precise AltAz transform to confirm altitude and find best time.
 
     Args:
         location: Observer location
@@ -386,33 +446,47 @@ def compute_visibility(
     Returns:
         List of visible asteroids with designation, magnitude, max_altitude, etc.
     """
+    from astropy.coordinates import CartesianRepresentation
+
     obs_time = Time(obs_date + " 00:00:00")
-    _progress("Fetching asteroid list from database...")
+
+    _progress("Computing night window...")
+    night_start, night_end = _get_night_times(location, obs_time)
+    night_duration_h = (night_end - night_start).to(u.hour).value
+    night_half_h = night_duration_h / 2.0
+    t_midnight = night_start + night_half_h * u.hour
+    _progress(f"  Night: {night_start.iso} to {night_end.iso} (midnight {t_midnight.iso})")
+
+    lat_deg = location.lat.deg
+    lst_midnight_deg = t_midnight.sidereal_time("apparent", longitude=location.lon).deg
+
+    _progress("Computing Earth position at midnight...")
+    with solar_system_ephemeris.set("builtin"):
+        earth_mid = get_body("earth", t_midnight)
+    ex_mid = earth_mid.cartesian.x.to(u.AU).value
+    ey_mid = earth_mid.cartesian.y.to(u.AU).value
+    ez_mid = earth_mid.cartesian.z.to(u.AU).value
+
+    _progress("Querying asteroids from database...")
     conn = db.connect()
     cursor = conn.cursor()
 
-    # Build WHERE: magnitude range is applied after computing apparent mag;
-    # we pre-filter by absolute magnitude to reduce work
-    where_parts = ["absolute_magnitude BETWEEN %s AND %s"]
-    params = [mag_min - 5, mag_max + 5]
+    # Pre-filter by absolute magnitude. Main-belt asteroids are ~2-3 AU away,
+    # adding ~4-5 mag; allow a generous margin of 7 mag for closer/farther objects.
+    H_margin = 7.0
+    where_parts = ["absolute_magnitude IS NOT NULL", "absolute_magnitude <= %s"]
+    params: list = [mag_max + H_margin]
 
     if constraint:
-        # Sanitize: allow only known columns and numeric/comparison.
-        # Quote column names so reserved words (e.g. "number") work in PostgreSQL.
-        # Support: "number_lt_10", "number < 10", or split form "number" "<" "10".
         allowed_cols = {"number", "designation", "absolute_magnitude"}
-        # Normalize: ASCII spaces and comparison chars (avoid Unicode fullwidth etc.)
-        constraint = constraint.strip().replace("\u00a0", " ")
-        constraint = constraint.replace("\uff1c", "<").replace("\uff1e", ">").replace("\uff1d", "=")
+        constraint = constraint.strip()
         op_map = {"lt": "<", "lte": "<=", "gt": ">", "gte": ">=", "eq": "=", "ne": "!="}
         sql_ops = ("<", "<=", ">", ">=", "=", "!=")
         added = False
 
         def apply_constraint(col: str, op: str, val_str: str) -> bool:
-            print(f"#### Applying constraint: {col} {op} {val_str}")
             col = col.lower()
             if col not in allowed_cols or op not in sql_ops:
-                print(f"#### Invalid constraint: {col}")
                 return False
             col_ident = '"' + col + '"'
             if col == "designation":
@@ -423,33 +497,25 @@ def compute_visibility(
                 v = int(val_str.strip()) if col == "number" else float(val_str.strip())
                 where_parts.append(col_ident + " " + op + " %s")
                 params.append(v)
-                print(f"#### where_parts: {where_parts}")
-                print(f"#### params: {params}")
                 return True
             except ValueError:
                 return False
 
-        # Format 1: "number_lt_10" (no spaces)
-        alt = re.match(r"^(\w+)_(lt|lte|gt|gte|eq|ne)_(.+)$", constraint, re.IGNORECASE)
-        if alt:
-            op = op_map.get(alt.group(2).lower())
+        alt_m = re.match(r"^(\w+)_(lt|lte|gt|gte|eq|ne)_(.+)$", constraint, re.IGNORECASE)
+        if alt_m:
+            op = op_map.get(alt_m.group(2).lower())
             if op:
-                added = apply_constraint(alt.group(1), op, alt.group(3))
-
-        # Format 2: "number < 10" — regex (space around operator)
+                added = apply_constraint(alt_m.group(1), op, alt_m.group(3))
         if not added:
             m = re.match(r"^\s*(\w+)\s*(<|<=|>|>=|=|!=)\s*(.+)\s*$", constraint)
             if m:
                 added = apply_constraint(m.group(1), m.group(2), m.group(3))
-
-        # Format 3: split by whitespace — "number < 10" -> ["number", "<", "10"]
         if not added:
             tokens = constraint.split()
             if len(tokens) >= 3 and tokens[0].lower() in allowed_cols and tokens[1] in sql_ops:
                 added = apply_constraint(tokens[0], tokens[1], tokens[2])
-
         if constraint and not added:
-            _progress(f"  Note: constraint {repr(constraint)} was not applied (use e.g. number_lt_10 or --constraint='number < 10').")
+            _progress(f"  Note: constraint {repr(constraint)} not applied.")
 
     order_clause = "absolute_magnitude"
     if order_by:
@@ -457,7 +523,6 @@ def compute_visibility(
         tokens = order_by.strip().lower().split()
         if tokens and tokens[0] in allowed_order:
             direction = " " + tokens[1] if len(tokens) > 1 and tokens[1] in ("asc", "desc") else ""
-            # Quote so reserved words (e.g. "number") work in PostgreSQL
             order_clause = '"' + tokens[0] + '"' + direction
 
     query = (
@@ -466,79 +531,140 @@ def compute_visibility(
         "semimajor_axis, absolute_magnitude, slope_parameter "
         "FROM asteroids WHERE " + " AND ".join(where_parts) + " ORDER BY " + order_clause
     )
-
-    print(f"#### query: {query}")
-    print(f"#### params: {params}")
-
     cursor.execute(query, params)
-    asteroids = cursor.fetchall()
-    conn.close()
-    _progress(f"  Found {len(asteroids)} asteroid(s) to check.")
 
-    _progress("Computing night window (sunrise/sunset)...")
-    night_start, night_end = _get_night_times(location, obs_time)
-    # Sample times during night
-    n_samples = 20
-    times = night_start + np.linspace(0, (night_end - night_start).to(u.hour).value, n_samples) * u.hour
-    _progress(f"  Night: {night_start.iso} to {night_end.iso}")
+    BATCH = 10_000
+    PROGRESS_EVERY = 50_000
 
     visible = []
-    _progress("Loading ephemeris and Earth positions...")
-    with solar_system_ephemeris.set("builtin"):
-        earth_positions = get_body("earth", times)
-    _progress("Computing visibility for each asteroid...")
+    total_checked = 0
+    skipped_altitude = 0
+    skipped_night = 0
+    skipped_magnitude = 0
 
-    total = len(asteroids)
-    for idx, row in enumerate(asteroids):
-        (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = row
-        _progress(f"  [{idx + 1}/{total}] {number or '':>6} {designation}")
-        if a is None or a <= 0 or e is None:
-            continue
-        epoch_jd = _unpack_epoch(epoch_s)
-        G = G if G is not None else 0.15
+    _progress("Screening asteroids (position at midnight)...")
 
-        max_alt = -90.0
-        best_mag = 99.0
-        best_time = times[0]
+    while True:
+        rows = cursor.fetchmany(BATCH)
+        if not rows:
+            break
 
-        for i, t in enumerate(times):
+        for row in rows:
+            (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = row
+            total_checked += 1
+
+            if total_checked % PROGRESS_EVERY == 0:
+                _progress(
+                    f"  Checked {total_checked:,} | visible so far: {len(visible)} "
+                    f"| rejected: alt={skipped_altitude:,} night={skipped_night:,} mag={skipped_magnitude:,}"
+                )
+
+            if a is None or a <= 0 or e is None or e >= 1.0:
+                skipped_altitude += 1
+                continue
+
+            G_val = G if G is not None else 0.15
+            epoch_jd = _unpack_epoch(epoch_s)
+
+            # Compute heliocentric position at midnight (one Kepler solve)
             x, y, z = _orbit_position_at_jd(
                 epoch_jd, float(a), float(e), float(inc), float(node),
-                float(peri), float(M_epoch), float(n), t.jd,
+                float(peri), float(M_epoch), float(n), t_midnight.jd,
             )
             xe, ye, ze = _ecliptic_to_equatorial(x, y, z)
-            ep = earth_positions[i]
-            ex = ep.cartesian.x.to(u.AU).value
-            ey = ep.cartesian.y.to(u.AU).value
-            ez = ep.cartesian.z.to(u.AU).value
-            ast_geo = (xe - ex, ye - ey, ze - ez)
+            ast_geo = (xe - ex_mid, ye - ey_mid, ze - ez_mid)
             r_au = np.sqrt(x * x + y * y + z * z)
             delta_au = np.sqrt(ast_geo[0] ** 2 + ast_geo[1] ** 2 + ast_geo[2] ** 2)
+
+            # Quick check a: transit altitude
+            ra_deg, dec_deg = _xyz_to_radec(ast_geo[0], ast_geo[1], ast_geo[2])
+            if _transit_altitude(dec_deg, lat_deg) < alt_min:
+                skipped_altitude += 1
+                continue
+
+            # Quick check b: night hour-angle overlap
+            if not _night_visible(ra_deg, dec_deg, lat_deg, lst_midnight_deg, night_half_h, alt_min):
+                skipped_night += 1
+                continue
+
+            # Quick check c: apparent magnitude at midnight
             cos_phase = (x * ast_geo[0] + y * ast_geo[1] + z * ast_geo[2]) / (r_au * delta_au + 1e-20)
             phase_deg = np.degrees(np.arccos(np.clip(cos_phase, -1, 1)))
-            mag = _apparent_magnitude(H, G, r_au, delta_au, phase_deg)
-            from astropy.coordinates import CartesianRepresentation
+            mag = _apparent_magnitude(H, G_val, r_au, delta_au, phase_deg)
+            if mag < mag_min or mag > mag_max:
+                skipped_magnitude += 1
+                continue
+
+            # Precise AltAz at midnight
             gcrs = GCRS(
                 CartesianRepresentation(ast_geo[0] * u.AU, ast_geo[1] * u.AU, ast_geo[2] * u.AU),
-                obstime=t,
+                obstime=t_midnight,
             )
-            altaz = gcrs.transform_to(AltAz(obstime=t, location=location))
+            altaz = gcrs.transform_to(AltAz(obstime=t_midnight, location=location))
             alt_deg = altaz.alt.to(u.deg).value
-            if alt_deg > max_alt:
-                max_alt = alt_deg
-                best_mag = mag
-                best_time = t
+            best_time = t_midnight
 
-        if max_alt >= alt_min and mag_min <= best_mag <= mag_max:
+            if alt_deg < alt_min:
+                # Midnight is not the peak; try the transit moment if it falls within the night
+                ha_mid = ((lst_midnight_deg - ra_deg) + 180.0) % 360.0 - 180.0
+                transit_offset_h = -ha_mid / 15.0
+                if abs(transit_offset_h) <= night_half_h:
+                    t_transit = t_midnight + transit_offset_h * u.hour
+                    with solar_system_ephemeris.set("builtin"):
+                        earth_tr = get_body("earth", t_transit)
+                    x_tr, y_tr, z_tr = _orbit_position_at_jd(
+                        epoch_jd, float(a), float(e), float(inc), float(node),
+                        float(peri), float(M_epoch), float(n), t_transit.jd,
+                    )
+                    xe_tr, ye_tr, ze_tr = _ecliptic_to_equatorial(x_tr, y_tr, z_tr)
+                    ast_geo_tr = (
+                        xe_tr - earth_tr.cartesian.x.to(u.AU).value,
+                        ye_tr - earth_tr.cartesian.y.to(u.AU).value,
+                        ze_tr - earth_tr.cartesian.z.to(u.AU).value,
+                    )
+                    gcrs_tr = GCRS(
+                        CartesianRepresentation(
+                            ast_geo_tr[0] * u.AU, ast_geo_tr[1] * u.AU, ast_geo_tr[2] * u.AU
+                        ),
+                        obstime=t_transit,
+                    )
+                    altaz_tr = gcrs_tr.transform_to(AltAz(obstime=t_transit, location=location))
+                    alt_transit = altaz_tr.alt.to(u.deg).value
+                    if alt_transit > alt_deg:
+                        alt_deg = alt_transit
+                        best_time = t_transit
+                        r_tr = np.sqrt(x_tr ** 2 + y_tr ** 2 + z_tr ** 2)
+                        d_tr = np.sqrt(sum(c ** 2 for c in ast_geo_tr))
+                        cp = (x_tr * ast_geo_tr[0] + y_tr * ast_geo_tr[1] + z_tr * ast_geo_tr[2]) / (
+                            r_tr * d_tr + 1e-20
+                        )
+                        mag = _apparent_magnitude(H, G_val, r_tr, d_tr, np.degrees(np.arccos(np.clip(cp, -1, 1))))
+
+                if alt_deg < alt_min:
+                    skipped_altitude += 1
+                    continue
+
+            if mag < mag_min or mag > mag_max:
+                skipped_magnitude += 1
+                continue
+
             visible.append({
                 "number": number,
                 "designation": designation,
                 "absolute_magnitude": H,
-                "apparent_magnitude": round(best_mag, 2),
-                "max_altitude_deg": round(max_alt, 2),
+                "apparent_magnitude": round(mag, 2),
+                "max_altitude_deg": round(alt_deg, 2),
                 "max_altitude_time": best_time.iso,
             })
-    _progress("Done.")
+
+    cursor.close()
+    conn.close()
+
+    _progress(
+        f"Done. Checked {total_checked:,} | "
+        f"rejected: altitude={skipped_altitude:,}, night={skipped_night:,}, magnitude={skipped_magnitude:,} | "
+        f"visible: {len(visible)}"
+    )
     return visible
 
 

@@ -45,7 +45,7 @@ from hevelius.cmd_equipment import (
     add_telescope_filter,
     remove_telescope_filter,
 )
-from hevelius.cmd_asteroid import asteroid_download, asteroid_visible
+from hevelius.cmd_asteroid import asteroids_download, asteroids_visible
 
 
 def run():
@@ -99,7 +99,6 @@ def run():
     catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
     catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
-<<<<<<< HEAD
     catalogs_parser = subparsers.add_parser('catalogs', help="List installed astronomical catalogs")
     catalogs_parser.add_argument(
         '--sort',
@@ -396,7 +395,6 @@ def run():
         return repo(args)  # see cmd_repo.py
     if args.command == "version":
         return version()
-<<<<<<< HEAD
     if args.command == "filters":
         list_filters(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
         return 0
@@ -648,9 +646,9 @@ def run():
         return user_parser.print_help() or 1
     if args.command == "asteroid":
         if args.asteroid_command == "download":
-            return asteroid_download(args)
+            return asteroids_download(args)
         if args.asteroid_command == "visible":
-            return asteroid_visible(args)
+            return asteroids_visible(args)
         return asteroid_parser.print_help()
     return parser.print_help()
 
