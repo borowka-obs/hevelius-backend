@@ -646,7 +646,8 @@ def run():
         return user_parser.print_help() or 1
     if args.command == "asteroid":
         if args.asteroid_command == "download":
-            return asteroids_download(args)
+            asteroids_download(args)
+            return 0
         if args.asteroid_command == "visible":
             return asteroids_visible(args)
         return asteroid_parser.print_help()
