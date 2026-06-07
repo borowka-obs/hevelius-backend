@@ -23,4 +23,4 @@ CREATE INDEX asteroids_number_idx ON asteroids (number) WHERE number IS NOT NULL
 CREATE INDEX asteroids_absolute_magnitude_idx ON asteroids (absolute_magnitude);
 CREATE INDEX asteroids_designation_idx ON asteroids (designation);
 
-UPDATE schema_version SET version = 15;
+UPDATE schema_version SET version = 22;
