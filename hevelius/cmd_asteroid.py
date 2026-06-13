@@ -700,3 +700,4 @@ def asteroids_visible(args):
         num = r["number"] or ""
         print(f"  {num:>6} {r['designation']:<12} mag={r['apparent_magnitude']:.2f} "
               f"max_alt={r['max_altitude_deg']:.1f}° at {r['max_altitude_time']}")
+    return len(results)
