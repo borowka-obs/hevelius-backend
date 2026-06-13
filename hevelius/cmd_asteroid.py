@@ -175,6 +175,7 @@ def download_mpcorb(force: bool = False) -> str:
     try:
         os.remove(gz_path)
     except OSError:
+        # Best-effort cleanup: ignore failure to remove temporary .gz file.
         pass
     print(f"Cached to {out_path}")
     return out_path
