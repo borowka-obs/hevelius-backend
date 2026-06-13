@@ -29,6 +29,8 @@ Status as of May 2026:
 - **Ability to search based on distance**. Implemented proper Haversine formula.
 - **Database management**: Schema versioning and upgrades, backup, etc.
 - **Configuration**: Config file support and some limited environment variables.
+- **Asteroid observation planning**: Download MPC orbital elements for 1M+ asteroids and find which ones are
+  visible from your site on a given night, with magnitude and altitude filters.
 
 ## Current capabilities (REST API)
 
@@ -69,6 +71,7 @@ can be loaded.
 - [Installation](doc/install.md) - You probably want to start here.
 - [Commands reference](doc/commands.md) - Available commands are (or soon will) be documented here.
 - [Catalogs](doc/catalogs.md) - Hevelius comes with several astronomical catalogs.
+- [Asteroid observation planning](doc/asteroids.md) - Algorithm and CLI reference for asteroid visibility.
 - [Database details](doc/db.md) - The most useful section is probably the paragraph about DB initalization.
 
 ## Developer's corner
