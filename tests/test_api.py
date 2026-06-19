@@ -2195,6 +2195,88 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(data['project']['description'], 'Brand new description')
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    # ── rotation field tests ──────────────────────────────────────────────────
+
+    @use_repository
+    def test_project_create_with_rotation(self, config):
+        """Create project with explicit rotation angle."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {
+            "name": "Test Rotation Project",
+            "scope_id": 1,
+            "ra": 83.82,
+            "decl": -5.39,
+            "rotation": 45.0,
+        }
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['project']['rotation'], 45.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_without_rotation_defaults_to_null(self, config):
+        """Create project without rotation; field should be None in response."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Test No Rotation", "scope_id": 1, "ra": 83.82, "decl": -5.39}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(data['project']['rotation'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch_sets_rotation(self, config):
+        """PATCH project to set a rotation angle."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"rotation": 90.0}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['project']['rotation'], 90.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch_clears_rotation(self, config):
+        """PATCH project with rotation=None clears the value."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        self.app.patch('/api/projects/1', data=json.dumps({"rotation": 30.0}), headers=self.headers)
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"rotation": None}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data['project']['rotation'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_get_includes_rotation(self, config):
+        """GET /api/projects/:id returns rotation field."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('rotation', data['project'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_includes_rotation(self, config):
+        """GET /api/projects list items include rotation field."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        if data['projects']:
+            self.assertIn('rotation', data['projects'][0])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestUsersAPI(unittest.TestCase):
     """GET /api/users/logins and GET /api/users (admin)."""

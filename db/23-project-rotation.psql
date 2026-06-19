@@ -1,0 +1,8 @@
+-- Schema version 23: add camera rotation to projects
+--
+-- rotation stores the nominal camera position angle in degrees (0–360, East of North).
+-- NULL means "not set / unknown"; 0.0 is a valid value (North up).
+--
+ALTER TABLE projects ADD COLUMN rotation FLOAT DEFAULT NULL;
+
+UPDATE schema_version SET version = 23;

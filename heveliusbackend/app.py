@@ -633,6 +633,7 @@ class ProjectSchema(Schema):
     start_date = fields.String(allow_none=True)
     end_date = fields.String(allow_none=True)
     publications = fields.String(allow_none=True)
+    rotation = fields.Float(allow_none=True)
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
 
@@ -648,6 +649,7 @@ class ProjectCreateSchema(Schema):
     start_date = fields.Date(load_default=None, allow_none=True)
     end_date = fields.Date(load_default=None, allow_none=True)
     publications = fields.String(load_default=None, allow_none=True)
+    rotation = fields.Float(load_default=None, allow_none=True)
 
 
 class ProjectUpdateSchema(Schema):
@@ -661,6 +663,7 @@ class ProjectUpdateSchema(Schema):
     start_date = fields.Date(allow_none=True)
     end_date = fields.Date(allow_none=True)
     publications = fields.String(allow_none=True)
+    rotation = fields.Float(allow_none=True)
 
 
 class ProjectSubframeCreateSchema(Schema):
@@ -2457,12 +2460,12 @@ class SensorDetailResource(MethodView):
 
 _PROJECT_SELECT_COLS = (
     "project_id, name, description, regexps, scope_id, ra, decl, active, "
-    "last_updated, total_integration_time, start_date, end_date, publications"
+    "last_updated, total_integration_time, start_date, end_date, publications, rotation"
 )
 
 _PROJECT_SELECT_COLS_P = (
     "p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active, "
-    "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications"
+    "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications, p.rotation"
 )
 
 _PROJECT_SORT_COLUMNS = {
@@ -2515,6 +2518,7 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
         "start_date": _sql_date_to_iso(r[10]),
         "end_date": _sql_date_to_iso(r[11]),
         "publications": _normalize_publications(r[12]),
+        "rotation": r[13],
         "subframes": subframes or [], "user_ids": user_ids or []
     }
 
@@ -2632,7 +2636,7 @@ class ProjectsResource(MethodView):
         start_date = body.get("start_date")
         end_date = body.get("end_date")
         publications = _normalize_publications(body.get("publications"))
-        cnx = db.connect()
+        rotation = body.get("rotation")
         if ra is None or decl is None:
             cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
             if not cat:
@@ -2650,9 +2654,9 @@ class ProjectsResource(MethodView):
         ]
         db.run_query(
             cnx,
-            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications),
+            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications, rotation) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications, rotation),
         )
         row = db.run_query(
             cnx,
@@ -2739,6 +2743,9 @@ class ProjectDetailResource(MethodView):
         if "publications" in body:
             updates.append("publications = %s")
             args.append(_normalize_publications(body["publications"]))
+        if "rotation" in body:
+            updates.append("rotation = %s")
+            args.append(body["rotation"])   # None is valid — clears the value
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
