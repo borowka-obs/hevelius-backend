@@ -610,6 +610,29 @@ components:
           description: >
             Nominal camera position angle in degrees (0–360, East of North, same convention
             as the FITS PA keyword). null means not set. 0.0 means North up, no rotation.
+        focal:
+          type: number
+          format: float
+          nullable: true
+          description: Focal length (mm) at the time the project was created; copied from the telescope's focal length.
+        resx:
+          type: integer
+          nullable: true
+          description: Sensor width in pixels; copied from the telescope's attached sensor at project creation.
+        resy:
+          type: integer
+          nullable: true
+          description: Sensor height in pixels; copied from the telescope's attached sensor at project creation.
+        pixel_x:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch in X axis (µm); copied from the telescope's attached sensor at project creation.
+        pixel_y:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch in Y axis (µm); copied from the telescope's attached sensor at project creation.
         subframes:
           type: array
           items:
@@ -666,6 +689,31 @@ components:
           description: >
             Nominal camera position angle in degrees (0–360, East of North).
             Omit or send null to leave unset.
+        focal:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Focal length (mm). Auto-populated from the telescope's focal when omitted.
+            Supply explicitly to override (e.g. with a focal reducer).
+        resx:
+          type: integer
+          nullable: true
+          description: Sensor width (pixels). Auto-populated from the telescope's sensor when omitted.
+        resy:
+          type: integer
+          nullable: true
+          description: Sensor height (pixels). Auto-populated from the telescope's sensor when omitted.
+        pixel_x:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch X (µm). Auto-populated from the telescope's sensor when omitted.
+        pixel_y:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch Y (µm). Auto-populated from the telescope's sensor when omitted.
     ProjectUpdate:
       type: object
       properties:
@@ -706,6 +754,29 @@ components:
           description: >
             Nominal camera position angle in degrees (0–360, East of North).
             Send null to clear the value.
+        focal:
+          type: number
+          format: float
+          nullable: true
+          description: Focal length (mm). Send null to clear.
+        resx:
+          type: integer
+          nullable: true
+          description: Sensor width (pixels). Send null to clear.
+        resy:
+          type: integer
+          nullable: true
+          description: Sensor height (pixels). Send null to clear.
+        pixel_x:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch X (µm). Send null to clear.
+        pixel_y:
+          type: number
+          format: float
+          nullable: true
+          description: Pixel pitch Y (µm). Send null to clear.
     ProjectsList:
       type: object
       properties:
