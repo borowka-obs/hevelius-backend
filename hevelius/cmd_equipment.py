@@ -256,7 +256,12 @@ def list_projects(scope_id=None):
 def show_project(project_id):
     """Show a single project with its subframes and user IDs."""
     cnx = db.connect()
-    row = db.run_query(cnx, "SELECT project_id, name, description, scope_id, ra, decl, active FROM projects WHERE project_id = %s", (project_id,))
+    row = db.run_query(
+        cnx,
+        "SELECT project_id, name, description, scope_id, ra, decl, active, rotation, focal, resx, resy, pixel_x, pixel_y "
+        "FROM projects WHERE project_id = %s",
+        (project_id,)
+    )
     if not row:
         cnx.close()
         print(f"Project {project_id} not found.")
@@ -269,6 +274,9 @@ def show_project(project_id):
     print(f"RA:         {r[4]}")
     print(f"Dec:        {r[5]}")
     print(f"Active:     {r[6]}")
+    print(f"Rotation:   {r[7]}")
+    print(f"Focal:      {r[8]}")
+    print(f"Sensor res: {r[9]}x{r[10]} px  pixel: {r[11]}x{r[12]} µm")
     sub = db.run_query(cnx, """SELECT ps.id, f.short_name, ps.exposure_time, ps.goal_count, ps.active
                                FROM project_subframes ps JOIN filters f ON ps.filter_id = f.filter_id
                                WHERE ps.project_id = %s ORDER BY ps.id""", (project_id,))
@@ -285,8 +293,11 @@ def show_project(project_id):
     return 0
 
 
-def add_project(name, scope_id, description=None, ra=None, dec=None, active=True):
-    """Add a new project. name and scope_id required. If ra/dec not given, resolve from catalog by name. Returns project_id or None on failure."""
+def add_project(name, scope_id, description=None, ra=None, dec=None, active=True,
+                focal=None, resx=None, resy=None, pixel_x=None, pixel_y=None):
+    """Add a new project. name and scope_id required. If ra/dec not given, resolve from catalog by name.
+    Optical params default to the telescope's attached sensor values when not supplied.
+    Returns project_id or None on failure."""
     cnx = db.connect()
     if ra is None or dec is None:
         cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
@@ -294,12 +305,33 @@ def add_project(name, scope_id, description=None, ra=None, dec=None, active=True
             cnx.close()
             return None
         ra, dec = cat[0][2], cat[0][3]
-    scope_exists = db.run_query(cnx, "SELECT 1 FROM telescopes WHERE scope_id = %s", (scope_id,))
-    if not scope_exists:
+    scope_row = db.run_query(
+        cnx,
+        "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y "
+        "FROM telescopes t LEFT JOIN sensors s ON s.sensor_id = t.sensor_id "
+        "WHERE t.scope_id = %s",
+        (scope_id,)
+    )
+    if not scope_row:
         cnx.close()
         return None
-    db.run_query(cnx, "INSERT INTO projects (name, description, scope_id, ra, decl, active) VALUES (%s, %s, %s, %s, %s, %s)",
-                 (name, description or "", scope_id, ra, dec, active))
+    sr = scope_row[0]
+    if focal is None:
+        focal = sr[0]
+    if resx is None:
+        resx = sr[1]
+    if resy is None:
+        resy = sr[2]
+    if pixel_x is None:
+        pixel_x = sr[3]
+    if pixel_y is None:
+        pixel_y = sr[4]
+    db.run_query(
+        cnx,
+        "INSERT INTO projects (name, description, scope_id, ra, decl, active, focal, resx, resy, pixel_x, pixel_y) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (name, description or "", scope_id, ra, dec, active, focal, resx, resy, pixel_x, pixel_y)
+    )
     row = db.run_query(cnx, "SELECT project_id FROM projects WHERE name=%s AND scope_id=%s ORDER BY project_id DESC LIMIT 1", (name, scope_id))
     project_id = row[0][0]
     cnx.close()

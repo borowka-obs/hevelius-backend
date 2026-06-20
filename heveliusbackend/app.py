@@ -634,6 +634,11 @@ class ProjectSchema(Schema):
     end_date = fields.String(allow_none=True)
     publications = fields.String(allow_none=True)
     rotation = fields.Float(allow_none=True)
+    focal = fields.Float(allow_none=True, metadata={"description": "Focal length (mm) at time of project creation"})
+    resx = fields.Integer(allow_none=True, metadata={"description": "Sensor width (pixels)"})
+    resy = fields.Integer(allow_none=True, metadata={"description": "Sensor height (pixels)"})
+    pixel_x = fields.Float(allow_none=True, metadata={"description": "Pixel pitch X (µm)"})
+    pixel_y = fields.Float(allow_none=True, metadata={"description": "Pixel pitch Y (µm)"})
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
 
@@ -650,6 +655,11 @@ class ProjectCreateSchema(Schema):
     end_date = fields.Date(load_default=None, allow_none=True)
     publications = fields.String(load_default=None, allow_none=True)
     rotation = fields.Float(load_default=None, allow_none=True)
+    focal = fields.Float(load_default=None, allow_none=True)
+    resx = fields.Integer(load_default=None, allow_none=True)
+    resy = fields.Integer(load_default=None, allow_none=True)
+    pixel_x = fields.Float(load_default=None, allow_none=True)
+    pixel_y = fields.Float(load_default=None, allow_none=True)
 
 
 class ProjectUpdateSchema(Schema):
@@ -664,6 +674,11 @@ class ProjectUpdateSchema(Schema):
     end_date = fields.Date(allow_none=True)
     publications = fields.String(allow_none=True)
     rotation = fields.Float(allow_none=True)
+    focal = fields.Float(allow_none=True)
+    resx = fields.Integer(allow_none=True)
+    resy = fields.Integer(allow_none=True)
+    pixel_x = fields.Float(allow_none=True)
+    pixel_y = fields.Float(allow_none=True)
 
 
 class ProjectSubframeCreateSchema(Schema):
@@ -2460,12 +2475,14 @@ class SensorDetailResource(MethodView):
 
 _PROJECT_SELECT_COLS = (
     "project_id, name, description, regexps, scope_id, ra, decl, active, "
-    "last_updated, total_integration_time, start_date, end_date, publications, rotation"
+    "last_updated, total_integration_time, start_date, end_date, publications, rotation, "
+    "focal, resx, resy, pixel_x, pixel_y"
 )
 
 _PROJECT_SELECT_COLS_P = (
     "p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active, "
-    "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications, p.rotation"
+    "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications, p.rotation, "
+    "p.focal, p.resx, p.resy, p.pixel_x, p.pixel_y"
 )
 
 _PROJECT_SORT_COLUMNS = {
@@ -2519,6 +2536,7 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
         "end_date": _sql_date_to_iso(r[11]),
         "publications": _normalize_publications(r[12]),
         "rotation": r[13],
+        "focal": r[14], "resx": r[15], "resy": r[16], "pixel_x": r[17], "pixel_y": r[18],
         "subframes": subframes or [], "user_ids": user_ids or []
     }
 
@@ -2625,7 +2643,9 @@ class ProjectsResource(MethodView):
     @blp.arguments(ProjectCreateSchema, location="json")
     @blp.response(201)
     def post(self, body):
-        """Create project. name and scope_id required. If ra/dec omitted, resolve from catalog by name."""
+        """Create project. name and scope_id required. If ra/dec omitted, resolve from catalog by name.
+        Optical params (focal, resx, resy, pixel_x, pixel_y) are auto-populated from the scope's sensor
+        when not supplied; the caller may override any or all of them explicitly."""
         name = body["name"]
         scope_id = body["scope_id"]
         description = body.get("description") or ""
@@ -2637,16 +2657,39 @@ class ProjectsResource(MethodView):
         end_date = body.get("end_date")
         publications = _normalize_publications(body.get("publications"))
         rotation = body.get("rotation")
+        focal = body.get("focal")
+        resx = body.get("resx")
+        resy = body.get("resy")
+        pixel_x = body.get("pixel_x")
+        pixel_y = body.get("pixel_y")
+        cnx = db.connect()
         if ra is None or decl is None:
             cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
             if not cat:
                 cnx.close()
                 abort(400, message="Name not found in catalog; provide ra and dec to create project.")
             ra, decl = cat[0][2], cat[0][3]
-        scope_exists = db.run_query(cnx, "SELECT 1 FROM telescopes WHERE scope_id = %s", (scope_id,))
-        if not scope_exists:
+        scope_row = db.run_query(
+            cnx,
+            "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y "
+            "FROM telescopes t LEFT JOIN sensors s ON s.sensor_id = t.sensor_id "
+            "WHERE t.scope_id = %s",
+            (scope_id,)
+        )
+        if not scope_row:
             cnx.close()
             abort(400, message="Invalid scope_id: telescope not found.")
+        sr = scope_row[0]
+        if focal is None:
+            focal = sr[0]
+        if resx is None:
+            resx = sr[1]
+        if resy is None:
+            resy = sr[2]
+        if pixel_x is None:
+            pixel_x = sr[3]
+        if pixel_y is None:
+            pixel_y = sr[4]
         similar = _find_similar_project_names(cnx, name)
         warnings = [
             f"Project with similar name '{p['name']}' already exists (id={p['project_id']})"
@@ -2654,9 +2697,11 @@ class ProjectsResource(MethodView):
         ]
         db.run_query(
             cnx,
-            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications, rotation) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, publications, rotation),
+            "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, "
+            "publications, rotation, focal, resx, resy, pixel_x, pixel_y) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            (name, description, regexps, scope_id, ra, decl, active, start_date, end_date,
+             publications, rotation, focal, resx, resy, pixel_x, pixel_y),
         )
         row = db.run_query(
             cnx,
@@ -2746,6 +2791,10 @@ class ProjectDetailResource(MethodView):
         if "rotation" in body:
             updates.append("rotation = %s")
             args.append(body["rotation"])   # None is valid — clears the value
+        for key in ("focal", "resx", "resy", "pixel_x", "pixel_y"):
+            if key in body:
+                updates.append(f"{key} = %s")
+                args.append(body[key])
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))
