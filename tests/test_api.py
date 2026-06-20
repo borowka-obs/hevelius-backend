@@ -2277,6 +2277,123 @@ class TestProjectOperations(unittest.TestCase):
             self.assertIn('rotation', data['projects'][0])
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    # ── optical params (focal / resx / resy / pixel_x / pixel_y) tests ────────
+
+    @use_repository
+    def test_project_create_autopopulates_optical_params_from_sensor(self, config):
+        """Create project with scope that has a sensor; optical params are auto-populated."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        # Give scope 1 a focal length and attach sensor 1 (QSI 583ws: 3326×2504, 5.4µm)
+        db.run_query(cnx, "UPDATE telescopes SET focal = 2541.0, sensor_id = 1 WHERE scope_id = 1")
+        cnx.close()
+        body = {"name": "FOV Auto Test", "scope_id": 1, "ra": 83.82, "decl": -5.39}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        p = data['project']
+        self.assertEqual(p['focal'], 2541.0)
+        self.assertEqual(p['resx'], 3326)
+        self.assertEqual(p['resy'], 2504)
+        self.assertEqual(p['pixel_x'], 5.4)
+        self.assertEqual(p['pixel_y'], 5.4)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_scope_without_sensor_has_null_optical_params(self, config):
+        """Create project with scope that has no sensor; optical params default to null."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        # Scope 1 has no sensor_id in the base fixture
+        body = {"name": "No Sensor Project", "scope_id": 1, "ra": 83.82, "decl": -5.39}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        p = data['project']
+        self.assertIsNone(p['focal'])
+        self.assertIsNone(p['resx'])
+        self.assertIsNone(p['resy'])
+        self.assertIsNone(p['pixel_x'])
+        self.assertIsNone(p['pixel_y'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_explicit_optical_params_override_sensor(self, config):
+        """Explicit optical params in POST body override the auto-populated sensor values."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE telescopes SET focal = 2541.0, sensor_id = 1 WHERE scope_id = 1")
+        cnx.close()
+        body = {
+            "name": "Override Focal Test", "scope_id": 1, "ra": 83.82, "decl": -5.39,
+            "focal": 1000.0, "resx": 1600, "resy": 1200, "pixel_x": 7.4, "pixel_y": 7.4,
+        }
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        p = data['project']
+        self.assertEqual(p['focal'], 1000.0)
+        self.assertEqual(p['resx'], 1600)
+        self.assertEqual(p['resy'], 1200)
+        self.assertEqual(p['pixel_x'], 7.4)
+        self.assertEqual(p['pixel_y'], 7.4)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch_updates_optical_params(self, config):
+        """PATCH project can update optical params individually."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"focal": 800.0, "resx": 4096, "resy": 4096, "pixel_x": 9.0, "pixel_y": 9.0}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        p = data['project']
+        self.assertEqual(p['focal'], 800.0)
+        self.assertEqual(p['resx'], 4096)
+        self.assertEqual(p['pixel_y'], 9.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch_clears_optical_params(self, config):
+        """PATCH project with null clears individual optical params."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        self.app.patch('/api/projects/1', data=json.dumps({"focal": 500.0}), headers=self.headers)
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"focal": None}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data['project']['focal'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_get_includes_optical_params(self, config):
+        """GET /api/projects/:id response includes optical param fields."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        for field in ('focal', 'resx', 'resy', 'pixel_x', 'pixel_y'):
+            self.assertIn(field, data['project'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_includes_optical_params(self, config):
+        """GET /api/projects list items include optical param fields."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/projects', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        if data['projects']:
+            p = data['projects'][0]
+            for field in ('focal', 'resx', 'resy', 'pixel_x', 'pixel_y'):
+                self.assertIn(field, p)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestUsersAPI(unittest.TestCase):
     """GET /api/users/logins and GET /api/users (admin)."""
