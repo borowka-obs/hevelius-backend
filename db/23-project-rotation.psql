@@ -1,8 +1,32 @@
--- Schema version 23: add camera rotation to projects
+-- Schema version 23: add camera rotation and optical params to projects
 --
--- rotation stores the nominal camera position angle in degrees (0–360, East of North).
--- NULL means "not set / unknown"; 0.0 is a valid value (North up).
+-- rotation: nominal camera position angle in degrees (0–360, East of North).
+--   NULL means "not set / unknown"; 0.0 is a valid value (North up).
+--
+-- focal, resx, resy, pixel_x, pixel_y: optical parameters copied from the
+--   telescope's sensor at project creation time.  Stored on the project so
+--   the FOV is stable even if the equipment is later changed, and so that
+--   the frontend needs no separate scopes API call to render the sky view.
+--   All are nullable (sensor may be absent at creation time).
 --
 ALTER TABLE projects ADD COLUMN rotation FLOAT DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN focal FLOAT DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN resx INTEGER DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN resy INTEGER DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN pixel_x FLOAT DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN pixel_y FLOAT DEFAULT NULL;
+
+-- Back-fill existing projects from their telescope's attached sensor.
+UPDATE projects p
+SET
+    focal   = t.focal,
+    resx    = s.resx,
+    resy    = s.resy,
+    pixel_x = s.pixel_x,
+    pixel_y = s.pixel_y
+FROM telescopes t
+LEFT JOIN sensors s ON s.sensor_id = t.sensor_id
+WHERE t.scope_id = p.scope_id
+  AND t.sensor_id IS NOT NULL;
 
 UPDATE schema_version SET version = 23;
