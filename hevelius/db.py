@@ -471,6 +471,116 @@ def catalog_objects_search(
     return run_query(conn, query, tuple(params) if params else None)
 
 
+ASTEROID_SORT_FIELDS = {
+    "number", "designation", "absolute_magnitude", "semimajor_axis",
+    "eccentricity", "inclination", "mean_motion", "epoch",
+}
+
+_ASTEROID_SELECT = """
+    SELECT id, number, designation, epoch, mean_anomaly, perihelion_arg,
+           ascending_node, inclination, eccentricity, mean_motion,
+           semimajor_axis, absolute_magnitude, slope_parameter
+    FROM asteroids
+"""
+
+
+def asteroids_build_where(
+    designation: str = None,
+    number: int = None,
+    numbered: bool = None,
+    mag_min: float = None,
+    mag_max: float = None,
+):
+    """
+    Build WHERE clause and parameters for asteroid queries.
+
+    Returns (where_suffix, params) where where_suffix is '' or ' WHERE ...'.
+    """
+    where_clauses = []
+    params = []
+
+    if designation:
+        where_clauses.append("designation ILIKE %s")
+        params.append(f"%{designation}%")
+
+    if number is not None:
+        where_clauses.append("number = %s")
+        params.append(number)
+
+    if numbered is not None:
+        where_clauses.append("number IS NOT NULL" if numbered else "number IS NULL")
+
+    if mag_min is not None:
+        where_clauses.append("absolute_magnitude >= %s")
+        params.append(mag_min)
+
+    if mag_max is not None:
+        where_clauses.append("absolute_magnitude <= %s")
+        params.append(mag_max)
+
+    if where_clauses:
+        return " WHERE " + " AND ".join(where_clauses), params
+    return "", []
+
+
+def asteroids_count(
+    conn,
+    designation: str = None,
+    number: int = None,
+    numbered: bool = None,
+    mag_min: float = None,
+    mag_max: float = None,
+) -> int:
+    """Return count of asteroids matching the given filters."""
+    where, params = asteroids_build_where(
+        designation=designation, number=number, numbered=numbered,
+        mag_min=mag_min, mag_max=mag_max,
+    )
+    query = "SELECT COUNT(*) FROM asteroids" + where
+    return run_query(conn, query, tuple(params) if params else None)[0][0]
+
+
+def asteroids_search(
+    conn,
+    designation: str = None,
+    number: int = None,
+    numbered: bool = None,
+    mag_min: float = None,
+    mag_max: float = None,
+    sort_by: str = "number",
+    sort_order: str = "asc",
+    limit: int = None,
+    offset: int = None,
+) -> List:
+    """Search asteroids with optional filters, sorting, and paging."""
+    if sort_by not in ASTEROID_SORT_FIELDS:
+        sort_by = "number"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "asc"
+
+    where, params = asteroids_build_where(
+        designation=designation, number=number, numbered=numbered,
+        mag_min=mag_min, mag_max=mag_max,
+    )
+
+    query = _ASTEROID_SELECT + where
+    query += f" ORDER BY {sort_by} {sort_order.upper()} NULLS LAST, id ASC"
+    if limit is not None:
+        query += " LIMIT %s"
+        params.append(limit)
+    if offset is not None:
+        query += " OFFSET %s"
+        params.append(offset)
+
+    return run_query(conn, query, tuple(params) if params else None)
+
+
+def asteroid_get_by_id(conn, asteroid_id: int):
+    """Return a single asteroid row by its primary key, or None if not found."""
+    rows = run_query(conn, _ASTEROID_SELECT + " WHERE id = %s", (asteroid_id,))
+    return rows[0] if rows else None
+
+
 def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = "", order: str = "") -> List:
     """
     Returns frames (completed tasks) that are close (within radius degrees) to

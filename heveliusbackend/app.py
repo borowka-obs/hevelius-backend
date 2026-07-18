@@ -814,6 +814,68 @@ class ObjectSearchResponseSchema(Schema):
     objects = fields.List(fields.Nested(ObjectSchema))
 
 
+class AsteroidSchema(Schema):
+    asteroid_id = fields.Integer(required=True, metadata={"description": "Asteroid ID"})
+    number = fields.Integer(allow_none=True, metadata={"description": "MPC number (null for unnumbered/provisional objects)"})
+    designation = fields.String(required=True, metadata={"description": "Packed MPC designation"})
+    epoch = fields.String(metadata={"description": "Epoch in MPC packed format"})
+    mean_anomaly = fields.Float(metadata={"description": "Mean anomaly M at epoch (degrees)"})
+    perihelion_arg = fields.Float(metadata={"description": "Argument of perihelion omega (degrees)"})
+    ascending_node = fields.Float(metadata={"description": "Longitude of ascending node Omega (degrees)"})
+    inclination = fields.Float(metadata={"description": "Orbital inclination i (degrees)"})
+    eccentricity = fields.Float(metadata={"description": "Eccentricity e"})
+    mean_motion = fields.Float(metadata={"description": "Mean daily motion n (degrees/day)"})
+    semimajor_axis = fields.Float(metadata={"description": "Semi-major axis a (AU)"})
+    absolute_magnitude = fields.Float(allow_none=True, metadata={"description": "Absolute magnitude H"})
+    slope_parameter = fields.Float(allow_none=True, metadata={"description": "Phase slope parameter G"})
+
+
+class AsteroidsListRequestSchema(Schema):
+    # Paging parameters
+    page = fields.Integer(missing=1, validate=validate.Range(min=1),
+                          metadata={"description": "Page number (starting from 1)"})
+    per_page = fields.Integer(missing=100, validate=validate.Range(min=1, max=1000),
+                              metadata={"description": "Number of items per page"})
+
+    # Sorting parameters
+    sort_by = fields.String(missing='number', validate=validate.OneOf(
+        ['number', 'designation', 'absolute_magnitude', 'semimajor_axis',
+         'eccentricity', 'inclination', 'mean_motion', 'epoch'],
+        error="Invalid sort field. Must be one of: number, designation, absolute_magnitude, "
+              "semimajor_axis, eccentricity, inclination, mean_motion, epoch"
+    ))
+    sort_order = fields.String(missing='asc', validate=validate.OneOf(['asc', 'desc']),
+                               metadata={"description": "Sort order (asc or desc)"})
+
+    # Filtering parameters
+    designation = fields.String(metadata={"description": "Filter by designation (partial match)"})
+    number = fields.Integer(metadata={"description": "Filter by exact MPC number"})
+    numbered = fields.Boolean(metadata={"description": "true: only numbered asteroids; false: only unnumbered/provisional"})
+    mag_min = fields.Float(metadata={"description": "Minimum absolute magnitude (H)"})
+    mag_max = fields.Float(metadata={"description": "Maximum absolute magnitude (H)"})
+
+    @validates_schema
+    def validate_mag_range(self, data, **_kwargs):
+        mag_min = data.get('mag_min')
+        mag_max = data.get('mag_max')
+        if mag_min is not None and mag_max is not None and mag_min > mag_max:
+            raise ValidationError('mag_min must be less than or equal to mag_max')
+
+
+class AsteroidsListResponseSchema(Schema):
+    asteroids = fields.List(fields.Nested(AsteroidSchema))
+    total = fields.Integer(required=True, metadata={"description": "Total number of asteroids"})
+    page = fields.Integer(required=True, metadata={"description": "Current page number"})
+    per_page = fields.Integer(required=True, metadata={"description": "Items per page"})
+    pages = fields.Integer(required=True, metadata={"description": "Total number of pages"})
+
+
+class AsteroidDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    asteroid = fields.Nested(AsteroidSchema)
+    msg = fields.String()
+
+
 class PasswordResetCompleteBodySchema(Schema):
     token = fields.String(required=True, metadata={"description": "One-time reset token"})
     new_password = fields.String(
@@ -3154,6 +3216,102 @@ class ObjectsListResource(MethodView):
             "per_page": per_page,
             "pages": total_pages,
         }
+
+
+def _asteroid_row_to_dict(row):
+    (asteroid_id, number, designation, epoch, mean_anomaly, perihelion_arg,
+     ascending_node, inclination, eccentricity, mean_motion, semimajor_axis,
+     absolute_magnitude, slope_parameter) = row
+    return {
+        'asteroid_id': asteroid_id,
+        'number': number,
+        'designation': designation,
+        'epoch': epoch,
+        'mean_anomaly': mean_anomaly,
+        'perihelion_arg': perihelion_arg,
+        'ascending_node': ascending_node,
+        'inclination': inclination,
+        'eccentricity': eccentricity,
+        'mean_motion': mean_motion,
+        'semimajor_axis': semimajor_axis,
+        'absolute_magnitude': absolute_magnitude,
+        'slope_parameter': slope_parameter,
+    }
+
+
+@blp.route("/asteroids")
+class AsteroidsListResource(MethodView):
+    @jwt_required()
+    @blp.arguments(AsteroidsListRequestSchema, location="query")
+    @blp.response(200, AsteroidsListResponseSchema)
+    def get(self, args):
+        """Get list of asteroids with paging, sorting, and filtering"""
+        return self._get_asteroids(args)
+
+    @jwt_required()
+    @blp.arguments(AsteroidsListRequestSchema)
+    @blp.response(200, AsteroidsListResponseSchema)
+    def post(self, args):
+        """Get list of asteroids with paging, sorting, and filtering"""
+        return self._get_asteroids(args)
+
+    def _get_asteroids(self, args):
+        """Helper method to get asteroids based on filters, sorting, and paging"""
+        page = args.get('page', 1)
+        per_page = args.get('per_page', 100)
+        offset = (page - 1) * per_page
+
+        cnx = db.connect()
+        total_count = db.asteroids_count(
+            cnx,
+            designation=args.get('designation'),
+            number=args.get('number'),
+            numbered=args.get('numbered'),
+            mag_min=args.get('mag_min'),
+            mag_max=args.get('mag_max'),
+        )
+        asteroids_list = db.asteroids_search(
+            cnx,
+            designation=args.get('designation'),
+            number=args.get('number'),
+            numbered=args.get('numbered'),
+            mag_min=args.get('mag_min'),
+            mag_max=args.get('mag_max'),
+            sort_by=args.get('sort_by', 'number'),
+            sort_order=args.get('sort_order', 'asc'),
+            limit=per_page,
+            offset=offset,
+        )
+        cnx.close()
+
+        logger.info(
+            "Asteroid list: returned %d entries (page %d, total matching: %d)",
+            len(asteroids_list), page, total_count
+        )
+
+        total_pages = (total_count + per_page - 1) // per_page if per_page else 0
+
+        return {
+            "asteroids": [_asteroid_row_to_dict(row) for row in asteroids_list],
+            "total": total_count,
+            "page": page,
+            "per_page": per_page,
+            "pages": total_pages,
+        }
+
+
+@blp.route("/asteroids/<int:asteroid_id>")
+class AsteroidDetailResource(MethodView):
+    @jwt_required()
+    @blp.response(200, AsteroidDetailResponseSchema)
+    def get(self, asteroid_id):
+        """Get single asteroid by ID"""
+        cnx = db.connect()
+        row = db.asteroid_get_by_id(cnx, asteroid_id)
+        cnx.close()
+        if row is None:
+            abort(404, message="Asteroid not found.")
+        return {"status": True, "asteroid": _asteroid_row_to_dict(row), "msg": "OK"}
 
 
 # Register blueprint
