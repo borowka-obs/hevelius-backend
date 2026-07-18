@@ -68,6 +68,8 @@ class TestOpenAPISpec(unittest.TestCase):
             "/api/catalogs",
             "/api/catalogs/search",
             "/api/catalogs/list",
+            "/api/asteroids",
+            "/api/asteroids/{asteroid_id}",
         }
         self.assertEqual(paths, expected, "OpenAPI paths should match implemented routes")
 

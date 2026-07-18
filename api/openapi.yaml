@@ -978,6 +978,88 @@ components:
           $ref: '#/components/schemas/Telescope'
         msg:
           type: string
+    Asteroid:
+      type: object
+      properties:
+        asteroid_id:
+          type: integer
+          description: Asteroid ID
+        number:
+          type: integer
+          nullable: true
+          description: MPC number (null for unnumbered/provisional objects)
+        designation:
+          type: string
+          description: Packed MPC designation
+        epoch:
+          type: string
+          description: Epoch in MPC packed format
+        mean_anomaly:
+          type: number
+          format: float
+          description: Mean anomaly M at epoch (degrees)
+        perihelion_arg:
+          type: number
+          format: float
+          description: Argument of perihelion omega (degrees)
+        ascending_node:
+          type: number
+          format: float
+          description: Longitude of ascending node Omega (degrees)
+        inclination:
+          type: number
+          format: float
+          description: Orbital inclination i (degrees)
+        eccentricity:
+          type: number
+          format: float
+          description: Eccentricity e
+        mean_motion:
+          type: number
+          format: float
+          description: Mean daily motion n (degrees/day)
+        semimajor_axis:
+          type: number
+          format: float
+          description: Semi-major axis a (AU)
+        absolute_magnitude:
+          type: number
+          format: float
+          nullable: true
+          description: Absolute magnitude H
+        slope_parameter:
+          type: number
+          format: float
+          nullable: true
+          description: Phase slope parameter G
+    AsteroidsList:
+      type: object
+      properties:
+        asteroids:
+          type: array
+          items:
+            $ref: '#/components/schemas/Asteroid'
+        total:
+          type: integer
+          description: Total number of asteroids
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Items per page
+        pages:
+          type: integer
+          description: Total number of pages
+    AsteroidResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        asteroid:
+          $ref: '#/components/schemas/Asteroid'
+        msg:
+          type: string
     Catalog:
       type: object
       properties:
@@ -2993,5 +3075,166 @@ paths:
                 $ref: '#/components/schemas/ObjectsList'
         '422':
           description: Invalid parameters (e.g. ra without decl)
+      security:
+        - bearerAuth: []
+  /api/asteroids:
+    get:
+      summary: Get list of asteroids
+      description: Returns a paginated list of asteroids (minor planets) with sorting and filtering options
+      parameters:
+        - name: page
+          in: query
+          description: Page number (starting from 1)
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: per_page
+          in: query
+          description: Number of items per page
+          required: false
+          schema:
+            type: integer
+            default: 100
+            minimum: 1
+            maximum: 1000
+        - name: sort_by
+          in: query
+          description: Field to sort by
+          required: false
+          schema:
+            type: string
+            enum: [number, designation, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
+            default: number
+        - name: sort_order
+          in: query
+          description: Sort order
+          required: false
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: asc
+        - name: designation
+          in: query
+          description: Filter by designation (partial match)
+          required: false
+          schema:
+            type: string
+        - name: number
+          in: query
+          description: Filter by exact MPC number
+          required: false
+          schema:
+            type: integer
+        - name: numbered
+          in: query
+          description: "true: only numbered asteroids; false: only unnumbered/provisional"
+          required: false
+          schema:
+            type: boolean
+        - name: mag_min
+          in: query
+          description: Minimum absolute magnitude (H)
+          required: false
+          schema:
+            type: number
+            format: float
+        - name: mag_max
+          in: query
+          description: Maximum absolute magnitude (H)
+          required: false
+          schema:
+            type: number
+            format: float
+      responses:
+        '200':
+          description: List of asteroids with pagination info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidsList'
+        '422':
+          description: Invalid parameters (e.g. mag_min greater than mag_max)
+      security:
+        - bearerAuth: []
+    post:
+      summary: Get list of asteroids
+      description: Returns a paginated list of asteroids (minor planets) with sorting and filtering options
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                page:
+                  type: integer
+                  description: Page number (starting from 1)
+                  default: 1
+                  minimum: 1
+                per_page:
+                  type: integer
+                  description: Number of items per page
+                  default: 100
+                  minimum: 1
+                  maximum: 1000
+                sort_by:
+                  type: string
+                  description: Field to sort by
+                  enum: [number, designation, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
+                  default: number
+                sort_order:
+                  type: string
+                  description: Sort order
+                  enum: [asc, desc]
+                  default: asc
+                designation:
+                  type: string
+                  description: Filter by designation (partial match)
+                number:
+                  type: integer
+                  description: Filter by exact MPC number
+                numbered:
+                  type: boolean
+                  description: "true: only numbered asteroids; false: only unnumbered/provisional"
+                mag_min:
+                  type: number
+                  format: float
+                  description: Minimum absolute magnitude (H)
+                mag_max:
+                  type: number
+                  format: float
+                  description: Maximum absolute magnitude (H)
+      responses:
+        '200':
+          description: List of asteroids with pagination info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidsList'
+        '422':
+          description: Invalid parameters (e.g. mag_min greater than mag_max)
+      security:
+        - bearerAuth: []
+  /api/asteroids/{asteroid_id}:
+    get:
+      summary: Get asteroid details
+      description: Returns a single asteroid's full orbital element set by its internal ID
+      parameters:
+        - name: asteroid_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Asteroid details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidResponse'
+        '404':
+          description: Asteroid not found
       security:
         - bearerAuth: []
