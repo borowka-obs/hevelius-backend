@@ -19,7 +19,7 @@ Tasks are explicitly **out of scope** — the visualisation is based solely on t
 
 | Column | Type | Source | Notes |
 |--------|------|--------|-------|
-| `rotation` | `FLOAT` | user input | degrees East of North; NULL = not set |
+| `rotation` | `FLOAT` | user input, or `telescopes.default_rotation` | degrees East of North; NULL = not set |
 | `focal` | `FLOAT` | `telescopes.focal` | focal length (mm) |
 | `resx` | `INTEGER` | `sensors.resx` | sensor width (pixels) |
 | `resy` | `INTEGER` | `sensors.resy` | sensor height (pixels) |
@@ -27,6 +27,17 @@ Tasks are explicitly **out of scope** — the visualisation is based solely on t
 | `pixel_y` | `FLOAT` | `sensors.pixel_y` | pixel pitch Y (µm) |
 
 At project creation time the backend looks up the telescope's attached sensor and copies these values as defaults. They can be overridden via the edit endpoint (e.g. to model a different binning or a reducer/extender). For existing rows the migration fills them in via a `JOIN`.
+
+### New column on `telescopes`
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `default_rotation` | `FLOAT` | Optional. Degrees East of North; NULL = no default. |
+
+When a project is created without an explicit `rotation`, the backend copies the telescope's
+`default_rotation` (if set); an explicit `rotation` in the request always wins. This lets a fixed
+imaging rig (camera bolted to the telescope at a known position angle) avoid having to repeat the
+same rotation value on every new project.
 
 ### FOV calculation (frontend or backend helper)
 
@@ -40,8 +51,9 @@ Because `focal`, `resx`, `resy`, `pixel_x`, `pixel_y` are now part of the projec
 ### API changes
 
 - `GET /api/projects` and `GET /api/projects/{id}` — response includes the five new fields
-- `POST /api/projects` — new optional fields `focal`, `resx`, `resy`, `pixel_x`, `pixel_y`; auto-populated from scope's sensor when omitted
+- `POST /api/projects` — new optional fields `focal`, `resx`, `resy`, `pixel_x`, `pixel_y`; auto-populated from scope's sensor when omitted. `rotation` auto-populated from the scope's `default_rotation` when omitted.
 - `PATCH /api/projects/{id}` — new optional fields, allowing override after creation
+- `GET /api/scopes`, `GET/POST /api/scopes/{id}`, `PATCH /api/scopes/{id}` — telescope responses/bodies include `default_rotation`
 
 ---
 
@@ -204,5 +216,6 @@ Pass the result to `A.polygon(corners)` in the Aladin overlay.
 
 - `rotation` convention: **degrees East of North**, 0–360 (same as FITS `PA` keyword and PixInsight plate-solve output). Values outside 0–360 are accepted by the DB and should be normalised modulo 360 on display.
 - The `rotation` field defaults to `NULL` in the DB, not `0`. The frontend should display a small indicator when it is null so users know it hasn't been configured rather than assuming North-up is correct.
+- A project's `rotation` is only auto-populated from the telescope's `default_rotation` at *creation* time (like the optical params). Changing a telescope's `default_rotation` later does not retroactively update existing projects.
 - Aladin Lite v3 is ESM-only; use a dynamic `import()` in the Angular component `ngAfterViewInit` to avoid SSR issues.
 - Optical params on `projects` are denormalised by design: they represent the imaging setup *as planned for this project*, which may differ from the telescope's current sensor (e.g. if the sensor is later swapped, or the user applies binning).

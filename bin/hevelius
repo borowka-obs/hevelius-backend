@@ -229,6 +229,8 @@ def run():
     project_add.add_argument('--ra', type=float, default=None, help="RA in hours (omit to resolve from catalog by name)")
     project_add.add_argument('--dec', type=float, default=None, help="Declination in degrees (omit to resolve from catalog by name)")
     project_add.add_argument('--description', default='', help="Project description")
+    project_add.add_argument('--rotation', type=float, default=None,
+                              help="Camera position angle in degrees, East of North (defaults to the telescope's default_rotation if omitted)")
     project_add.add_argument('--active', action='store_true', default=True, help="Project is active (default)")
     project_add.add_argument('--inactive', action='store_true', help="Create project as inactive")
     project_edit = project_sub.add_parser('edit', help="Edit an existing project")
@@ -238,6 +240,7 @@ def run():
     project_edit.add_argument('--description', default=None, help="Project description")
     project_edit.add_argument('--ra', type=float, default=None, help="RA in hours")
     project_edit.add_argument('--dec', type=float, default=None, help="Declination in degrees")
+    project_edit.add_argument('--rotation', type=float, default=None, help="Camera position angle in degrees, East of North")
     project_edit.add_argument('--active', action='store_true', help="Set project active")
     project_edit.add_argument('--inactive', action='store_true', help="Set project inactive")
     project_show = project_sub.add_parser('show', help="Show project details")
@@ -293,6 +296,8 @@ def run():
     t_add.add_argument('--lat', type=float, help="Latitude")
     t_add.add_argument('--alt', type=float, help="Altitude")
     t_add.add_argument('--sensor-id', type=int, default=None, help="Sensor ID (0 or omit = none)")
+    t_add.add_argument('--default-rotation', type=float, default=None,
+                        help="Default camera position angle in degrees, East of North; used for new projects on this telescope when their rotation is not specified")
     t_add.add_argument('--active', action='store_true', default=True, help="Telescope is active (default)")
     t_add.add_argument('--inactive', action='store_true', help="Create telescope as inactive")
     t_edit = telescope_sub.add_parser('edit', help="Edit an existing telescope")
@@ -307,6 +312,8 @@ def run():
     t_edit.add_argument('--lat', type=float, help="Latitude")
     t_edit.add_argument('--alt', type=float, help="Altitude")
     t_edit.add_argument('--sensor-id', type=int, default=None, help="Sensor ID (0 to remove)")
+    t_edit.add_argument('--default-rotation', type=float, default=None,
+                         help="Default camera position angle in degrees, East of North; used for new projects on this telescope when their rotation is not specified")
     t_edit.add_argument('--active', action='store_true', help="Set active")
     t_edit.add_argument('--inactive', action='store_true', help="Set inactive")
     t_show = telescope_sub.add_parser('show', help="Show telescope details (sensor + filters)")
@@ -467,7 +474,8 @@ def run():
                 description=getattr(args, 'description', '') or '',
                 ra=getattr(args, 'ra', None),
                 dec=getattr(args, 'dec', None),
-                active=active
+                active=active,
+                rotation=getattr(args, 'rotation', None)
             )
             if pid is None:
                 print("Failed to add project: name not in catalog (provide --ra and --dec) or invalid scope_id.", file=sys.stderr)
@@ -487,7 +495,8 @@ def run():
                 scope_id=getattr(args, 'scope_id', None),
                 ra=getattr(args, 'ra', None),
                 dec=getattr(args, 'dec', None),
-                active=active
+                active=active,
+                rotation=getattr(args, 'rotation', None)
             )
             return 0 if ok else 1
         if args.project_command == "delete":
@@ -582,7 +591,8 @@ def run():
                 lat=getattr(args, 'lat', None),
                 alt=getattr(args, 'alt', None),
                 sensor_id=getattr(args, 'sensor_id', None),
-                active=active
+                active=active,
+                default_rotation=getattr(args, 'default_rotation', None)
             ) is not None else 1
         if args.telescope_command == "edit":
             active = None
@@ -602,7 +612,8 @@ def run():
                 lat=getattr(args, 'lat', None),
                 alt=getattr(args, 'alt', None),
                 sensor_id=getattr(args, 'sensor_id', None),
-                active=active
+                active=active,
+                default_rotation=getattr(args, 'default_rotation', None)
             ) else 1
         if args.telescope_command == "show":
             return show_telescope(args.scope_id)

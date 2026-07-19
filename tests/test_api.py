@@ -1727,6 +1727,70 @@ class TestTelescopeOperations(unittest.TestCase):
         self.assertNotIn(1, filter_ids)
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    # ── default_rotation field tests ────────────────────────────────────────
+
+    @use_repository
+    def test_telescope_post_add_with_default_rotation(self, config):
+        """Add telescope with an explicit default_rotation."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Rotated Scope", "default_rotation": 15.5}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['status'])
+        self.assertEqual(data['scope']['default_rotation'], 15.5)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_post_add_without_default_rotation_is_null(self, config):
+        """Add telescope without default_rotation; field should be None."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "No Rotation Scope"}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data['scope']['default_rotation'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_get_includes_default_rotation(self, config):
+        """GET /api/scopes/:id returns default_rotation field."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.get('/api/scopes/1', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('default_rotation', data['scope'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_patch_sets_default_rotation(self, config):
+        """PATCH telescope to set default_rotation."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/scopes/1',
+            data=json.dumps({"default_rotation": 200.0}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['scope']['default_rotation'], 200.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_patch_clears_default_rotation(self, config):
+        """PATCH telescope with default_rotation=None clears the value."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        self.app.patch('/api/scopes/1', data=json.dumps({"default_rotation": 60.0}), headers=self.headers)
+        response = self.app.patch(
+            '/api/scopes/1',
+            data=json.dumps({"default_rotation": None}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data['scope']['default_rotation'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestProjectOperations(unittest.TestCase):
     """Tests for project and subframe CRUD: add (catalog lookup), edit, subframe add/edit/remove."""
@@ -2275,6 +2339,34 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         if data['projects']:
             self.assertIn('rotation', data['projects'][0])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_defaults_rotation_from_telescope(self, config):
+        """Create project without rotation; value is copied from telescope's default_rotation."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE telescopes SET default_rotation = 123.0 WHERE scope_id = 1")
+        cnx.close()
+        body = {"name": "Rotation From Scope", "scope_id": 1, "ra": 83.82, "decl": -5.39}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(data['project']['rotation'], 123.0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_explicit_rotation_overrides_telescope_default(self, config):
+        """Explicit rotation in POST body overrides the telescope's default_rotation."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = db.connect()
+        db.run_query(cnx, "UPDATE telescopes SET default_rotation = 123.0 WHERE scope_id = 1")
+        cnx.close()
+        body = {"name": "Rotation Override", "scope_id": 1, "ra": 83.82, "decl": -5.39, "rotation": 7.0}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(data['project']['rotation'], 7.0)
         os.environ.pop('HEVELIUS_DB_NAME')
 
     # ── optical params (focal / resx / resy / pixel_x / pixel_y) tests ────────
