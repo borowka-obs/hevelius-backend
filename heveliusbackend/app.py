@@ -814,6 +814,48 @@ class ObjectSearchResponseSchema(Schema):
     objects = fields.List(fields.Nested(ObjectSchema))
 
 
+class AsteroidTagSchema(Schema):
+    tag_id = fields.Integer(required=True, metadata={"description": "Tag ID"})
+    name = fields.String(required=True, metadata={"description": "Tag name (e.g. amor, neo, pha)"})
+    description = fields.String(allow_none=True, metadata={"description": "Tag description"})
+    color = fields.String(allow_none=True, metadata={"description": "Display color (e.g. #1976d2)"})
+    asteroid_count = fields.Integer(metadata={"description": "Number of asteroids carrying this tag"})
+
+
+class AsteroidTagCreateSchema(Schema):
+    name = fields.String(required=True, validate=validate.Length(min=1, max=64),
+                         metadata={"description": "Tag name (e.g. amor, neo, pha)"})
+    description = fields.String(validate=validate.Length(max=256), load_default=None, allow_none=True)
+    color = fields.String(validate=validate.Length(max=16), load_default=None, allow_none=True)
+
+
+class AsteroidTagUpdateSchema(Schema):
+    name = fields.String(validate=validate.Length(min=1, max=64), load_default=None)
+    description = fields.String(validate=validate.Length(max=256), load_default=None, allow_none=True)
+    color = fields.String(validate=validate.Length(max=16), load_default=None, allow_none=True)
+
+
+class AsteroidTagsListResponseSchema(Schema):
+    tags = fields.List(fields.Nested(AsteroidTagSchema))
+
+
+class AsteroidTagCreateResponseSchema(Schema):
+    status = fields.Boolean()
+    tag_id = fields.Integer()
+    tag = fields.Nested(AsteroidTagSchema)
+    msg = fields.String()
+
+
+class AsteroidTagDetailResponseSchema(Schema):
+    status = fields.Boolean()
+    tag = fields.Nested(AsteroidTagSchema)
+    msg = fields.String()
+
+
+class AsteroidTagAttachRequestSchema(Schema):
+    tag_id = fields.Integer(required=True, metadata={"description": "Tag ID to attach"})
+
+
 class AsteroidSchema(Schema):
     asteroid_id = fields.Integer(required=True, metadata={"description": "Asteroid ID"})
     number = fields.Integer(allow_none=True, metadata={"description": "MPC number (null for unnumbered/provisional objects)"})
@@ -828,6 +870,7 @@ class AsteroidSchema(Schema):
     semimajor_axis = fields.Float(metadata={"description": "Semi-major axis a (AU)"})
     absolute_magnitude = fields.Float(allow_none=True, metadata={"description": "Absolute magnitude H"})
     slope_parameter = fields.Float(allow_none=True, metadata={"description": "Phase slope parameter G"})
+    tags = fields.List(fields.Nested(AsteroidTagSchema), metadata={"description": "Tags attached to this asteroid"})
 
 
 class AsteroidsListRequestSchema(Schema):
@@ -853,6 +896,11 @@ class AsteroidsListRequestSchema(Schema):
     numbered = fields.Boolean(metadata={"description": "true: only numbered asteroids; false: only unnumbered/provisional"})
     mag_min = fields.Float(metadata={"description": "Minimum absolute magnitude (H)"})
     mag_max = fields.Float(metadata={"description": "Maximum absolute magnitude (H)"})
+    tags = fields.String(metadata={"description": "Comma-separated tag names to filter by (e.g. 'neo,pha')"})
+    tags_mode = fields.String(
+        missing='any', validate=validate.OneOf(['any', 'all']),
+        metadata={"description": "'any' (default) matches at least one listed tag; 'all' requires every listed tag"}
+    )
 
     @validates_schema
     def validate_mag_range(self, data, **_kwargs):
@@ -3218,7 +3266,7 @@ class ObjectsListResource(MethodView):
         }
 
 
-def _asteroid_row_to_dict(row):
+def _asteroid_row_to_dict(row, tags=None):
     (asteroid_id, number, designation, epoch, mean_anomaly, perihelion_arg,
      ascending_node, inclination, eccentricity, mean_motion, semimajor_axis,
      absolute_magnitude, slope_parameter) = row
@@ -3236,6 +3284,22 @@ def _asteroid_row_to_dict(row):
         'semimajor_axis': semimajor_axis,
         'absolute_magnitude': absolute_magnitude,
         'slope_parameter': slope_parameter,
+        'tags': tags or [],
+    }
+
+
+def _parse_tag_names(raw: str):
+    if not raw:
+        return None
+    names = [n.strip() for n in raw.split(',') if n.strip()]
+    return names or None
+
+
+def _row_to_asteroid_tag(row):
+    tag_id, name, description, color, asteroid_count = row
+    return {
+        'tag_id': tag_id, 'name': name, 'description': description,
+        'color': color, 'asteroid_count': asteroid_count,
     }
 
 
@@ -3260,6 +3324,8 @@ class AsteroidsListResource(MethodView):
         page = args.get('page', 1)
         per_page = args.get('per_page', 100)
         offset = (page - 1) * per_page
+        tag_names = _parse_tag_names(args.get('tags'))
+        tags_mode = args.get('tags_mode', 'any')
 
         cnx = db.connect()
         total_count = db.asteroids_count(
@@ -3269,6 +3335,8 @@ class AsteroidsListResource(MethodView):
             numbered=args.get('numbered'),
             mag_min=args.get('mag_min'),
             mag_max=args.get('mag_max'),
+            tag_names=tag_names,
+            tags_mode=tags_mode,
         )
         asteroids_list = db.asteroids_search(
             cnx,
@@ -3277,11 +3345,14 @@ class AsteroidsListResource(MethodView):
             numbered=args.get('numbered'),
             mag_min=args.get('mag_min'),
             mag_max=args.get('mag_max'),
+            tag_names=tag_names,
+            tags_mode=tags_mode,
             sort_by=args.get('sort_by', 'number'),
             sort_order=args.get('sort_order', 'asc'),
             limit=per_page,
             offset=offset,
         )
+        tags_by_asteroid = db.asteroid_tags_for_asteroids(cnx, [row[0] for row in asteroids_list])
         cnx.close()
 
         logger.info(
@@ -3292,7 +3363,10 @@ class AsteroidsListResource(MethodView):
         total_pages = (total_count + per_page - 1) // per_page if per_page else 0
 
         return {
-            "asteroids": [_asteroid_row_to_dict(row) for row in asteroids_list],
+            "asteroids": [
+                _asteroid_row_to_dict(row, tags=tags_by_asteroid.get(row[0]))
+                for row in asteroids_list
+            ],
             "total": total_count,
             "page": page,
             "per_page": per_page,
@@ -3308,10 +3382,162 @@ class AsteroidDetailResource(MethodView):
         """Get single asteroid by ID"""
         cnx = db.connect()
         row = db.asteroid_get_by_id(cnx, asteroid_id)
+        if row is None:
+            cnx.close()
+            abort(404, message="Asteroid not found.")
+        tags = db.asteroid_tags_for_asteroids(cnx, [asteroid_id]).get(asteroid_id)
+        cnx.close()
+        return {"status": True, "asteroid": _asteroid_row_to_dict(row, tags=tags), "msg": "OK"}
+
+
+@blp.route("/asteroid-tags")
+class AsteroidTagsResource(MethodView):
+    @jwt_required()
+    @blp.response(200, AsteroidTagsListResponseSchema)
+    def get(self):
+        """List all asteroid tags, with the number of asteroids carrying each."""
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            """SELECT t.tag_id, t.name, t.description, t.color, COUNT(m.asteroid_id)
+               FROM asteroid_tags t
+               LEFT JOIN asteroid_tag_map m ON m.tag_id = t.tag_id
+               GROUP BY t.tag_id
+               ORDER BY t.name""",
+        )
+        cnx.close()
+        return {"tags": [_row_to_asteroid_tag(r) for r in (rows or [])]}
+
+    @jwt_required()
+    @blp.arguments(AsteroidTagCreateSchema)
+    @blp.response(200, AsteroidTagCreateResponseSchema)
+    def post(self, tag_data):
+        """Create a new asteroid tag (e.g. amor, neo, pha, fast rotator)."""
+        cnx = db.connect()
+        try:
+            row = db.run_query(
+                cnx,
+                "INSERT INTO asteroid_tags (name, description, color) VALUES (%s, %s, %s) RETURNING tag_id",
+                (tag_data["name"], tag_data.get("description"), tag_data.get("color")),
+            )
+        except Exception as e:
+            cnx.close()
+            err = str(e).lower()
+            if "unique constraint" in err or "duplicate key" in err:
+                abort(400, message="Tag with this name already exists.")
+            raise
+        tag_id = row if isinstance(row, int) else (row[0] if row else None)
+        cnx.close()
+        if tag_id is None:
+            abort(500, message="Failed to create tag.")
+        return {
+            "status": True,
+            "tag_id": tag_id,
+            "tag": {
+                "tag_id": tag_id, "name": tag_data["name"],
+                "description": tag_data.get("description"), "color": tag_data.get("color"),
+                "asteroid_count": 0,
+            },
+            "msg": "Tag created successfully.",
+        }
+
+
+@blp.route("/asteroid-tags/<int:tag_id>")
+class AsteroidTagDetailResource(MethodView):
+    def _fetch(self, cnx, tag_id):
+        rows = db.run_query(
+            cnx,
+            """SELECT t.tag_id, t.name, t.description, t.color, COUNT(m.asteroid_id)
+               FROM asteroid_tags t
+               LEFT JOIN asteroid_tag_map m ON m.tag_id = t.tag_id
+               WHERE t.tag_id = %s
+               GROUP BY t.tag_id""",
+            (tag_id,),
+        )
+        return rows[0] if rows else None
+
+    @jwt_required()
+    @blp.response(200, AsteroidTagDetailResponseSchema)
+    def get(self, tag_id):
+        """Get a single asteroid tag."""
+        cnx = db.connect()
+        row = self._fetch(cnx, tag_id)
         cnx.close()
         if row is None:
-            abort(404, message="Asteroid not found.")
-        return {"status": True, "asteroid": _asteroid_row_to_dict(row), "msg": "OK"}
+            abort(404, message="Tag not found.")
+        return {"status": True, "tag": _row_to_asteroid_tag(row), "msg": "OK"}
+
+    @jwt_required()
+    @blp.arguments(AsteroidTagUpdateSchema)
+    @blp.response(200, AsteroidTagDetailResponseSchema)
+    def patch(self, tag_data, tag_id):
+        """Edit an asteroid tag (partial update: name, description, color)."""
+        cnx = db.connect()
+        if self._fetch(cnx, tag_id) is None:
+            cnx.close()
+            abort(404, message="Tag not found.")
+        updates = []
+        params = []
+        for key in ("name", "description", "color"):
+            if key in tag_data and tag_data[key] is not None:
+                updates.append(f"{key} = %s")
+                params.append(tag_data[key])
+        if not updates:
+            row = self._fetch(cnx, tag_id)
+            cnx.close()
+            return {"status": True, "tag": _row_to_asteroid_tag(row), "msg": "No changes."}
+        params.append(tag_id)
+        try:
+            db.run_query(cnx, "UPDATE asteroid_tags SET " + ", ".join(updates) + " WHERE tag_id = %s", tuple(params))
+        except Exception as e:
+            cnx.close()
+            err = str(e).lower()
+            if "unique constraint" in err or "duplicate key" in err:
+                abort(400, message="Tag with this name already exists.")
+            raise
+        row = self._fetch(cnx, tag_id)
+        cnx.close()
+        return {"status": True, "tag": _row_to_asteroid_tag(row), "msg": "Tag updated."}
+
+    @jwt_required()
+    @blp.response(200, StatusMsgSchema)
+    def delete(self, tag_id):
+        """Delete an asteroid tag (also removes it from any tagged asteroids)."""
+        cnx = db.connect()
+        db.run_query(cnx, "DELETE FROM asteroid_tags WHERE tag_id = %s", (tag_id,))
+        cnx.close()
+        return {"status": True, "msg": "Tag deleted"}
+
+
+@blp.route("/asteroids/<int:asteroid_id>/tags")
+class AsteroidTagAttachResource(MethodView):
+    @jwt_required()
+    @blp.arguments(AsteroidTagAttachRequestSchema)
+    @blp.response(200, StatusMsgSchema)
+    def post(self, data, asteroid_id):
+        """Attach an existing tag to an asteroid."""
+        tag_id = data["tag_id"]
+        cnx = db.connect()
+        asteroid = db.run_query(cnx, "SELECT id FROM asteroids WHERE id = %s", (asteroid_id,))
+        tag = db.run_query(cnx, "SELECT tag_id FROM asteroid_tags WHERE tag_id = %s", (tag_id,))
+        if not asteroid or not tag:
+            cnx.close()
+            return {"status": False, "msg": "Asteroid or tag not found"}
+        db.asteroid_tag_attach(cnx, asteroid_id, tag_id)
+        cnx.close()
+        return {"status": True, "msg": "Tag added"}
+
+
+@blp.route("/asteroids/<int:asteroid_id>/tags/<int:tag_id>")
+class AsteroidTagDetachResource(MethodView):
+    @jwt_required()
+    @blp.response(200, StatusMsgSchema)
+    def delete(self, asteroid_id, tag_id):
+        """Detach a tag from an asteroid."""
+        cnx = db.connect()
+        db.asteroid_tag_detach(cnx, asteroid_id, tag_id)
+        cnx.close()
+        return {"status": True, "msg": "Tag removed"}
 
 
 # Register blueprint
