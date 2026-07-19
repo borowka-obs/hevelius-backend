@@ -1141,6 +1141,63 @@ components:
           $ref: '#/components/schemas/Asteroid'
         msg:
           type: string
+    AsteroidVisibilitySample:
+      type: object
+      properties:
+        time:
+          type: string
+          description: Sample time (UTC)
+        altitude_deg:
+          type: number
+          format: float
+          description: Altitude above the horizon (degrees)
+        azimuth_deg:
+          type: number
+          format: float
+          description: Azimuth (degrees, from North through East)
+        apparent_magnitude:
+          type: number
+          format: float
+          nullable: true
+          description: Estimated apparent magnitude, if H is known
+    AsteroidVisibilityResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        scope_id:
+          type: integer
+        scope_name:
+          type: string
+        night_start:
+          type: string
+          description: Start of the astronomical night (UTC)
+        night_end:
+          type: string
+          description: End of the astronomical night (UTC)
+        samples:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsteroidVisibilitySample'
+        max_altitude_deg:
+          type: number
+          format: float
+          description: Highest altitude reached during the night
+        max_altitude_time:
+          type: string
+          description: Time of highest altitude (UTC)
+        apparent_magnitude_at_max:
+          type: number
+          format: float
+          nullable: true
+        visible:
+          type: boolean
+          description: Whether the asteroid rises above the horizon during the night
+        has_magnitude_estimate:
+          type: boolean
+          description: Whether absolute_magnitude (H) was available
+        msg:
+          type: string
     Catalog:
       type: object
       properties:
@@ -3339,6 +3396,54 @@ paths:
                 $ref: '#/components/schemas/AsteroidResponse'
         '404':
           description: Asteroid not found
+      security:
+        - bearerAuth: []
+  /api/asteroids/{asteroid_id}/visibility:
+    get:
+      summary: Compute asteroid visibility for a night from a telescope's location
+      description: >-
+        Computes altitude, azimuth, and (if absolute magnitude H is known) estimated apparent
+        magnitude across a night for one asteroid as seen from a telescope's location.
+        Defaults to tonight; pass `date` to check a different night.
+      parameters:
+        - name: asteroid_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: scope_id
+          in: query
+          description: Telescope to compute visibility from
+          required: true
+          schema:
+            type: integer
+        - name: date
+          in: query
+          description: Evening date (YYYY-MM-DD) whose night to compute; defaults to tonight
+          required: false
+          schema:
+            type: string
+            format: date
+        - name: step_minutes
+          in: query
+          description: Sampling interval across the night, in minutes
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 120
+      responses:
+        '200':
+          description: Visibility curve for the requested night
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidVisibilityResponse'
+        '400':
+          description: Telescope has no location configured
+        '404':
+          description: Asteroid or telescope not found
       security:
         - bearerAuth: []
   /api/asteroid-tags:
