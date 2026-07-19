@@ -161,6 +161,7 @@ class TestAsteroids(unittest.TestCase):
         self.assertEqual(data['asteroid']['designation'], '00001')
         self.assertEqual(data['asteroid']['number'], 1)
         self.assertEqual(data['asteroid']['asteroid_id'], asteroid_id)
+        self.assertEqual(data['asteroid']['tags'], [])
 
         # Not found
         response = self.app.get('/api/asteroids/999999', headers=self.headers)

@@ -1,0 +1,23 @@
+-- Tags for asteroids (e.g. amor, neo, pha, fast rotator, visited by spacecraft).
+-- Many-to-many: an asteroid can carry multiple tags, a tag applies to many asteroids.
+
+CREATE TABLE IF NOT EXISTS asteroid_tags (
+    tag_id SERIAL PRIMARY KEY,
+    name VARCHAR(64) NOT NULL,
+    description VARCHAR(256),
+    color VARCHAR(16),
+    UNIQUE (name)
+);
+
+CREATE TABLE IF NOT EXISTS asteroid_tag_map (
+    asteroid_id INTEGER NOT NULL REFERENCES asteroids(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES asteroid_tags(tag_id) ON DELETE CASCADE,
+    PRIMARY KEY (asteroid_id, tag_id)
+);
+
+-- The composite PK (asteroid_id, tag_id) already serves "tags for asteroid X"
+-- lookups. This extra index on tag_id serves the reverse direction: "asteroids
+-- with tag Y" and multi-tag filtering (both ANY and ALL semantics).
+CREATE INDEX asteroid_tag_map_tag_id_idx ON asteroid_tag_map (tag_id);
+
+UPDATE schema_version SET version = 23;

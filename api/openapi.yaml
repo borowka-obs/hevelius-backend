@@ -1032,6 +1032,87 @@ components:
           format: float
           nullable: true
           description: Phase slope parameter G
+        tags:
+          type: array
+          description: Tags attached to this asteroid
+          items:
+            $ref: '#/components/schemas/AsteroidTag'
+    AsteroidTag:
+      type: object
+      properties:
+        tag_id:
+          type: integer
+          description: Tag ID
+        name:
+          type: string
+          description: Tag name (e.g. amor, neo, pha)
+        description:
+          type: string
+          nullable: true
+          description: Tag description
+        color:
+          type: string
+          nullable: true
+          description: Display color (e.g. "#1976d2")
+        asteroid_count:
+          type: integer
+          description: Number of asteroids carrying this tag
+    AsteroidTagsList:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            $ref: '#/components/schemas/AsteroidTag'
+    AsteroidTagCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 256
+          nullable: true
+        color:
+          type: string
+          maxLength: 16
+          nullable: true
+    AsteroidTagUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          maxLength: 64
+        description:
+          type: string
+          maxLength: 256
+          nullable: true
+        color:
+          type: string
+          maxLength: 16
+          nullable: true
+    AsteroidTagCreateResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        tag_id:
+          type: integer
+        tag:
+          $ref: '#/components/schemas/AsteroidTag'
+        msg:
+          type: string
+    AsteroidTagResponse:
+      type: object
+      properties:
+        status:
+          type: boolean
+        tag:
+          $ref: '#/components/schemas/AsteroidTag'
+        msg:
+          type: string
     AsteroidsList:
       type: object
       properties:
@@ -3147,6 +3228,20 @@ paths:
           schema:
             type: number
             format: float
+        - name: tags
+          in: query
+          description: Comma-separated tag names to filter by (e.g. "neo,pha")
+          required: false
+          schema:
+            type: string
+        - name: tags_mode
+          in: query
+          description: "'any': match asteroids with at least one listed tag (default); 'all': require every listed tag"
+          required: false
+          schema:
+            type: string
+            enum: [any, all]
+            default: any
       responses:
         '200':
           description: List of asteroids with pagination info
@@ -3206,6 +3301,14 @@ paths:
                   type: number
                   format: float
                   description: Maximum absolute magnitude (H)
+                tags:
+                  type: string
+                  description: Comma-separated tag names to filter by (e.g. "neo,pha")
+                tags_mode:
+                  type: string
+                  description: "'any': match asteroids with at least one listed tag (default); 'all': require every listed tag"
+                  enum: [any, all]
+                  default: any
       responses:
         '200':
           description: List of asteroids with pagination info
@@ -3236,5 +3339,157 @@ paths:
                 $ref: '#/components/schemas/AsteroidResponse'
         '404':
           description: Asteroid not found
+      security:
+        - bearerAuth: []
+  /api/asteroid-tags:
+    get:
+      summary: List asteroid tags
+      description: Returns all asteroid tags with the number of asteroids carrying each
+      responses:
+        '200':
+          description: List of tags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidTagsList'
+      security:
+        - bearerAuth: []
+    post:
+      summary: Create asteroid tag
+      description: Creates a new asteroid tag (e.g. amor, neo, pha, fast rotator, visited by spacecraft)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsteroidTagCreate'
+      responses:
+        '200':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidTagCreateResponse'
+        '400':
+          description: Bad request (e.g. duplicate tag name)
+      security:
+        - bearerAuth: []
+  /api/asteroid-tags/{tag_id}:
+    get:
+      summary: Get asteroid tag details
+      parameters:
+        - name: tag_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidTagResponse'
+        '404':
+          description: Tag not found
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Edit asteroid tag
+      description: Partial update of an asteroid tag's name, description, or color
+      parameters:
+        - name: tag_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AsteroidTagUpdate'
+      responses:
+        '200':
+          description: Tag updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AsteroidTagResponse'
+        '400':
+          description: Bad request (e.g. duplicate tag name)
+        '404':
+          description: Tag not found
+      security:
+        - bearerAuth: []
+    delete:
+      summary: Delete asteroid tag
+      description: Deletes the tag definition and removes it from any asteroids carrying it
+      parameters:
+        - name: tag_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
+      security:
+        - bearerAuth: []
+  /api/asteroids/{asteroid_id}/tags:
+    post:
+      summary: Attach tag to asteroid
+      description: Attaches an existing asteroid tag to an asteroid (no-op if already attached)
+      parameters:
+        - name: asteroid_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tag_id]
+              properties:
+                tag_id:
+                  type: integer
+                  description: Tag ID to attach
+      responses:
+        '200':
+          description: Tag attached (or asteroid/tag not found, see status/msg)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
+      security:
+        - bearerAuth: []
+  /api/asteroids/{asteroid_id}/tags/{tag_id}:
+    delete:
+      summary: Detach tag from asteroid
+      description: Detaches a tag from an asteroid (no-op if not attached)
+      parameters:
+        - name: asteroid_id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: tag_id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Tag detached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
       security:
         - bearerAuth: []

@@ -490,11 +490,19 @@ def asteroids_build_where(
     numbered: bool = None,
     mag_min: float = None,
     mag_max: float = None,
+    tag_names: List[str] = None,
+    tags_mode: str = "any",
 ):
     """
     Build WHERE clause and parameters for asteroid queries.
 
     Returns (where_suffix, params) where where_suffix is '' or ' WHERE ...'.
+
+    tag_names/tags_mode filter by tag membership: "any" (default) matches
+    asteroids carrying at least one of the given tags, "all" requires every
+    given tag to be present. Both forms use the asteroid_tag_map(tag_id)
+    index via a correlated subquery keyed on asteroid_id, so filtering stays
+    cheap even with a large asteroid catalogue.
     """
     where_clauses = []
     params = []
@@ -518,6 +526,24 @@ def asteroids_build_where(
         where_clauses.append("absolute_magnitude <= %s")
         params.append(mag_max)
 
+    if tag_names:
+        distinct_names = list(dict.fromkeys(tag_names))
+        if tags_mode == "all":
+            where_clauses.append(
+                "(SELECT COUNT(DISTINCT m.tag_id) FROM asteroid_tag_map m "
+                "JOIN asteroid_tags t ON t.tag_id = m.tag_id "
+                "WHERE m.asteroid_id = asteroids.id AND t.name = ANY(%s)) = %s"
+            )
+            params.append(distinct_names)
+            params.append(len(distinct_names))
+        else:
+            where_clauses.append(
+                "EXISTS (SELECT 1 FROM asteroid_tag_map m "
+                "JOIN asteroid_tags t ON t.tag_id = m.tag_id "
+                "WHERE m.asteroid_id = asteroids.id AND t.name = ANY(%s))"
+            )
+            params.append(distinct_names)
+
     if where_clauses:
         return " WHERE " + " AND ".join(where_clauses), params
     return "", []
@@ -530,11 +556,13 @@ def asteroids_count(
     numbered: bool = None,
     mag_min: float = None,
     mag_max: float = None,
+    tag_names: List[str] = None,
+    tags_mode: str = "any",
 ) -> int:
     """Return count of asteroids matching the given filters."""
     where, params = asteroids_build_where(
         designation=designation, number=number, numbered=numbered,
-        mag_min=mag_min, mag_max=mag_max,
+        mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
     query = "SELECT COUNT(*) FROM asteroids" + where
     return run_query(conn, query, tuple(params) if params else None)[0][0]
@@ -547,6 +575,8 @@ def asteroids_search(
     numbered: bool = None,
     mag_min: float = None,
     mag_max: float = None,
+    tag_names: List[str] = None,
+    tags_mode: str = "any",
     sort_by: str = "number",
     sort_order: str = "asc",
     limit: int = None,
@@ -560,7 +590,7 @@ def asteroids_search(
 
     where, params = asteroids_build_where(
         designation=designation, number=number, numbered=numbered,
-        mag_min=mag_min, mag_max=mag_max,
+        mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
 
     query = _ASTEROID_SELECT + where
@@ -579,6 +609,53 @@ def asteroid_get_by_id(conn, asteroid_id: int):
     """Return a single asteroid row by its primary key, or None if not found."""
     rows = run_query(conn, _ASTEROID_SELECT + " WHERE id = %s", (asteroid_id,))
     return rows[0] if rows else None
+
+
+def asteroid_tags_for_asteroids(conn, asteroid_ids: List[int]) -> dict:
+    """
+    Batch-fetch tags for multiple asteroids in a single query (avoids N+1
+    lookups when building a paginated asteroid list).
+
+    Returns {asteroid_id: [{"tag_id", "name", "description", "color"}, ...]},
+    with every requested id present (empty list if untagged).
+    """
+    result = {aid: [] for aid in asteroid_ids}
+    if not asteroid_ids:
+        return result
+    rows = run_query(
+        conn,
+        """
+        SELECT m.asteroid_id, t.tag_id, t.name, t.description, t.color
+        FROM asteroid_tag_map m
+        JOIN asteroid_tags t ON t.tag_id = m.tag_id
+        WHERE m.asteroid_id = ANY(%s)
+        ORDER BY t.name
+        """,
+        (list(asteroid_ids),),
+    )
+    for asteroid_id, tag_id, name, description, color in rows or []:
+        result[asteroid_id].append({
+            "tag_id": tag_id, "name": name, "description": description, "color": color,
+        })
+    return result
+
+
+def asteroid_tag_attach(conn, asteroid_id: int, tag_id: int) -> None:
+    """Attach a tag to an asteroid; a no-op if already attached."""
+    run_query(
+        conn,
+        "INSERT INTO asteroid_tag_map (asteroid_id, tag_id) VALUES (%s, %s) ON CONFLICT DO NOTHING",
+        (asteroid_id, tag_id),
+    )
+
+
+def asteroid_tag_detach(conn, asteroid_id: int, tag_id: int) -> None:
+    """Detach a tag from an asteroid; a no-op if not attached."""
+    run_query(
+        conn,
+        "DELETE FROM asteroid_tag_map WHERE asteroid_id = %s AND tag_id = %s",
+        (asteroid_id, tag_id),
+    )
 
 
 def tasks_radius_get(conn, ra: float, decl: float, radius: float, filter: str = "", order: str = "") -> List:
