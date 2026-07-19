@@ -20,6 +20,15 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 23 (project rotation, optical params, telescope default rotation)
+
+- **projects** – Added **rotation** (float, degrees East of North, nullable; user-supplied or defaulted
+  from the telescope, see below) and **focal**, **resx**, **resy**, **pixel_x**, **pixel_y** (optical
+  parameters, copied from the telescope's attached sensor at creation time, all nullable).
+- **telescopes** – Added **default_rotation** (float, degrees East of North, nullable). When a new
+  project is created on a telescope without an explicit `rotation`, it is copied from the telescope's
+  `default_rotation` (if set); otherwise the project's `rotation` stays NULL.
+
 ### Schema version 18 (users cleanup, audit, password reset)
 
 - **users** – **ftp_login** and **ftp_pass** removed. Non-empty **login** values are unique (partial unique index where `login IS NOT NULL`). Empty-string logins are normalized to NULL before the constraint is applied.

@@ -9,12 +9,20 @@
 --   the frontend needs no separate scopes API call to render the sky view.
 --   All are nullable (sensor may be absent at creation time).
 --
+-- telescopes.default_rotation: optional per-telescope default for the
+--   project's rotation field above. When a new project is created without
+--   an explicit rotation, it is copied from the telescope's default_rotation
+--   (if set); otherwise the project's rotation stays NULL. Nullable; 0.0 is
+--   a valid value (North up).
+--
 ALTER TABLE projects ADD COLUMN rotation FLOAT DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN focal FLOAT DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN resx INTEGER DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN resy INTEGER DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN pixel_x FLOAT DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN pixel_y FLOAT DEFAULT NULL;
+
+ALTER TABLE telescopes ADD COLUMN default_rotation FLOAT DEFAULT NULL;
 
 -- Back-fill existing projects from their telescope's attached sensor.
 UPDATE projects p

@@ -294,9 +294,10 @@ def show_project(project_id):
 
 
 def add_project(name, scope_id, description=None, ra=None, dec=None, active=True,
-                focal=None, resx=None, resy=None, pixel_x=None, pixel_y=None):
+                focal=None, resx=None, resy=None, pixel_x=None, pixel_y=None, rotation=None):
     """Add a new project. name and scope_id required. If ra/dec not given, resolve from catalog by name.
     Optical params default to the telescope's attached sensor values when not supplied.
+    rotation defaults to the telescope's default_rotation (if set) when not supplied.
     Returns project_id or None on failure."""
     cnx = db.connect()
     if ra is None or dec is None:
@@ -307,7 +308,7 @@ def add_project(name, scope_id, description=None, ra=None, dec=None, active=True
         ra, dec = cat[0][2], cat[0][3]
     scope_row = db.run_query(
         cnx,
-        "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y "
+        "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y, t.default_rotation "
         "FROM telescopes t LEFT JOIN sensors s ON s.sensor_id = t.sensor_id "
         "WHERE t.scope_id = %s",
         (scope_id,)
@@ -326,11 +327,13 @@ def add_project(name, scope_id, description=None, ra=None, dec=None, active=True
         pixel_x = sr[3]
     if pixel_y is None:
         pixel_y = sr[4]
+    if rotation is None:
+        rotation = sr[5]
     db.run_query(
         cnx,
-        "INSERT INTO projects (name, description, scope_id, ra, decl, active, focal, resx, resy, pixel_x, pixel_y) "
-        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
-        (name, description or "", scope_id, ra, dec, active, focal, resx, resy, pixel_x, pixel_y)
+        "INSERT INTO projects (name, description, scope_id, ra, decl, active, focal, resx, resy, pixel_x, pixel_y, rotation) "
+        "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+        (name, description or "", scope_id, ra, dec, active, focal, resx, resy, pixel_x, pixel_y, rotation)
     )
     row = db.run_query(cnx, "SELECT project_id FROM projects WHERE name=%s AND scope_id=%s ORDER BY project_id DESC LIMIT 1", (name, scope_id))
     project_id = row[0][0]
@@ -338,7 +341,7 @@ def add_project(name, scope_id, description=None, ra=None, dec=None, active=True
     return project_id
 
 
-def edit_project(project_id, name=None, description=None, scope_id=None, ra=None, dec=None, active=None):
+def edit_project(project_id, name=None, description=None, scope_id=None, ra=None, dec=None, active=None, rotation=None):
     """Update project fields. Returns True on success."""
     cnx = db.connect()
     row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
@@ -347,7 +350,10 @@ def edit_project(project_id, name=None, description=None, scope_id=None, ra=None
         return False
     updates = []
     args = []
-    for key, val in (("name", name), ("description", description), ("scope_id", scope_id), ("ra", ra), ("decl", dec), ("active", active)):
+    for key, val in (
+        ("name", name), ("description", description), ("scope_id", scope_id), ("ra", ra), ("decl", dec),
+        ("active", active), ("rotation", rotation)
+    ):
         if val is not None:
             updates.append(f"{key} = %s")
             args.append(val)
@@ -537,7 +543,7 @@ def list_telescopes(sort_by="scope_id", sort_order="asc"):
 
 
 def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
-                  lon=None, lat=None, alt=None, sensor_id=None, active=True):
+                  lon=None, lat=None, alt=None, sensor_id=None, active=True, default_rotation=None):
     """Add a new telescope. scope_id is optional (auto-assigned if omitted). Returns scope_id on success, None on failure."""
     if sensor_id == 0:
         sensor_id = None
@@ -555,7 +561,8 @@ def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, f
     vals = [scope_id, name]
     for key, val in [
         ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec), ("focal", focal),
-        ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
+        ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active),
+        ("default_rotation", default_rotation)
     ]:
         if val is not None:
             cols.append(key)
@@ -576,7 +583,7 @@ def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, f
 
 
 def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
-                   lon=None, lat=None, alt=None, sensor_id=None, active=None):
+                   lon=None, lat=None, alt=None, sensor_id=None, active=None, default_rotation=None):
     """Edit an existing telescope. sensor_id=0 removes the sensor. Returns True on success."""
     cnx = db.connect()
     row = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
@@ -588,7 +595,8 @@ def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, 
     params = []
     for key, val in [
         ("name", name), ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec),
-        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
+        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active),
+        ("default_rotation", default_rotation)
     ]:
         if val is not None:
             updates.append(f"{key} = %s")
@@ -612,7 +620,7 @@ def show_telescope(scope_id):
     cnx = db.connect()
     row = db.run_query(cnx, """
         SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
-               t.lon, t.lat, t.alt, t.sensor_id, t.active
+               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation
         FROM telescopes t WHERE t.scope_id = %s
     """, (scope_id,))
     if not row:
@@ -629,6 +637,7 @@ def show_telescope(scope_id):
     print(f"Aperture:  {r[6]}")
     print(f"Lon/Lat/Alt: {r[7]} / {r[8]} / {r[9]}")
     print(f"Active:    {r[11]}")
+    print(f"Default rotation: {r[12]}")
     if r[10] is not None:
         srow = db.run_query(cnx, """
             SELECT sensor_id, name, resx, resy, pixel_x, pixel_y, bits, width, height, vendor, url, active

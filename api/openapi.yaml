@@ -688,7 +688,8 @@ components:
           nullable: true
           description: >
             Nominal camera position angle in degrees (0–360, East of North).
-            Omit or send null to leave unset.
+            Auto-populated from the telescope's default_rotation when omitted, if set
+            there; otherwise left unset. Supply explicitly to override.
         focal:
           type: number
           format: float
@@ -861,6 +862,14 @@ components:
         active:
           type: boolean
           description: Whether the telescope is active
+        default_rotation:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Default camera position angle in degrees (0–360, East of North) applied to
+            new projects created on this telescope when their rotation is not specified.
+            null means no default is set.
     TelescopesList:
       type: object
       properties:
@@ -908,6 +917,13 @@ components:
         active:
           type: boolean
           default: true
+        default_rotation:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Default camera position angle in degrees (0–360, East of North) applied to
+            new projects created on this telescope when their rotation is not specified.
     ScopeUpdate:
       type: object
       properties:
@@ -943,6 +959,13 @@ components:
           description: Camera/sensor ID; use 0 to remove sensor
         active:
           type: boolean
+        default_rotation:
+          type: number
+          format: float
+          nullable: true
+          description: >
+            Default camera position angle in degrees (0–360, East of North) for new
+            projects on this telescope. Send null to clear.
     ScopeResponse:
       type: object
       properties:

@@ -572,6 +572,10 @@ class TelescopeSchema(Schema):
     sensor = fields.Nested(SensorSchema, allow_none=True, metadata={"description": "Associated sensor"})
     filters = fields.List(fields.Nested(FilterSchema), metadata={"description": "Filters on this telescope"})
     active = fields.Boolean(metadata={"description": "Whether the telescope is active"})
+    default_rotation = fields.Float(
+        allow_none=True,
+        metadata={"description": "Default camera rotation (degrees East of North) applied to new projects on this telescope when not specified"}
+    )
 
 
 class TelescopesListSchema(Schema):
@@ -591,6 +595,10 @@ class ScopeCreateSchema(Schema):
     alt = fields.Float()
     sensor_id = fields.Integer(load_default=None)
     active = fields.Boolean(load_default=True)
+    default_rotation = fields.Float(
+        load_default=None, allow_none=True,
+        metadata={"description": "Default camera rotation (degrees East of North) for new projects on this telescope"}
+    )
 
 
 class ScopeUpdateSchema(Schema):
@@ -605,6 +613,7 @@ class ScopeUpdateSchema(Schema):
     alt = fields.Float()
     sensor_id = fields.Integer(load_default=None)
     active = fields.Boolean()
+    default_rotation = fields.Float(allow_none=True)
 
 
 class ProjectSubframeSchema(Schema):
@@ -2008,7 +2017,7 @@ class NightPlanResource(MethodView):
 def _scopes_base_query():
     return """
         SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
-               t.lon, t.lat, t.alt, t.sensor_id, t.active,
+               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation,
                s.sensor_id, s.name, s.resx, s.resy, s.pixel_x, s.pixel_y,
                s.bits, s.width, s.height, s.vendor, s.url, s.active AS sensor_active
         FROM telescopes t
@@ -2081,7 +2090,7 @@ class ScopesResource(MethodView):
                 return {"status": False, "scope_id": None, "scope": None, "msg": f"Telescope scope_id={scope_id} already exists"}
         cols = ["scope_id", "name"]
         vals = [scope_id, name]
-        for key in ("descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active"):
+        for key in ("descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active", "default_rotation"):
             if data.get(key) is not None:
                 cols.append(key)
                 vals.append(data[key])
@@ -2101,7 +2110,7 @@ class ScopesResource(MethodView):
             "scope_id": scope_id, "name": name, "descr": data.get("descr"), "min_dec": data.get("min_dec"),
             "max_dec": data.get("max_dec"), "focal": data.get("focal"), "aperture": data.get("aperture"),
             "lon": data.get("lon"), "lat": data.get("lat"), "alt": data.get("alt"), "sensor": None,
-            "filters": [], "active": data.get("active", True)
+            "filters": [], "active": data.get("active", True), "default_rotation": data.get("default_rotation")
         }
         return {"status": True, "scope_id": scope_id, "scope": scope, "msg": "Created"}
 
@@ -2138,6 +2147,9 @@ class ScopeDetailResource(MethodView):
             if data.get(key) is not None:
                 updates.append(f"{key} = %s")
                 params.append(data[key])
+        if "default_rotation" in data:
+            updates.append("default_rotation = %s")
+            params.append(data["default_rotation"])   # None is valid — clears the value
         if "sensor_id" in data:
             sid = data["sensor_id"]
             updates.append("sensor_id = %s")
@@ -2205,14 +2217,15 @@ def _telescope_row_to_dict(row, filters_list=None):
         'lat': row[8],
         'alt': row[9],
         'active': row[11],
+        'default_rotation': row[12],
         'filters': filters_list or []
     }
     if row[10] is not None:  # sensor_id
         telescope['sensor'] = {
-            'sensor_id': row[12], 'name': row[13], 'resx': row[14], 'resy': row[15],
-            'pixel_x': row[16], 'pixel_y': row[17], 'bits': row[18],
-            'width': row[19], 'height': row[20],
-            'vendor': row[21], 'url': row[22], 'active': row[23]
+            'sensor_id': row[13], 'name': row[14], 'resx': row[15], 'resy': row[16],
+            'pixel_x': row[17], 'pixel_y': row[18], 'bits': row[19],
+            'width': row[20], 'height': row[21],
+            'vendor': row[22], 'url': row[23], 'active': row[24]
         }
     else:
         telescope['sensor'] = None
@@ -2645,7 +2658,8 @@ class ProjectsResource(MethodView):
     def post(self, body):
         """Create project. name and scope_id required. If ra/dec omitted, resolve from catalog by name.
         Optical params (focal, resx, resy, pixel_x, pixel_y) are auto-populated from the scope's sensor
-        when not supplied; the caller may override any or all of them explicitly."""
+        when not supplied; the caller may override any or all of them explicitly. rotation defaults to
+        the telescope's default_rotation (if set) when not supplied."""
         name = body["name"]
         scope_id = body["scope_id"]
         description = body.get("description") or ""
@@ -2671,7 +2685,7 @@ class ProjectsResource(MethodView):
             ra, decl = cat[0][2], cat[0][3]
         scope_row = db.run_query(
             cnx,
-            "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y "
+            "SELECT t.focal, s.resx, s.resy, s.pixel_x, s.pixel_y, t.default_rotation "
             "FROM telescopes t LEFT JOIN sensors s ON s.sensor_id = t.sensor_id "
             "WHERE t.scope_id = %s",
             (scope_id,)
@@ -2690,6 +2704,8 @@ class ProjectsResource(MethodView):
             pixel_x = sr[3]
         if pixel_y is None:
             pixel_y = sr[4]
+        if rotation is None:
+            rotation = sr[5]
         similar = _find_similar_project_names(cnx, name)
         warnings = [
             f"Project with similar name '{p['name']}' already exists (id={p['project_id']})"
