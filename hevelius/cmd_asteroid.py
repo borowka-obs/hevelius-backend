@@ -12,6 +12,7 @@ from typing import List, Optional, Tuple
 
 from astropy.coordinates import (
     AltAz,
+    CartesianRepresentation,
     EarthLocation,
     GCRS,
     get_body,
@@ -20,10 +21,18 @@ from astropy.coordinates import (
 )
 from astropy.time import Time
 from astropy import units as u
+from astropy.utils import iers
 import numpy as np
 
 from hevelius import db
 from hevelius.config import load_config
+
+# Recent/future dates need up-to-date Earth orientation (IERS) data, normally
+# auto-downloaded. Without network access (or if the download fails), astropy
+# raises rather than falling back to extrapolated values. The extrapolation
+# error is sub-arcsecond and irrelevant for altitude/visibility purposes, so
+# disable the hard age limit rather than let observation planning fail offline.
+iers.conf.auto_max_age = None
 
 # MPCORB.DAT fixed-width columns (0-based); format from MPC Export Format.
 # Columns 1-7: designation (1-4 packed, 5-7 number or continuation)
@@ -447,7 +456,6 @@ def compute_visibility(
     Returns:
         List of visible asteroids with designation, magnitude, max_altitude, etc.
     """
-    from astropy.coordinates import CartesianRepresentation
 
     obs_time = Time(obs_date + " 00:00:00")
 
@@ -667,6 +675,104 @@ def compute_visibility(
         f"visible: {len(visible)}"
     )
     return visible
+
+
+def compute_asteroid_visibility_curve(
+    asteroid_row: Tuple,
+    location: EarthLocation,
+    obs_date: str,
+    step_minutes: int = 10,
+) -> dict:
+    """
+    Compute a full-night altitude/azimuth/magnitude curve for a single asteroid
+    at a given site. Shared by the web API and (eventually) the CLI, so the
+    orbital mechanics live here rather than being duplicated in a client.
+
+    Args:
+        asteroid_row: (number, designation, epoch, mean_anomaly, perihelion_arg,
+            ascending_node, inclination, eccentricity, mean_motion,
+            semimajor_axis, absolute_magnitude, slope_parameter) as stored in
+            the asteroids table (i.e. the row without its internal id).
+        location: Observer location.
+        obs_date: Night to compute, as the evening date (YYYY-MM-DD); the
+            night runs from that evening into the following morning.
+        step_minutes: Sampling interval across the night.
+
+    Returns:
+        dict with night_start/night_end (ISO), samples (list of
+        {time, altitude_deg, azimuth_deg, apparent_magnitude}), max_altitude_deg,
+        max_altitude_time, apparent_magnitude_at_max, visible (max altitude
+        above the geometric horizon), and has_magnitude_estimate (whether H
+        was available to estimate apparent magnitude).
+    """
+    (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = asteroid_row
+    G = G if G is not None else 0.15
+
+    obs_time = Time(obs_date + " 00:00:00")
+    night_start, night_end = _get_night_times(location, obs_time)
+    duration_h = (night_end - night_start).to(u.hour).value
+    n_samples = max(2, int(duration_h * 60 / step_minutes) + 1)
+    times = night_start + np.linspace(0, duration_h, n_samples) * u.hour
+
+    epoch_jd = _unpack_epoch(epoch_s)
+
+    with solar_system_ephemeris.set("builtin"):
+        earth_positions = get_body("earth", times)
+    ex = earth_positions.cartesian.x.to(u.AU).value
+    ey = earth_positions.cartesian.y.to(u.AU).value
+    ez = earth_positions.cartesian.z.to(u.AU).value
+
+    geo_x = np.empty(n_samples)
+    geo_y = np.empty(n_samples)
+    geo_z = np.empty(n_samples)
+    magnitudes: List[Optional[float]] = [None] * n_samples
+
+    for i, t in enumerate(times):
+        x, y, z = _orbit_position_at_jd(
+            epoch_jd, float(a), float(e), float(inc), float(node),
+            float(peri), float(M_epoch), float(n), t.jd,
+        )
+        xe, ye, ze = _ecliptic_to_equatorial(x, y, z)
+        gx, gy, gz = xe - ex[i], ye - ey[i], ze - ez[i]
+        geo_x[i], geo_y[i], geo_z[i] = gx, gy, gz
+
+        if H is not None:
+            r_au = np.sqrt(x * x + y * y + z * z)
+            delta_au = np.sqrt(gx * gx + gy * gy + gz * gz)
+            cos_phase = (x * gx + y * gy + z * gz) / (r_au * delta_au + 1e-20)
+            phase_deg = np.degrees(np.arccos(np.clip(cos_phase, -1, 1)))
+            magnitudes[i] = _apparent_magnitude(H, G, r_au, delta_au, phase_deg)
+
+    gcrs = GCRS(
+        CartesianRepresentation(geo_x * u.AU, geo_y * u.AU, geo_z * u.AU),
+        obstime=times,
+    )
+    altaz = gcrs.transform_to(AltAz(obstime=times, location=location))
+    alt_deg = altaz.alt.to(u.deg).value
+    az_deg = altaz.az.to(u.deg).value
+
+    samples = []
+    for i, t in enumerate(times):
+        mag = magnitudes[i]
+        samples.append({
+            "time": t.iso,
+            "altitude_deg": round(float(alt_deg[i]), 2),
+            "azimuth_deg": round(float(az_deg[i]), 2),
+            "apparent_magnitude": round(mag, 2) if mag is not None else None,
+        })
+
+    max_idx = int(np.argmax(alt_deg))
+
+    return {
+        "night_start": night_start.iso,
+        "night_end": night_end.iso,
+        "samples": samples,
+        "max_altitude_deg": round(float(alt_deg[max_idx]), 2),
+        "max_altitude_time": times[max_idx].iso,
+        "apparent_magnitude_at_max": samples[max_idx]["apparent_magnitude"],
+        "visible": bool(alt_deg[max_idx] > 0),
+        "has_magnitude_estimate": H is not None,
+    }
 
 
 def asteroids_download(args):

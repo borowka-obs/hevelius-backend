@@ -70,6 +70,7 @@ class TestOpenAPISpec(unittest.TestCase):
             "/api/catalogs/list",
             "/api/asteroids",
             "/api/asteroids/{asteroid_id}",
+            "/api/asteroids/{asteroid_id}/visibility",
             "/api/asteroid-tags",
             "/api/asteroid-tags/{tag_id}",
             "/api/asteroids/{asteroid_id}/tags",

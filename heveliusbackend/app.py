@@ -23,7 +23,10 @@ from flask_jwt_extended import JWTManager, create_access_token, jwt_required, ge
 from argon2 import PasswordHasher, Type  # type: ignore[import-not-found]
 from argon2.exceptions import VerifyMismatchError, InvalidHashError  # type: ignore[import-not-found]
 
-from hevelius import cmd_stats, db, config as hevelius_config
+from astropy.coordinates import EarthLocation
+from astropy import units as u
+
+from hevelius import cmd_asteroid, cmd_stats, db, config as hevelius_config
 from hevelius.user_admin_audit import log_user_admin_action
 from hevelius.version import VERSION
 
@@ -921,6 +924,40 @@ class AsteroidsListResponseSchema(Schema):
 class AsteroidDetailResponseSchema(Schema):
     status = fields.Boolean()
     asteroid = fields.Nested(AsteroidSchema)
+    msg = fields.String()
+
+
+class AsteroidVisibilityQuerySchema(Schema):
+    scope_id = fields.Integer(required=True, metadata={"description": "Telescope to compute visibility from"})
+    date = fields.Date(
+        load_default=None,
+        metadata={"description": "Evening date (YYYY-MM-DD) whose night to compute; defaults to tonight"}
+    )
+    step_minutes = fields.Integer(
+        load_default=10, validate=validate.Range(min=1, max=120),
+        metadata={"description": "Sampling interval across the night, in minutes"}
+    )
+
+
+class AsteroidVisibilitySampleSchema(Schema):
+    time = fields.String(metadata={"description": "Sample time (UTC)"})
+    altitude_deg = fields.Float(metadata={"description": "Altitude above the horizon (degrees)"})
+    azimuth_deg = fields.Float(metadata={"description": "Azimuth (degrees, from North through East)"})
+    apparent_magnitude = fields.Float(allow_none=True, metadata={"description": "Estimated apparent magnitude, if H is known"})
+
+
+class AsteroidVisibilityResponseSchema(Schema):
+    status = fields.Boolean()
+    scope_id = fields.Integer()
+    scope_name = fields.String()
+    night_start = fields.String(metadata={"description": "Start of the astronomical night (UTC)"})
+    night_end = fields.String(metadata={"description": "End of the astronomical night (UTC)"})
+    samples = fields.List(fields.Nested(AsteroidVisibilitySampleSchema))
+    max_altitude_deg = fields.Float(metadata={"description": "Highest altitude reached during the night"})
+    max_altitude_time = fields.String(metadata={"description": "Time of highest altitude (UTC)"})
+    apparent_magnitude_at_max = fields.Float(allow_none=True)
+    visible = fields.Boolean(metadata={"description": "Whether the asteroid rises above the horizon during the night"})
+    has_magnitude_estimate = fields.Boolean(metadata={"description": "Whether absolute_magnitude (H) was available"})
     msg = fields.String()
 
 
@@ -3388,6 +3425,52 @@ class AsteroidDetailResource(MethodView):
         tags = db.asteroid_tags_for_asteroids(cnx, [asteroid_id]).get(asteroid_id)
         cnx.close()
         return {"status": True, "asteroid": _asteroid_row_to_dict(row, tags=tags), "msg": "OK"}
+
+
+@blp.route("/asteroids/<int:asteroid_id>/visibility")
+class AsteroidVisibilityResource(MethodView):
+    @jwt_required()
+    @blp.arguments(AsteroidVisibilityQuerySchema, location="query")
+    @blp.response(200, AsteroidVisibilityResponseSchema)
+    def get(self, args, asteroid_id):
+        """
+        Compute altitude/azimuth/magnitude across a night for one asteroid as
+        seen from a telescope's location. Defaults to tonight; pass `date` to
+        check a different night. The orbital mechanics live in
+        hevelius.cmd_asteroid so the same computation can be reused by a
+        future CLI command.
+        """
+        cnx = db.connect()
+        asteroid_row = db.asteroid_get_by_id(cnx, asteroid_id)
+        if asteroid_row is None:
+            cnx.close()
+            abort(404, message="Asteroid not found.")
+
+        scope_id = args["scope_id"]
+        scope_rows = db.run_query(
+            cnx, "SELECT name, lat, lon, alt FROM telescopes WHERE scope_id = %s", (scope_id,)
+        )
+        cnx.close()
+        if not scope_rows:
+            abort(404, message="Telescope not found.")
+        scope_name, lat, lon, alt = scope_rows[0]
+        if lat is None or lon is None:
+            abort(400, message="Telescope has no location (lat/lon) configured.")
+
+        obs_date = args.get("date") or date.today()
+        location = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=(alt or 0) * u.m)
+
+        result = cmd_asteroid.compute_asteroid_visibility_curve(
+            asteroid_row[1:], location, obs_date.isoformat(), step_minutes=args.get("step_minutes", 10),
+        )
+
+        return {
+            "status": True,
+            "scope_id": scope_id,
+            "scope_name": scope_name,
+            **result,
+            "msg": "OK",
+        }
 
 
 @blp.route("/asteroid-tags")
