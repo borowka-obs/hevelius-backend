@@ -3,6 +3,14 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.6.0 (unreleased)
+- DB: schema bumped to 22: asteroids data now available.
+- DB: schema bumped to 23: camera rotation, camera details in the projects.
+- API: The telescopes now have a default camera rotation. The projects now have camera rotation.
+  If not specified, the default from the telescope is copied.
+- CLI: It's possible to specify default rotation for a telescope, and an image rotation for
+  a project.
+
 ## 0.5.1 (2026-05-26)
 
 - CLI: `hevelius catalogs` lists installed catalogs with object counts (`--sort entries|name`).
