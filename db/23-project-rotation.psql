@@ -24,7 +24,9 @@ ALTER TABLE projects ADD COLUMN pixel_y FLOAT DEFAULT NULL;
 
 ALTER TABLE telescopes ADD COLUMN default_rotation FLOAT DEFAULT NULL;
 
--- Back-fill existing projects from their telescope's attached sensor.
+-- Back-fill existing projects from their telescope (focal) and attached sensor
+-- (res/pixel). LEFT JOIN so focal is copied even when the telescope has no sensor;
+-- sensor columns stay NULL in that case.
 UPDATE projects p
 SET
     focal   = t.focal,
@@ -34,7 +36,6 @@ SET
     pixel_y = s.pixel_y
 FROM telescopes t
 LEFT JOIN sensors s ON s.sensor_id = t.sensor_id
-WHERE t.scope_id = p.scope_id
-  AND t.sensor_id IS NOT NULL;
+WHERE t.scope_id = p.scope_id;
 
 UPDATE schema_version SET version = 23;
