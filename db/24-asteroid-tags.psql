@@ -20,4 +20,4 @@ CREATE TABLE IF NOT EXISTS asteroid_tag_map (
 -- with tag Y" and multi-tag filtering (both ANY and ALL semantics).
 CREATE INDEX asteroid_tag_map_tag_id_idx ON asteroid_tag_map (tag_id);
 
-UPDATE schema_version SET version = 23;
+UPDATE schema_version SET version = 24;
