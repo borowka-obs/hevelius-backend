@@ -341,8 +341,11 @@ def add_project(name, scope_id, description=None, ra=None, dec=None, active=True
     return project_id
 
 
-def edit_project(project_id, name=None, description=None, scope_id=None, ra=None, dec=None, active=None, rotation=None):
-    """Update project fields. Returns True on success."""
+def edit_project(project_id, name=None, description=None, scope_id=None, ra=None, dec=None, active=None,
+                 rotation=None, clear_rotation=False,
+                 focal=None, resx=None, resy=None, pixel_x=None, pixel_y=None):
+    """Update project fields. Returns True on success.
+    clear_rotation=True sets rotation to NULL (API null parity). Optical params can be overridden."""
     cnx = db.connect()
     row = db.run_query(cnx, "SELECT project_id FROM projects WHERE project_id = %s", (project_id,))
     if not row:
@@ -352,11 +355,18 @@ def edit_project(project_id, name=None, description=None, scope_id=None, ra=None
     args = []
     for key, val in (
         ("name", name), ("description", description), ("scope_id", scope_id), ("ra", ra), ("decl", dec),
-        ("active", active), ("rotation", rotation)
+        ("active", active), ("focal", focal), ("resx", resx), ("resy", resy),
+        ("pixel_x", pixel_x), ("pixel_y", pixel_y)
     ):
         if val is not None:
             updates.append(f"{key} = %s")
             args.append(val)
+    if clear_rotation:
+        updates.append("rotation = %s")
+        args.append(None)
+    elif rotation is not None:
+        updates.append("rotation = %s")
+        args.append(rotation)
     if not updates:
         cnx.close()
         return True
@@ -583,8 +593,10 @@ def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, f
 
 
 def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
-                   lon=None, lat=None, alt=None, sensor_id=None, active=None, default_rotation=None):
-    """Edit an existing telescope. sensor_id=0 removes the sensor. Returns True on success."""
+                   lon=None, lat=None, alt=None, sensor_id=None, active=None,
+                   default_rotation=None, clear_default_rotation=False):
+    """Edit an existing telescope. sensor_id=0 removes the sensor.
+    clear_default_rotation=True sets default_rotation to NULL. Returns True on success."""
     cnx = db.connect()
     row = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
     if not row:
@@ -595,12 +607,17 @@ def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, 
     params = []
     for key, val in [
         ("name", name), ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec),
-        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active),
-        ("default_rotation", default_rotation)
+        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
     ]:
         if val is not None:
             updates.append(f"{key} = %s")
             params.append(val)
+    if clear_default_rotation:
+        updates.append("default_rotation = %s")
+        params.append(None)
+    elif default_rotation is not None:
+        updates.append("default_rotation = %s")
+        params.append(default_rotation)
     if sensor_id is not None:
         updates.append("sensor_id = %s")
         params.append(None if sensor_id == 0 else sensor_id)

@@ -230,6 +230,11 @@ def run():
     project_add.add_argument('--dec', type=float, default=None, help="Declination in degrees (omit to resolve from catalog by name)")
     project_add.add_argument('--description', default='', help="Project description")
     project_add.add_argument('--rotation', type=float, default=None, help="Camera angle in degrees, East of North (defaults to telescope's default_rotation)")
+    project_add.add_argument('--focal', type=float, default=None, help="Focal length (mm); defaults from telescope")
+    project_add.add_argument('--resx', type=int, default=None, help="Sensor width (pixels); defaults from sensor")
+    project_add.add_argument('--resy', type=int, default=None, help="Sensor height (pixels); defaults from sensor")
+    project_add.add_argument('--pixel-x', type=float, default=None, help="Pixel pitch X (µm); defaults from sensor")
+    project_add.add_argument('--pixel-y', type=float, default=None, help="Pixel pitch Y (µm); defaults from sensor")
     project_add.add_argument('--active', action='store_true', default=True, help="Project is active (default)")
     project_add.add_argument('--inactive', action='store_true', help="Create project as inactive")
     project_edit = project_sub.add_parser('edit', help="Edit an existing project")
@@ -240,6 +245,12 @@ def run():
     project_edit.add_argument('--ra', type=float, default=None, help="RA in hours")
     project_edit.add_argument('--dec', type=float, default=None, help="Declination in degrees")
     project_edit.add_argument('--rotation', type=float, default=None, help="Camera position angle in degrees, East of North")
+    project_edit.add_argument('--clear-rotation', action='store_true', help="Clear rotation (set to null)")
+    project_edit.add_argument('--focal', type=float, default=None, help="Focal length (mm)")
+    project_edit.add_argument('--resx', type=int, default=None, help="Sensor width (pixels)")
+    project_edit.add_argument('--resy', type=int, default=None, help="Sensor height (pixels)")
+    project_edit.add_argument('--pixel-x', type=float, default=None, help="Pixel pitch X (µm)")
+    project_edit.add_argument('--pixel-y', type=float, default=None, help="Pixel pitch Y (µm)")
     project_edit.add_argument('--active', action='store_true', help="Set project active")
     project_edit.add_argument('--inactive', action='store_true', help="Set project inactive")
     project_show = project_sub.add_parser('show', help="Show project details")
@@ -311,6 +322,7 @@ def run():
     t_edit.add_argument('--alt', type=float, help="Altitude")
     t_edit.add_argument('--sensor-id', type=int, default=None, help="Sensor ID (0 to remove)")
     t_edit.add_argument('--default-rotation', type=float, default=None, help="Default rotation (deg, East of North) for new projects on this telescope")
+    t_edit.add_argument('--clear-default-rotation', action='store_true', help="Clear default_rotation (set to null)")
     t_edit.add_argument('--active', action='store_true', help="Set active")
     t_edit.add_argument('--inactive', action='store_true', help="Set inactive")
     t_show = telescope_sub.add_parser('show', help="Show telescope details (sensor + filters)")
@@ -472,7 +484,12 @@ def run():
                 ra=getattr(args, 'ra', None),
                 dec=getattr(args, 'dec', None),
                 active=active,
-                rotation=getattr(args, 'rotation', None)
+                rotation=getattr(args, 'rotation', None),
+                focal=getattr(args, 'focal', None),
+                resx=getattr(args, 'resx', None),
+                resy=getattr(args, 'resy', None),
+                pixel_x=getattr(args, 'pixel_x', None),
+                pixel_y=getattr(args, 'pixel_y', None)
             )
             if pid is None:
                 print("Failed to add project: name not in catalog (provide --ra and --dec) or invalid scope_id.", file=sys.stderr)
@@ -485,6 +502,9 @@ def run():
                 active = True
             if getattr(args, 'inactive', False):
                 active = False
+            if getattr(args, 'clear_rotation', False) and getattr(args, 'rotation', None) is not None:
+                print("Error: specify only one of --rotation or --clear-rotation.", file=sys.stderr)
+                return 1
             ok = edit_project(
                 args.project_id,
                 name=getattr(args, 'name', None),
@@ -493,7 +513,13 @@ def run():
                 ra=getattr(args, 'ra', None),
                 dec=getattr(args, 'dec', None),
                 active=active,
-                rotation=getattr(args, 'rotation', None)
+                rotation=getattr(args, 'rotation', None),
+                clear_rotation=getattr(args, 'clear_rotation', False),
+                focal=getattr(args, 'focal', None),
+                resx=getattr(args, 'resx', None),
+                resy=getattr(args, 'resy', None),
+                pixel_x=getattr(args, 'pixel_x', None),
+                pixel_y=getattr(args, 'pixel_y', None)
             )
             return 0 if ok else 1
         if args.project_command == "delete":
@@ -597,6 +623,11 @@ def run():
                 active = True
             if getattr(args, 'inactive', False):
                 active = False
+            if (getattr(args, 'clear_default_rotation', False)
+                    and getattr(args, 'default_rotation', None) is not None):
+                print("Error: specify only one of --default-rotation or --clear-default-rotation.",
+                      file=sys.stderr)
+                return 1
             return 0 if edit_telescope(
                 args.scope_id,
                 name=getattr(args, 'name', None),
@@ -610,7 +641,8 @@ def run():
                 alt=getattr(args, 'alt', None),
                 sensor_id=getattr(args, 'sensor_id', None),
                 active=active,
-                default_rotation=getattr(args, 'default_rotation', None)
+                default_rotation=getattr(args, 'default_rotation', None),
+                clear_default_rotation=getattr(args, 'clear_default_rotation', False)
             ) else 1
         if args.telescope_command == "show":
             return show_telescope(args.scope_id)
