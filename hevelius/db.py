@@ -559,7 +559,13 @@ def asteroids_count(
     tag_names: List[str] = None,
     tags_mode: str = "any",
 ) -> int:
-    """Return count of asteroids matching the given filters."""
+    """
+    Return count of asteroids matching the given filters.
+
+    NOTE: An unfiltered COUNT(*) scans the full asteroids table. At MPCORB
+    scale (~1M+ rows) every default list page pays this cost. Consider caching,
+    approximate counts, or requiring a filter if this becomes a bottleneck.
+    """
     where, params = asteroids_build_where(
         designation=designation, number=number, numbered=numbered,
         mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,

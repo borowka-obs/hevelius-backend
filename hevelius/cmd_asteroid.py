@@ -29,15 +29,8 @@ import numpy as np
 from hevelius import db
 from hevelius.config import load_config
 
-# Recent/future dates need up-to-date Earth orientation (IERS) data, normally
-# auto-downloaded. Without network access (or if the download fails), astropy
-# raises rather than falling back to extrapolated values. The extrapolation
-# error is sub-arcsecond and irrelevant for altitude/visibility purposes, so
-# disable the hard age limit rather than let observation planning fail offline.
-iers.conf.auto_max_age = None
-
 # MPCORB.DAT fixed-width columns (0-based); format from MPC Export Format.
-# Columns 1-7: designation (1-4 packed, 5-7 number or continuation)
+# Columns 1-7: number or provisional designation (packed form)
 # 9-13: H, 15-19: G, 21-25: Epoch, 27-35: M, 38-46: omega, 49-57: Omega,
 # 60-68: i, 71-79: e, 81-91: n, 93-103: a
 MPCORB_COLS = {
@@ -56,8 +49,37 @@ MPCORB_COLS = {
 
 MPCORB_URL = "https://minorplanetcenter.net/iau/MPCORB/MPCORB.DAT.gz"
 
+
 # Skip re-download from MPC when the local cache is younger than this.
 MPCORB_MAX_AGE_DAYS = 7
+
+
+# Base-62 alphabet used in MPC packed permanent designations (>= 620000).
+_BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+_BASE62_INDEX = {c: i for i, c in enumerate(_BASE62)}
+
+_iers_configured_for_planning = False
+
+
+def _configure_iers_for_planning() -> None:
+    """
+    Allow IERS age extrapolation for offline/future observation planning.
+
+    Recent/future dates need up-to-date Earth orientation (IERS) data, normally
+    auto-downloaded. Without network access (or if the download fails), astropy
+    raises rather than falling back to extrapolated values. The extrapolation
+    error is sub-arcsecond and irrelevant for altitude/visibility purposes, so
+    disable the hard age limit when running visibility computations.
+
+    Applied lazily (once per process) from visibility entry points only, so
+    importing this module for MPCORB parsing does not change global IERS
+    behaviour for unrelated astropy callers.
+    """
+    global _iers_configured_for_planning
+    if _iers_configured_for_planning:
+        return
+    iers.conf.auto_max_age = None
+    _iers_configured_for_planning = True
 
 
 def _progress(msg: str) -> None:
@@ -146,6 +168,56 @@ def _parse_int(s: str) -> Optional[int]:
         return None
 
 
+def _unpack_permanent_number(designation: str) -> Optional[int]:
+    """
+    Unpack an MPC packed permanent designation to an integer MPC number.
+
+    Permanent packed forms are documented at
+    https://minorplanetcenter.net/iau/info/PackedDes.html :
+
+      - < 100000: zero-padded digits (e.g. ``00001``, ``00433``)
+      - 100000–619999: letter (A–Z / a–z) + 4 digits (e.g. ``A0345`` → 100345)
+      - ≥ 620000: ``~`` + 4 base-62 chars (e.g. ``~0000`` → 620000)
+
+    Provisional designations (typically 7 characters) and other non-permanent
+    forms return None.
+    """
+    d = designation.strip()
+    if not d:
+        return None
+
+    # Plain numeric permanent numbers (often 5-digit zero-padded in cols 1–7).
+    if d.isdigit():
+        return int(d)
+
+    if len(d) != 5:
+        return None
+
+    first, rest = d[0], d[1:]
+
+    # Letter + 4 digits: A=10 … Z=35, a=36 … z=61 (number DIV 10000).
+    if first.isalpha() and rest.isdigit():
+        if "A" <= first <= "Z":
+            high = ord(first) - ord("A") + 10
+        elif "a" <= first <= "z":
+            high = ord(first) - ord("a") + 36
+        else:
+            return None
+        return high * 10000 + int(rest)
+
+    # Tilde + base-62 encoding of (number - 620000).
+    if first == "~":
+        value = 0
+        for ch in rest:
+            digit = _BASE62_INDEX.get(ch)
+            if digit is None:
+                return None
+            value = value * 62 + digit
+        return 620000 + value
+
+    return None
+
+
 def _unpack_epoch(packed: str) -> float:
     """Convert MPC packed epoch (5 chars, e.g. K22A2) to Julian Date (approximate)."""
     packed = packed.strip()
@@ -184,9 +256,9 @@ def _parse_mpcorb_line(line: str) -> Optional[dict]:
         return None
     try:
         designation = line[MPCORB_COLS["designation"][0]: MPCORB_COLS["designation"][1]].strip()
-        if not designation or designation.startswith("--------"):
+        if not designation or set(designation) == {"-"}:
             return None
-        number = _parse_int(line[4:7])  # columns 5-7 are number for numbered
+        number = _unpack_permanent_number(designation)
         H = _parse_float(line[MPCORB_COLS["H"][0]: MPCORB_COLS["H"][1]])
         G = _parse_float(line[MPCORB_COLS["G"][0]: MPCORB_COLS["G"][1]])
         epoch = line[MPCORB_COLS["epoch"][0]: MPCORB_COLS["epoch"][1]].strip()
@@ -600,6 +672,7 @@ def compute_visibility(
     Returns:
         List of visible asteroids with designation, magnitude, max_altitude, etc.
     """
+    _configure_iers_for_planning()
 
     obs_time = Time(obs_date + " 00:00:00")
 
@@ -852,6 +925,7 @@ def compute_asteroid_visibility_curve(
     (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = asteroid_row
     G = G if G is not None else 0.15
 
+    _configure_iers_for_planning()
     obs_time = Time(obs_date + " 00:00:00")
     night_start, night_end = _get_night_times(location, obs_time)
     duration_h = (night_end - night_start).to(u.hour).value

@@ -822,7 +822,14 @@ class AsteroidTagSchema(Schema):
     name = fields.String(required=True, metadata={"description": "Tag name (e.g. amor, neo, pha)"})
     description = fields.String(allow_none=True, metadata={"description": "Tag description"})
     color = fields.String(allow_none=True, metadata={"description": "Display color (e.g. #1976d2)"})
-    asteroid_count = fields.Integer(metadata={"description": "Number of asteroids carrying this tag"})
+    asteroid_count = fields.Integer(
+        metadata={
+            "description": (
+                "Number of asteroids carrying this tag. Present on tag vocabulary "
+                "endpoints; omitted when tags are embedded on asteroid list/detail."
+            )
+        }
+    )
 
 
 class AsteroidTagCreateSchema(Schema):
@@ -833,9 +840,11 @@ class AsteroidTagCreateSchema(Schema):
 
 
 class AsteroidTagUpdateSchema(Schema):
-    name = fields.String(validate=validate.Length(min=1, max=64), load_default=None)
-    description = fields.String(validate=validate.Length(max=256), load_default=None, allow_none=True)
-    color = fields.String(validate=validate.Length(max=16), load_default=None, allow_none=True)
+    # No load_default: absent keys stay absent so PATCH can distinguish
+    # "leave unchanged" from an explicit null clear of nullable fields.
+    name = fields.String(validate=validate.Length(min=1, max=64))
+    description = fields.String(validate=validate.Length(max=256), allow_none=True)
+    color = fields.String(validate=validate.Length(max=16), allow_none=True)
 
 
 class AsteroidTagsListResponseSchema(Schema):
@@ -931,11 +940,21 @@ class AsteroidVisibilityQuerySchema(Schema):
     scope_id = fields.Integer(required=True, metadata={"description": "Telescope to compute visibility from"})
     date = fields.Date(
         load_default=None,
-        metadata={"description": "Evening date (YYYY-MM-DD) whose night to compute; defaults to tonight"}
+        metadata={
+            "description": (
+                "Evening date (YYYY-MM-DD) whose night to compute; defaults to the "
+                "server's local calendar date (not the telescope site's timezone)"
+            )
+        },
     )
     step_minutes = fields.Integer(
         load_default=10, validate=validate.Range(min=1, max=120),
-        metadata={"description": "Sampling interval across the night, in minutes"}
+        metadata={
+            "description": (
+                "Sampling interval across the night, in minutes "
+                "(smaller steps are more CPU-heavy)"
+            )
+        },
     )
 
 
@@ -956,7 +975,12 @@ class AsteroidVisibilityResponseSchema(Schema):
     max_altitude_deg = fields.Float(metadata={"description": "Highest altitude reached during the night"})
     max_altitude_time = fields.String(metadata={"description": "Time of highest altitude (UTC)"})
     apparent_magnitude_at_max = fields.Float(allow_none=True)
-    visible = fields.Boolean(metadata={"description": "Whether the asteroid rises above the horizon during the night"})
+    visible = fields.Boolean(metadata={
+        "description": (
+            "True if max altitude during the night is above the geometric horizon "
+            "(altitude > 0°); no airmass or site horizon mask is applied"
+        )
+    })
     has_magnitude_estimate = fields.Boolean(metadata={"description": "Whether absolute_magnitude (H) was available"})
     msg = fields.String()
 
@@ -3562,7 +3586,7 @@ class AsteroidTagDetailResource(MethodView):
         updates = []
         params = []
         for key in ("name", "description", "color"):
-            if key in tag_data and tag_data[key] is not None:
+            if key in tag_data:
                 updates.append(f"{key} = %s")
                 params.append(tag_data[key])
         if not updates:
@@ -3587,6 +3611,9 @@ class AsteroidTagDetailResource(MethodView):
     def delete(self, tag_id):
         """Delete an asteroid tag (also removes it from any tagged asteroids)."""
         cnx = db.connect()
+        if self._fetch(cnx, tag_id) is None:
+            cnx.close()
+            abort(404, message="Tag not found.")
         db.run_query(cnx, "DELETE FROM asteroid_tags WHERE tag_id = %s", (tag_id,))
         cnx.close()
         return {"status": True, "msg": "Tag deleted"}
@@ -3605,7 +3632,7 @@ class AsteroidTagAttachResource(MethodView):
         tag = db.run_query(cnx, "SELECT tag_id FROM asteroid_tags WHERE tag_id = %s", (tag_id,))
         if not asteroid or not tag:
             cnx.close()
-            return {"status": False, "msg": "Asteroid or tag not found"}
+            abort(404, message="Asteroid or tag not found.")
         db.asteroid_tag_attach(cnx, asteroid_id, tag_id)
         cnx.close()
         return {"status": True, "msg": "Tag added"}
