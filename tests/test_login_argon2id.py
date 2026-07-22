@@ -7,7 +7,8 @@ from argon2 import PasswordHasher, Type
 from hevelius import db
 from tests.dbtest import use_repository
 
-from heveliusbackend.app import app, password_hasher  # noqa: E402
+from hevelius.api import app
+from hevelius.passwords import password_hasher  # noqa: E402
 
 
 class TestLoginArgon2id(unittest.TestCase):

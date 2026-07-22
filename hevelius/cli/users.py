@@ -2,17 +2,9 @@
 CLI commands for user management (list, add, enable, disable).
 """
 
-from argon2 import PasswordHasher, Type  # type: ignore[import-not-found]
-
 from hevelius import db
+from hevelius.passwords import password_hasher as _password_hasher
 from hevelius.user_admin_audit import log_user_admin_action
-
-_password_hasher = PasswordHasher(
-    time_cost=2,
-    memory_cost=65536,
-    parallelism=1,
-    type=Type.ID,
-)
 
 
 def _resolve_user(cnx, login_or_id):

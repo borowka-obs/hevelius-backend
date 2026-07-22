@@ -4,7 +4,7 @@ import json
 from flask_jwt_extended import create_access_token
 from tests.dbtest import use_repository
 from hevelius import db
-from heveliusbackend.app import app
+from hevelius.api import app
 
 
 class TestAsteroids(unittest.TestCase):

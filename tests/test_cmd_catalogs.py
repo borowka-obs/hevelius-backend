@@ -6,9 +6,11 @@ from unittest.mock import patch
 
 from tests.dbtest import use_repository
 from hevelius import db
-from hevelius.cmd_catalogs import (
+from hevelius.catalogs import (
     fetch_catalog_objects,
     fetch_installed_catalogs,
+)
+from hevelius.cli.catalogs import (
     find_catalog_objects,
     list_catalogs,
     render_catalogs_text,

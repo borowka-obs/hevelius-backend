@@ -10,7 +10,7 @@ import unittest
 import yaml
 
 # Import app after potential test env setup
-from heveliusbackend.app import app
+from hevelius.api import app
 
 
 def load_spec():
