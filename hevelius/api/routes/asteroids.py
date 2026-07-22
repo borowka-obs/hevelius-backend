@@ -1,3 +1,5 @@
+"""Asteroid and asteroid-tag API routes."""
+
 import logging
 from datetime import date
 
@@ -186,7 +188,7 @@ class AsteroidVisibilityResource(MethodView):
             abort(400, message="Telescope has no location (lat/lon) configured.")
 
         obs_date = args.get("date") or date.today()
-        location = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=(alt or 0) * u.m)
+        location = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=(alt or 0) * u.m)  # pylint: disable=no-member
 
         result = asteroid.compute_asteroid_visibility_curve(
             asteroid_row[1:], location, obs_date.isoformat(), step_minutes=args.get("step_minutes", 10),
@@ -332,9 +334,9 @@ class AsteroidTagAttachResource(MethodView):
         """Attach an existing tag to an asteroid."""
         tag_id = data["tag_id"]
         cnx = db.connect()
-        asteroid = db.run_query(cnx, "SELECT id FROM asteroids WHERE id = %s", (asteroid_id,))
+        asteroid_rows = db.run_query(cnx, "SELECT id FROM asteroids WHERE id = %s", (asteroid_id,))
         tag = db.run_query(cnx, "SELECT tag_id FROM asteroid_tags WHERE tag_id = %s", (tag_id,))
-        if not asteroid or not tag:
+        if not asteroid_rows or not tag:
             cnx.close()
             abort(404, message="Asteroid or tag not found.")
         db.asteroid_tag_attach(cnx, asteroid_id, tag_id)

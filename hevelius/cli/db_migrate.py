@@ -32,7 +32,7 @@ def migrate(args):
         sys.exit(-1)
 
 
-def migrate_mysql(args, cfg={}):
+def migrate_mysql(args, cfg=None):
     """
     Performs MySQL database migration to the newest schema.
 
@@ -42,9 +42,9 @@ def migrate_mysql(args, cfg={}):
     # Fill in the defaults of DB connection, if not specified
     cfg = config_db_get(cfg)
 
-    dir = "db"
-    files = sorted([f for f in listdir(dir) if (
-        isfile(join(dir, f)) and f.endswith("mysql"))])
+    schema_dir = "db"
+    files = sorted([f for f in listdir(schema_dir) if (
+        isfile(join(schema_dir, f)) and f.endswith("mysql"))])
 
     for f in files:
         cnx = db.connect()
@@ -59,15 +59,14 @@ def migrate_mysql(args, cfg={}):
 
             if not args.dry_run:
                 schema = subprocess.Popen(
-                    ["cat", join(dir, f)], stdout=subprocess.PIPE)
+                    ["cat", join(schema_dir, f)], stdout=subprocess.PIPE)
                 mysql = subprocess.Popen(["mysql", "-u", cfg['user'], "-h", cfg['host'],
                                           "-p" +
                                           cfg['password'], "-P", str(cfg['port']),
                                           cfg['dbname'], "-B"], stdin=schema.stdout)
+                mysql.communicate()
             else:
                 print("Skipping (--dry-run).")
-
-            output, _ = mysql.communicate()
 
             cnx = db.connect()
             current_ver = db.version_get(cnx)
@@ -89,14 +88,14 @@ def run_file(cfg, filename):
 
     conn = db.connect(cfg)
 
-    with open(filename, "r") as f:
+    with open(filename, "r", encoding="utf-8") as f:
         sql = f.read()
         db.run_query(conn, sql)
 
     conn.close()
 
 
-def migrate_pgsql(args, cfg={}):
+def migrate_pgsql(args, cfg=None):
     """
     Performs PostgreSQL database migration to the newest schema.
 
@@ -108,9 +107,9 @@ def migrate_pgsql(args, cfg={}):
 
     dry_run = args.get('dry_run') if isinstance(args, dict) else args.dry_run
 
-    DIR = "db"
-    files = sorted([f for f in listdir(DIR) if (
-        isfile(join(DIR, f)) and f.endswith("psql"))])
+    schema_dir = "db"
+    files = sorted([f for f in listdir(schema_dir) if (
+        isfile(join(schema_dir, f)) and f.endswith("psql"))])
 
     for f in files:
         cnx = db.connect(cfg)
@@ -132,14 +131,12 @@ def migrate_pgsql(args, cfg={}):
                 my_env['PGPASSWORD'] = cfg['password']
 
                 psql = subprocess.Popen(["psql", "-U", cfg['user'], "-h", cfg['host'], "-p",
-                                        str(cfg['port']), cfg['database'], "-f", DIR + "/" + f],
+                                        str(cfg['port']), cfg['database'], "-f", schema_dir + "/" + f],
                                         stdout=subprocess.PIPE, env=my_env)
-                output = ""
-                for line in iter(psql.stdout.readline, b''):
-                    output += line.decode('utf-8').rstrip()
-
-                # TODO: make sure the output is printable, if a variable is set
-                # print(output)
+                # Drain stdout (optionally print when debugging migrations).
+                for _line in iter(psql.stdout.readline, b''):
+                    pass
+                psql.wait()
 
             else:
                 print("Skipping (--dry-run).")

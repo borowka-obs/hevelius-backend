@@ -2,9 +2,10 @@
 Code that handles files repository on disk.
 """
 import glob
-import sys
-from astropy.io import fits
 import os
+import sys
+
+from astropy.io import fits
 
 from hevelius import config, db
 from hevelius.iteleskop import parse_iteleskop_filename
@@ -74,7 +75,7 @@ def process_fits_dir(dir: str, show_hdr: bool, dry_run: bool):
     cnx.close()
 
 
-def task_add(cnx, fname, details):
+def task_add(cnx, _fname, details):
     """Adds a new task based on a image filename, specified by fname. The
        filename parsing is already done by parse_iteleskop_name() and stored in
        details dict."""
@@ -90,7 +91,7 @@ def task_add(cnx, fname, details):
     db.task_add(cnx, details)
 
 
-def process_fits_file(cnx, fname, verbose=False, show_hdr=False, dry_run=False):
+def process_fits_file(cnx, fname, verbose=False, _show_hdr=False, dry_run=False):
     """ Processes FITS file: reads its FITS content, then attempts to update the data in the database. """
 
     details = parse_iteleskop_filename(fname)
@@ -189,7 +190,7 @@ def get_int_header(header, sql, header_name):
     """
     Returns specified integer field from the header
     """
-    if header_name not in header or not len(str(header[header_name])):
+    if header_name not in header or not str(header[header_name]):
         return ""
     return "%s=%i, " % (sql, geti(header, header_name))
 
@@ -198,7 +199,7 @@ def get_float_header(header, sql, header_name):
     """
     Returns specified float field from the header
     """
-    if header_name not in header or not len(str(header[header_name])):
+    if header_name not in header or not str(header[header_name]):
         return ""
     return "%s=%f, " % (sql, getf(header, header_name))
 
@@ -207,7 +208,7 @@ def get_string_header(header, sql, header_name):
     """
     Returns specified string field from the header
     """
-    if header_name not in header or not len(str(header[header_name])):
+    if header_name not in header or not str(header[header_name]):
         return ""
     return "%s='%s', " % (sql, gets(header, header_name))
 
@@ -352,7 +353,7 @@ def read_fits(filename):
 
     hdul = fits.open(filename)
 
-    return hdul[0].header
+    return hdul[0].header  # pylint: disable=no-member
 
 
 def sanity_files(args):
@@ -521,3 +522,4 @@ def repo(args):
     if not args.sanity_files and not args.sanity_db:
         print("ERROR: No sanity check selected. Use --sanity-files or --sanity-db to check the repository.")
         return -1
+    return 0

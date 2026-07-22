@@ -1,3 +1,5 @@
+"""Project and subframe API routes."""
+
 import logging
 from datetime import date, datetime
 
@@ -8,6 +10,7 @@ from flask_smorest import abort
 
 
 from hevelius import db
+from hevelius.equipment import find_similar_project_names
 from hevelius.api.auth_utils import (
     _jwt_user_id_int,
 )
@@ -102,7 +105,6 @@ def _project_subframe_count(goal_count, count):
 
 def _find_similar_project_names(cnx, name, exclude_id=None):
     """Return list of existing projects whose names are similar to name."""
-    from hevelius.equipment import find_similar_project_names
     return find_similar_project_names(name, exclude_id=exclude_id, cnx=cnx)
 
 

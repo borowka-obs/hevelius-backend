@@ -2,13 +2,15 @@
 Code handling several basic commands (stats, version, config)
 """
 
+import datetime
+import pathlib
+import subprocess
 from importlib.metadata import version as importlib_version
+from os import environ, path
+
 from hevelius import db
 from hevelius.config import load_config
-import datetime
-import subprocess
-import pathlib
-from os import path, environ
+from hevelius.version import VERSION
 
 
 def db_version():
@@ -31,11 +33,8 @@ def hevelius_version() -> str:
 
     :return: string representing version (or empty string)
     """
-    try:
-        from hevelius.version import VERSION
+    if VERSION:
         return VERSION
-    except ModuleNotFoundError:
-        pass
 
     try:
         return importlib_version('hevelius')
@@ -82,7 +81,7 @@ def config_show():
     print(f"Backup storage path:   {config['paths']['backup-path']}")
 
 
-def backup(args):
+def backup(args):  # pylint: disable=unused-argument
     """
     Generated DB backup
     """
@@ -100,7 +99,6 @@ def backup(args):
 
     psql = subprocess.Popen(["pg_dump", "-U", config['database']['user'], "-h", config['database']['host'], "-p",
                             str(config['database']['port']), config['database']['database'], "-f", full_path], env=my_env)
-    # this returns std output, (something else)
-    output, _ = psql.communicate()
+    psql.communicate()
 
     print(f"Backup stored in {full_path}")
