@@ -3,7 +3,8 @@
 Hevelius can identify asteroids that are observable from your site on a given
 night.  With over one million asteroids in the Minor Planet Center (MPC)
 catalogue, the implementation needs to be fast.  This document describes the
-data source, the database schema, the CLI, and the visibility algorithm in detail.
+data source, the database schema, the CLI, the REST API, and the visibility
+algorithm in detail.
 
 ## Data source
 
@@ -23,9 +24,13 @@ download is skipped when that cache is younger than 7 days; use `--force` to
 re-download anyway.  The `--limit N` flag on `load` (or `download --load`)
 restricts the load to the first *N* records, which is handy for testing.
 
+Permanent MPC numbers are unpacked from the packed designation in columns 1–7
+(plain digits, letter-coded forms for 100000–619999, and tilde/base-62 for
+≥ 620000). Provisional designations leave `number` NULL.
+
 ## Database schema
 
-Orbital elements are stored in the `asteroids` table (migration 15):
+Orbital elements are stored in the `asteroids` table (migration **22**):
 
 | Column | Type | Description |
 |--------|------|-------------|
@@ -43,6 +48,13 @@ Orbital elements are stored in the `asteroids` table (migration 15):
 | `slope_parameter` | double | Phase slope parameter G (default 0.15) |
 
 Indices exist on `absolute_magnitude`, `number`, and `designation`.
+
+### Tags (migration 24)
+
+Shared tag vocabulary lives in `asteroid_tags` (`name`, optional `description` /
+`color`) with a many-to-many map `asteroid_tag_map`. Any authenticated API user
+may create, edit, delete, or attach tags — the vocabulary is deployment-wide,
+same pattern as other shared catalogue metadata.
 
 ## CLI usage
 
@@ -74,6 +86,32 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 
 Progress for `visible` is printed to stderr so stdout output can be redirected
 to a file.
+
+## REST API
+
+See `api/openapi.yaml` for the full contract. Summary:
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET/POST | `/api/asteroids` | Paginated list with filters (designation, number, magnitude, tags) |
+| GET | `/api/asteroids/{id}` | Detail including attached tags |
+| GET | `/api/asteroids/{id}/visibility` | Night altitude/azimuth/magnitude curve from a telescope |
+| GET/POST | `/api/asteroid-tags` | List / create tags |
+| GET/PATCH/DELETE | `/api/asteroid-tags/{id}` | Tag CRUD |
+| POST/DELETE | `/api/asteroids/{id}/tags[/{tag_id}]` | Attach / detach |
+
+All endpoints require JWT (`bearerAuth`).
+
+### Visibility curve semantics
+
+- Default `date` is the **server's local calendar date**, not the telescope site's timezone.
+- `visible` is true when max altitude during the night is **above 0°** (geometric horizon only; no airmass or site horizon mask).
+- `step_minutes` (1–120, default 10) controls sampling density; smaller steps are more CPU-heavy.
+
+### List performance note
+
+Unfiltered list responses always run `COUNT(*)` on `asteroids`. At full MPCORB
+scale that can be expensive; prefer filters when browsing large catalogues.
 
 ## Visibility algorithm
 

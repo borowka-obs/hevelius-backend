@@ -6,7 +6,13 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 ## 0.6.0 (unreleased)
 - DB: schema bumped to 22: asteroids data now available.
 - DB: schema bumped to 23: camera rotation, camera details in the projects.
-- DB: schema bumped to 24: asteroid tags (many-to-many).
+- DB: schema bumped to 24: asteroid tags (`asteroid_tags`, `asteroid_tag_map`) for
+  families / NEO / PHA / etc., with list filtering by tag (`any` / `all`).
+- API: asteroid list/detail (`GET`/`POST /api/asteroids`, `GET /api/asteroids/{id}`),
+  per-asteroid night visibility curve (`GET /api/asteroids/{id}/visibility`), and
+  tag CRUD plus attach/detach endpoints.
+- CLI: asteroid download/load from MPCORB and bulk night visibility listing.
+- Fix: MPCORB permanent-number unpacking (plain, letter-coded, and tilde/base-62 forms).
 - API: The telescopes now have a default camera rotation. The projects now have camera rotation.
   If not specified, the default from the telescope is copied.
 - CLI: It's possible to specify default rotation for a telescope, and an image rotation for

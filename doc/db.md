@@ -20,6 +20,13 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 24 (asteroid tags)
+
+- **asteroid_tags** – Shared tag vocabulary for asteroids (`name` unique, optional
+  `description` / `color`). Examples: neo, pha, amor, fast rotator.
+- **asteroid_tag_map** – Many-to-many link (`asteroid_id`, `tag_id`) with cascade
+  deletes; index on `tag_id` for reverse lookups and multi-tag list filters.
+
 ### Schema version 23 (project rotation, optical params, telescope default rotation)
 
 - **projects** – Added **rotation** (float, degrees East of North, nullable; user-supplied or defaulted
@@ -32,7 +39,8 @@ he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 ### Schema version 22 (asteroids)
 
 - **asteroids** – MPC orbital elements for visibility planning (`designation`, epoch, Keplerian
-  elements, absolute magnitude / slope). Used by asteroid night-visibility queries.
+  elements, absolute magnitude / slope). Used by asteroid night-visibility queries and the
+  REST asteroid list/detail/visibility API.
 
 ### Schema version 18 (users cleanup, audit, password reset)
 
