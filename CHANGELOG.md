@@ -6,10 +6,15 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 ## 0.6.0 (unreleased)
 - DB: schema bumped to 22: asteroids data now available.
 - DB: schema bumped to 23: camera rotation, camera details in the projects.
+- DB: schema bumped to 24: asteroid tags (many-to-many).
 - API: The telescopes now have a default camera rotation. The projects now have camera rotation.
   If not specified, the default from the telescope is copied.
 - CLI: It's possible to specify default rotation for a telescope, and an image rotation for
   a project.
+- CLI: `hevelius asteroid download` skips MPC when the local cache is younger than 7 days
+  (prints the reason); use `--force` to re-download. Download failures are logged clearly.
+- CLI: `hevelius asteroid status` reports MPCORB cache location/age and DB asteroid counters.
+- CLI: `hevelius asteroid load` upserts orbital elements from the cached MPCORB file into the DB.
 
 ## 0.5.1 (2026-05-26)
 

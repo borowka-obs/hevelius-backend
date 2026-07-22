@@ -73,28 +73,37 @@ python bin/hevelius catalog --object C38 --proximity 0.5 --format full
 
 ## Asteroids
 
-A basic support for asteroid handling is available.
-
-First, you need to download and load asteroid data from MPC.
+Asteroid orbital elements come from the Minor Planet Center (MPCORB). Typical
+workflow:
 
 ```shell
+# Check whether MPCORB was downloaded and whether the DB has asteroids
+hevelius asteroid status
+
+# Download MPCORB.DAT (skipped if the local cache is younger than 7 days)
 hevelius asteroid download
+
+# Force a re-download regardless of cache age
+hevelius asteroid download --force
+
+# Upsert orbital elements from the cached file into the database
+hevelius asteroid load
+
+# Or download and load in one step
+hevelius asteroid download --load
 ```
 
-The orbitalal parameters downloaded are cached. You can force redownloading
-by using `--force`. Please be gentle on the MPC servers. The data can be loaded
-into database if `--load` is specified. The data can optionally be limited
-using `--limit LIMIT`, e.g. to load first 10 entries just for testing.
+The orbital parameters are cached locally (default: `~/.cache/hevelius/MPCORB.DAT`).
+Please be gentle on the MPC servers. Use `--limit N` with `load` (or
+`download --load`) to load only the first *N* records for testing.
 
-Once the database is loaded, the next step is to show visible asteroids.
-Several parameters are mandatory: `--date` that specifies the night date,
-and observatory location, using `--lat` and `--lon`. Many for parameters
-might be specified to filter list of asteroids. For complete list, see
-`bin/hevelius asteroid visible --help`.
+Once the database is loaded, list visible asteroids. Mandatory parameters are
+`--date` (night date) and observatory location (`--lat`, `--lon`). See
+`bin/hevelius asteroid visible --help` for the full filter list.
 
 An example usage:
 
 ```shell
 # Visible asteroids on a given night (e.g. mag 10–14, altitude ≥ 25°, numbered < 3000)
-hevelius asteroids visible --date 2025-03-15 --lat 52.2 --lon 21.0 --mag-min 10 --mag-max 14 --alt-min 25 --constraint number_lt_3000 --order-by number
+hevelius asteroid visible --date 2025-03-15 --lat 52.2 --lon 21.0 --mag-min 10 --mag-max 14 --alt-min 25 --constraint number_lt_3000 --order-by number
 ```
