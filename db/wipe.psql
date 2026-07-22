@@ -8,4 +8,7 @@ DROP TABLE IF EXISTS filters CASCADE;
 DROP TABLE IF EXISTS mymfavorites;
 DROP TABLE IF EXISTS task_states;
 DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS asteroid_tag_map;
+DROP TABLE IF EXISTS asteroid_tags;
+DROP TABLE IF EXISTS asteroids;
 DROP TABLE IF EXISTS schema_version;
