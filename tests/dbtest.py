@@ -7,7 +7,7 @@ import psycopg2
 from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
 
 from hevelius import config as hevelius_config, db
-from hevelius.cmd_db_migrate import migrate_pgsql, run_file
+from hevelius.cli.db_migrate import migrate_pgsql, run_file
 
 # The relative path to the root directory.
 _root_dir = os.path.dirname(os.path.realpath(__file__))

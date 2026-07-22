@@ -7,7 +7,7 @@ from argparse import Namespace
 from contextlib import redirect_stdout
 
 from tests.dbtest import use_repository
-from hevelius import db, cmd_asteroid
+from hevelius import db, asteroid
 
 
 class TestAsteroidsList(unittest.TestCase):
@@ -44,7 +44,7 @@ class TestAsteroidsList(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_list(self._args())
+            rc = asteroid.asteroids_list(self._args())
         self.assertEqual(rc, 0)
         out = buf.getvalue()
         self.assertIn('showing 1–4 of 4', out)
@@ -56,7 +56,7 @@ class TestAsteroidsList(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_list(self._args(name='ves', limit=10))
+            rc = asteroid.asteroids_list(self._args(name='ves', limit=10))
         self.assertEqual(rc, 0)
         out = buf.getvalue()
         self.assertIn('Vesta', out)
@@ -65,7 +65,7 @@ class TestAsteroidsList(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_list(self._args(numbered=True))
+            rc = asteroid.asteroids_list(self._args(numbered=True))
         self.assertEqual(rc, 0)
         out = buf.getvalue()
         self.assertIn('of 3', out)
@@ -73,7 +73,7 @@ class TestAsteroidsList(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_list(
+            rc = asteroid.asteroids_list(
                 self._args(sort_by='absolute_magnitude', sort_order='desc', limit=2)
             )
         self.assertEqual(rc, 0)

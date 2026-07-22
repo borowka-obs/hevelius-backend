@@ -5,7 +5,7 @@ import unittest
 from astropy.coordinates import EarthLocation
 from astropy import units as u
 
-from hevelius import cmd_asteroid
+from hevelius import asteroid
 
 
 def _mpcorb_line(designation: str, H: str = " 3.34", G: str = " 0.15",
@@ -38,34 +38,34 @@ def _mpcorb_line(designation: str, H: str = " 3.34", G: str = " 0.15",
 
 class TestUnpackPermanentNumber(unittest.TestCase):
     def test_plain_numbers(self):
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("00001"), 1)
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("00433"), 433)
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("10000"), 10000)
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("99999"), 99999)
+        self.assertEqual(asteroid._unpack_permanent_number("00001"), 1)
+        self.assertEqual(asteroid._unpack_permanent_number("00433"), 433)
+        self.assertEqual(asteroid._unpack_permanent_number("10000"), 10000)
+        self.assertEqual(asteroid._unpack_permanent_number("99999"), 99999)
         # Trailing spaces from the 7-char MPCORB field
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("00001  "), 1)
+        self.assertEqual(asteroid._unpack_permanent_number("00001  "), 1)
 
     def test_letter_coded_numbers(self):
         # A0345 → 10*10000 + 345 = 100345
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("A0345"), 100345)
+        self.assertEqual(asteroid._unpack_permanent_number("A0345"), 100345)
         # a0017 → 36*10000 + 17 = 360017
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("a0017"), 360017)
+        self.assertEqual(asteroid._unpack_permanent_number("a0017"), 360017)
         # K3289 → 20*10000 + 3289 = 203289
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("K3289"), 203289)
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("A0001"), 100001)
+        self.assertEqual(asteroid._unpack_permanent_number("K3289"), 203289)
+        self.assertEqual(asteroid._unpack_permanent_number("A0001"), 100001)
 
     def test_tilde_base62_numbers(self):
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("~0000"), 620000)
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("~000z"), 620061)
+        self.assertEqual(asteroid._unpack_permanent_number("~0000"), 620000)
+        self.assertEqual(asteroid._unpack_permanent_number("~000z"), 620061)
         # ~AZaz = 10*62^3 + 35*62^2 + 36*62 + 61 = 2520113 → 3140113
-        self.assertEqual(cmd_asteroid._unpack_permanent_number("~AZaz"), 3140113)
+        self.assertEqual(asteroid._unpack_permanent_number("~AZaz"), 3140113)
 
     def test_provisional_returns_none(self):
-        self.assertIsNone(cmd_asteroid._unpack_permanent_number("K25A00A"))
-        self.assertIsNone(cmd_asteroid._unpack_permanent_number("J98S53D"))
-        self.assertIsNone(cmd_asteroid._unpack_permanent_number("PLS2040"))
-        self.assertIsNone(cmd_asteroid._unpack_permanent_number(""))
-        self.assertIsNone(cmd_asteroid._unpack_permanent_number("J013S"))  # satellite
+        self.assertIsNone(asteroid._unpack_permanent_number("K25A00A"))
+        self.assertIsNone(asteroid._unpack_permanent_number("J98S53D"))
+        self.assertIsNone(asteroid._unpack_permanent_number("PLS2040"))
+        self.assertIsNone(asteroid._unpack_permanent_number(""))
+        self.assertIsNone(asteroid._unpack_permanent_number("J013S"))  # satellite
 
 
 class TestParseMpcorbLine(unittest.TestCase):
@@ -77,53 +77,53 @@ class TestParseMpcorbLine(unittest.TestCase):
             ("A0001", 100001),
             ("~0000", 620000),
         ]:
-            parsed = cmd_asteroid._parse_mpcorb_line(_mpcorb_line(desig))
+            parsed = asteroid._parse_mpcorb_line(_mpcorb_line(desig))
             self.assertIsNotNone(parsed, desig)
             self.assertEqual(parsed["number"], expected, desig)
             self.assertEqual(parsed["designation"], desig.strip())
             self.assertAlmostEqual(parsed["semimajor_axis"], 2.76, places=2)
 
     def test_provisional_has_null_number(self):
-        parsed = cmd_asteroid._parse_mpcorb_line(_mpcorb_line("K25A00A"))
+        parsed = asteroid._parse_mpcorb_line(_mpcorb_line("K25A00A"))
         self.assertIsNotNone(parsed)
         self.assertIsNone(parsed["number"])
         self.assertEqual(parsed["designation"], "K25A00A")
         self.assertIsNone(parsed["name"])
 
     def test_extracts_proper_name_from_readable_designation(self):
-        parsed = cmd_asteroid._parse_mpcorb_line(
+        parsed = asteroid._parse_mpcorb_line(
             _mpcorb_line("00001", readable="     (1) Ceres              ")
         )
         self.assertIsNotNone(parsed)
         self.assertEqual(parsed["number"], 1)
         self.assertEqual(parsed["name"], "Ceres")
 
-        parsed = cmd_asteroid._parse_mpcorb_line(
+        parsed = asteroid._parse_mpcorb_line(
             _mpcorb_line("00433", readable="   (433) Eros               ")
         )
         self.assertEqual(parsed["name"], "Eros")
 
         # Provisional readable designation has no proper name
-        parsed = cmd_asteroid._parse_mpcorb_line(
+        parsed = asteroid._parse_mpcorb_line(
             _mpcorb_line("K25A00A", readable="           2025 AA           ")
         )
         self.assertIsNone(parsed["name"])
 
     def test_short_or_header_line_rejected(self):
-        self.assertIsNone(cmd_asteroid._parse_mpcorb_line("too short"))
+        self.assertIsNone(asteroid._parse_mpcorb_line("too short"))
         # Separator rows in MPCORB start with a run of dashes in the designation field
-        self.assertIsNone(cmd_asteroid._parse_mpcorb_line(_mpcorb_line("--------")))
+        self.assertIsNone(asteroid._parse_mpcorb_line(_mpcorb_line("--------")))
 
 
 class TestApparentMagnitude(unittest.TestCase):
     def test_opposition_like_geometry(self):
         # At r=delta=1 AU and phase≈0, mag ≈ H
-        mag = cmd_asteroid._apparent_magnitude(10.0, 0.15, 1.0, 1.0, 0.0)
+        mag = asteroid._apparent_magnitude(10.0, 0.15, 1.0, 1.0, 0.0)
         self.assertAlmostEqual(mag, 10.0, places=2)
 
     def test_farther_is_fainter(self):
-        near = cmd_asteroid._apparent_magnitude(10.0, 0.15, 1.0, 1.0, 10.0)
-        far = cmd_asteroid._apparent_magnitude(10.0, 0.15, 2.0, 2.0, 10.0)
+        near = asteroid._apparent_magnitude(10.0, 0.15, 1.0, 1.0, 10.0)
+        far = asteroid._apparent_magnitude(10.0, 0.15, 2.0, 2.0, 10.0)
         self.assertGreater(far, near)
 
 
@@ -137,7 +137,7 @@ class TestVisibilityCurve(unittest.TestCase):
             3.34, 0.12,
         )
         location = EarthLocation(lat=52.2 * u.deg, lon=21.0 * u.deg, height=100 * u.m)
-        result = cmd_asteroid.compute_asteroid_visibility_curve(
+        result = asteroid.compute_asteroid_visibility_curve(
             row, location, "2026-06-15", step_minutes=30,
         )
         self.assertIn("night_start", result)
@@ -159,7 +159,7 @@ class TestVisibilityCurve(unittest.TestCase):
             None, 0.15,
         )
         location = EarthLocation(lat=52.2 * u.deg, lon=21.0 * u.deg, height=100 * u.m)
-        result = cmd_asteroid.compute_asteroid_visibility_curve(
+        result = asteroid.compute_asteroid_visibility_curve(
             row, location, "2026-06-15", step_minutes=60,
         )
         self.assertFalse(result["has_magnitude_estimate"])
@@ -171,9 +171,9 @@ class TestIersConfigLazy(unittest.TestCase):
     def test_import_does_not_require_prior_iers_config(self):
         # Visibility entry points call _configure_iers_for_planning(); the
         # helper is idempotent and safe to call again.
-        cmd_asteroid._configure_iers_for_planning()
-        cmd_asteroid._configure_iers_for_planning()
-        self.assertIsNone(cmd_asteroid.iers.conf.auto_max_age)
+        asteroid._configure_iers_for_planning()
+        asteroid._configure_iers_for_planning()
+        self.assertIsNone(asteroid.iers.conf.auto_max_age)
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ import unittest
 from argparse import Namespace
 from unittest.mock import patch
 
-from hevelius import cmd_asteroid as asteroid
+from hevelius import asteroid
 
 
 class TestMpcorbCacheInfo(unittest.TestCase):

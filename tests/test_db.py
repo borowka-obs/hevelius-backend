@@ -1,6 +1,6 @@
 import os
 from hevelius import db
-from hevelius.cmd_equipment import (
+from hevelius.equipment import (
     add_filter,
     edit_filter,
     set_filter_active,

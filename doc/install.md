@@ -11,6 +11,7 @@ development environment as explained in the "For Developers" section.
 2. Enable virtual environment: `source venv/bin/activate`
 3. Update pip: `pip install --upgrade pip`
 4. Install dependencies: `pip install -r requirements.txt`
+5. Install package (editable): `pip install -e .`
 
 ## Set up PostgreSQL database
 
@@ -67,5 +68,6 @@ $ python bin/hevelius
 
 ```shell
 source venv/bin/activate
-python -m flask --app heveliusbackend/app.py run
+python -m hevelius.api
+# or: flask --app hevelius.api:app run
 ```

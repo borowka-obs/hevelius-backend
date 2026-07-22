@@ -376,14 +376,17 @@ def edit_project(project_id, name=None, description=None, scope_id=None, ra=None
     return True
 
 
-def find_similar_project_names(name, exclude_id=None):
+def find_similar_project_names(name, exclude_id=None, cnx=None):
     """Return list of {project_id, name} dicts for projects with names similar to name."""
-    cnx = db.connect()
+    own_cnx = cnx is None
+    if own_cnx:
+        cnx = db.connect()
     if exclude_id is not None:
         rows = db.run_query(cnx, "SELECT project_id, name FROM projects WHERE project_id != %s", (exclude_id,))
     else:
         rows = db.run_query(cnx, "SELECT project_id, name FROM projects")
-    cnx.close()
+    if own_cnx:
+        cnx.close()
     if not rows:
         return []
     name_lower = name.strip().lower()

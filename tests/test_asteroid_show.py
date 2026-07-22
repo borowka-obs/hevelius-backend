@@ -7,7 +7,7 @@ from argparse import Namespace
 from contextlib import redirect_stdout
 
 from tests.dbtest import use_repository
-from hevelius import db, cmd_asteroid
+from hevelius import db, asteroid
 
 
 class TestAsteroidNameLookup(unittest.TestCase):
@@ -60,7 +60,7 @@ class TestAsteroidNameLookup(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_show(Namespace(query='Ceres', limit=20, no_color=True))
+            rc = asteroid.asteroids_show(Namespace(query='Ceres', limit=20, no_color=True))
         self.assertEqual(rc, 0)
         out = buf.getvalue()
         self.assertIn('(1) Ceres', out)
@@ -70,7 +70,7 @@ class TestAsteroidNameLookup(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_show(Namespace(query='er', limit=20, no_color=True))
+            rc = asteroid.asteroids_show(Namespace(query='er', limit=20, no_color=True))
         self.assertEqual(rc, 0)
         out = buf.getvalue()
         self.assertIn('Multiple matches', out)
@@ -79,7 +79,7 @@ class TestAsteroidNameLookup(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_show(Namespace(query='NoSuchRock', limit=20, no_color=True))
+            rc = asteroid.asteroids_show(Namespace(query='NoSuchRock', limit=20, no_color=True))
         self.assertEqual(rc, 1)
         self.assertIn('No asteroid matching', buf.getvalue())
 
@@ -89,16 +89,16 @@ class TestAsteroidNameLookup(unittest.TestCase):
 class TestExtractName(unittest.TestCase):
     def test_extract_name_from_readable(self):
         self.assertEqual(
-            cmd_asteroid._extract_name_from_readable('     (1) Ceres              '),
+            asteroid._extract_name_from_readable('     (1) Ceres              '),
             'Ceres',
         )
         self.assertEqual(
-            cmd_asteroid._extract_name_from_readable('(433) Eros'),
+            asteroid._extract_name_from_readable('(433) Eros'),
             'Eros',
         )
-        self.assertIsNone(cmd_asteroid._extract_name_from_readable('1960 SB1'))
-        self.assertIsNone(cmd_asteroid._extract_name_from_readable('(123456)'))
-        self.assertIsNone(cmd_asteroid._extract_name_from_readable(''))
+        self.assertIsNone(asteroid._extract_name_from_readable('1960 SB1'))
+        self.assertIsNone(asteroid._extract_name_from_readable('(123456)'))
+        self.assertIsNone(asteroid._extract_name_from_readable(''))
 
 
 class TestAltitudeChart(unittest.TestCase):
@@ -115,7 +115,7 @@ class TestAltitudeChart(unittest.TestCase):
             {"time": "2026-07-23 04:00:00.000", "altitude_deg": -5.0,
              "azimuth_deg": 270.0, "apparent_magnitude": 8.1, "moon_up": False},
         ]
-        lines = cmd_asteroid.render_altitude_chart(samples, width=40, height=10, color=False)
+        lines = asteroid.render_altitude_chart(samples, width=40, height=10, color=False)
         joined = "\n".join(lines)
         self.assertIn("horizon", joined)
         self.assertIn("●", joined)
@@ -123,7 +123,7 @@ class TestAltitudeChart(unittest.TestCase):
         self.assertIn("04:00", joined)
 
         colored = "\n".join(
-            cmd_asteroid.render_altitude_chart(samples, width=40, height=10, color=True)
+            asteroid.render_altitude_chart(samples, width=40, height=10, color=True)
         )
         self.assertIn("\033[33m", colored)  # yellow for moon-up columns
         self.assertIn("asteroid + moon up", colored)
@@ -136,7 +136,7 @@ class TestNightWindow(unittest.TestCase):
         from astropy import units as u
 
         loc = EarthLocation(lat=52.2 * u.deg, lon=21.0 * u.deg, height=100 * u.m)
-        start, end = cmd_asteroid._get_night_times(loc, Time("2026-07-22 00:00:00"))
+        start, end = asteroid._get_night_times(loc, Time("2026-07-22 00:00:00"))
         self.assertLess(start, end)
         # Must cross midnight and start in the evening (not the old 06:00–18:00 fallback)
         self.assertNotEqual(start.iso[:10], end.iso[:10])
@@ -197,7 +197,7 @@ class TestTelescopeResolveAndShowVisibility(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_show(Namespace(
+            rc = asteroid.asteroids_show(Namespace(
                 query='Vesta',
                 limit=20,
                 no_color=True,
@@ -222,7 +222,7 @@ class TestTelescopeResolveAndShowVisibility(unittest.TestCase):
 
         buf = io.StringIO()
         with redirect_stdout(buf):
-            rc = cmd_asteroid.asteroids_show(Namespace(
+            rc = asteroid.asteroids_show(Namespace(
                 query='Vesta',
                 limit=20,
                 no_color=True,

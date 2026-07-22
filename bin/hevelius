@@ -10,14 +10,14 @@ import argparse
 sys.path.append(".")
 
 # pylint: disable=wrong-import-position
-from hevelius.cmd_basic import db_version, hevelius_version, config_show, backup
-from hevelius.cmd_stats import stats, histogram_show, groups
-from hevelius.cmd_db_migrate import migrate
-from hevelius.cmd_repo import repo
-from hevelius.cmd_catalog import catalog, format_get
-from hevelius.cmd_catalogs import list_catalogs, find_catalog_objects
-from hevelius.cmd_users import list_users, add_user, disable_user, enable_user, edit_user_profile
-from hevelius.cmd_equipment import (
+from hevelius.cli.basic import db_version, hevelius_version, config_show, backup
+from hevelius.stats import stats, histogram_show, groups
+from hevelius.cli.db_migrate import migrate
+from hevelius.cli.repo import repo
+from hevelius.cli.catalog import catalog, format_get
+from hevelius.cli.catalogs import list_catalogs, find_catalog_objects
+from hevelius.cli.users import list_users, add_user, disable_user, enable_user, edit_user_profile
+from hevelius.cli.equipment import (
     list_filters,
     list_sensors,
     list_projects,
@@ -45,7 +45,7 @@ from hevelius.cmd_equipment import (
     add_telescope_filter,
     remove_telescope_filter,
 )
-from hevelius.cmd_asteroid import (
+from hevelius.asteroid import (
     asteroids_download,
     asteroids_list,
     asteroids_load,
