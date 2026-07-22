@@ -1,3 +1,5 @@
+"""Camera sensor inventory API routes."""
+
 import logging
 
 from flask import request

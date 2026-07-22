@@ -1,2 +1,2 @@
-"""CLI wrappers for equipment management (filters, sensors, telescopes, projects)."""
-from hevelius.equipment import *  # noqa: F401,F403
+"""CLI wrappers for equipment management (logic lives in hevelius.equipment)."""
+from hevelius.equipment import *  # pylint: disable=wildcard-import,unused-wildcard-import

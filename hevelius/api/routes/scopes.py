@@ -1,3 +1,5 @@
+"""Telescope (scope) inventory API routes."""
+
 import logging
 
 from flask.views import MethodView

@@ -1,3 +1,5 @@
+"""Login, password reset, and user profile API routes."""
+
 import logging
 import hashlib
 import hmac
@@ -63,7 +65,7 @@ class LoginResource(MethodView):
         db_resp = db.run_query(cnx, query, (user,))
         cnx.close()
 
-        if db_resp is None or not len(db_resp):
+        if not db_resp:
             print(f"Login: No such username ({user})")
             return {'status': False, 'msg': 'Invalid credentials'}
 
@@ -121,7 +123,7 @@ class LoginResource(MethodView):
         print(f"User {user} logged in successfully, generated JWT token.")
         return _login_success_payload(
             access_token, user_id, firstname, lastname, share, phone, email,
-            permissions, aavso_id, user,
+            permissions, aavso_id,
         )
 
 

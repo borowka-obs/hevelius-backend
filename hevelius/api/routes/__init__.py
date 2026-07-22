@@ -2,8 +2,10 @@
 
 
 def register_blueprints(api, app):
+    """Import route modules (registers MethodViews on blp) and attach the blueprint."""
+    # pylint: disable=import-outside-toplevel,unused-import
     from hevelius.api.blueprint import blp
-    from hevelius.api.routes import (  # noqa: F401
+    from hevelius.api.routes import (
         auth_users,
         tasks,
         scopes,

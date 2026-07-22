@@ -1,3 +1,5 @@
+"""Task, night-plan, and version API routes."""
+
 import logging
 
 from flask import current_app

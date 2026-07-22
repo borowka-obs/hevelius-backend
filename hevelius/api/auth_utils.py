@@ -24,10 +24,12 @@ def jwt_identity_to_string(identity):
 
 
 def password_reset_token_hash(raw_token: str) -> str:
+    """SHA-256 hex digest of a password-reset token for DB storage."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def jwt_user_id_int():
+    """Return the JWT subject as an int user_id, or None if missing/invalid."""
     ident = get_jwt_identity()
     try:
         return int(ident)
@@ -36,6 +38,7 @@ def jwt_user_id_int():
 
 
 def jwt_permissions_int():
+    """Return the permissions claim as an int (default 0)."""
     claims = get_jwt()
     p = claims.get("permissions")
     if p is None:
@@ -47,7 +50,8 @@ def jwt_permissions_int():
 
 
 def login_success_payload(access_token, user_id, firstname, lastname, share, phone, email,
-                          permissions, aavso_id, username):
+                          permissions, aavso_id):
+    """Build the JSON body returned by successful login / token refresh."""
     return {
         "status": True,
         "token": access_token,

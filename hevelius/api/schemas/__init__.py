@@ -130,7 +130,7 @@ class TaskAddRequestSchema(Schema):
     )
 
     @validates_schema
-    def validate_cross_fields(self, data, **kwargs):
+    def validate_cross_fields(self, data, **_kwargs):
         if data.get("filter") and data.get("filter_id") is not None:
             raise ValidationError("Provide either filter or filter_id, not both", field_name="filter_id")
         if data.get("project_id") is not None and data.get("project_ids"):
@@ -348,7 +348,7 @@ class TaskUpdateRequestSchema(Schema):
     )
 
     @validates_schema
-    def validate_cross_fields(self, data, **kwargs):
+    def validate_cross_fields(self, data, **_kwargs):
         if data.get("filter") and data.get("filter_id") is not None:
             raise ValidationError("Provide either filter or filter_id, not both", field_name="filter_id")
         if data.get("project_id") is not None and data.get("project_ids"):

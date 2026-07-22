@@ -1,3 +1,5 @@
+"""Catalog listing and object search API routes."""
+
 import logging
 
 from flask.views import MethodView

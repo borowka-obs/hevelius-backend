@@ -1,8 +1,10 @@
-from hevelius import db
-from hevelius.utils import parse_dec, parse_ra, format_dec, format_ra
-from hevelius.config import load_config
+"""Legacy CLI catalog search near sky coordinates."""
 from argparse import ArgumentTypeError
 import sys
+
+from hevelius import db
+from hevelius.config import load_config
+from hevelius.utils import format_dec, format_ra, parse_dec, parse_ra
 
 
 def format_get(format: str) -> str:
@@ -22,7 +24,7 @@ def format_get(format: str) -> str:
     return format
 
 
-def object_print(obj, format: str):
+def object_print(obj, _format: str):
     """prints info about catalog object"""
     print(f"Object {obj[1]} at RA {format_ra(obj[3])} DEC {format_dec(obj[4])}")
 

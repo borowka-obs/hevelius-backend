@@ -1,4 +1,4 @@
-from hevelius.api.routes.scopes import _row_to_filter
+"""Optical filter inventory API routes."""
 import logging
 
 from flask import request
@@ -6,9 +6,9 @@ from flask.views import MethodView
 from flask_jwt_extended import jwt_required
 from flask_smorest import abort
 
-
 from hevelius import db
 from hevelius.api.blueprint import blp
+from hevelius.api.routes.scopes import _row_to_filter
 from hevelius.api.schemas import (
     FilterCreateResponseSchema,
     FilterCreateSchema,

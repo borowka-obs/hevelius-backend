@@ -7,6 +7,7 @@ from hevelius import stats
 
 
 def register_misc_routes(app):
+    """Register non-/api routes (homepage stub and histogram HTML page)."""
     @app.route("/")
     def root():
         """Just a stub API homepage."""

@@ -36,7 +36,7 @@ def list_users():
     )
     print("-" * 110)
     for r in rows:
-        uid, login, fn, ln, share, phone, email, perm, aavso, pass_d = r
+        uid, login, fn, ln, _share, _phone, email, perm, aavso, pass_d = r
         can_login = bool(pass_d and str(pass_d).strip())
         name = f"{fn or ''} {ln or ''}".strip()[:26]
         login_s = (login or "")[:10]
