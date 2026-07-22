@@ -60,8 +60,6 @@ MPCORB_MAX_AGE_DAYS = 7
 _BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 _BASE62_INDEX = {c: i for i, c in enumerate(_BASE62)}
 
-_iers_configured_for_planning = False
-
 
 def _configure_iers_for_planning() -> None:
     """
@@ -73,15 +71,13 @@ def _configure_iers_for_planning() -> None:
     error is sub-arcsecond and irrelevant for altitude/visibility purposes, so
     disable the hard age limit when running visibility computations.
 
-    Applied lazily (once per process) from visibility entry points only, so
-    importing this module for MPCORB parsing does not change global IERS
-    behaviour for unrelated astropy callers.
+    Applied lazily from visibility entry points only (idempotent via the
+    auto_max_age sentinel), so importing this module for MPCORB parsing does
+    not change global IERS behaviour for unrelated astropy callers.
     """
-    global _iers_configured_for_planning
-    if _iers_configured_for_planning:
+    if iers.conf.auto_max_age is None:
         return
     iers.conf.auto_max_age = None
-    _iers_configured_for_planning = True
 
 
 def _progress(msg: str) -> None:
@@ -444,7 +440,8 @@ def _asteroid_db_stats(conn) -> Optional[dict]:
             cursor.execute("SELECT count(DISTINCT asteroid_id) FROM asteroid_tag_map")
             stats["tagged_asteroids"] = cursor.fetchone()[0]
         return stats
-    except BaseException:
+    except Exception:
+        # asteroids / tag tables may be missing on older schemas
         conn.rollback()
         return None
     finally:
