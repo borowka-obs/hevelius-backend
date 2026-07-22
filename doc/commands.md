@@ -96,6 +96,10 @@ hevelius asteroid download --load
 hevelius asteroid show Ceres
 hevelius asteroid show 433
 
+# Catalogue listing (first 100 by MPC number; filters/sorting available)
+hevelius asteroid list
+hevelius asteroid list --name cer --limit 20 --sort-by absolute_magnitude
+
 # With a telescope, also print a night altitude chart for that site
 hevelius asteroid show Vesta --telescope-id 3
 hevelius asteroid show Vesta --telescope hakos-e180 --date 2026-07-22
