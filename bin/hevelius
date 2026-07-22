@@ -48,6 +48,7 @@ from hevelius.cmd_equipment import (
 from hevelius.cmd_asteroid import (
     asteroids_download,
     asteroids_load,
+    asteroids_show,
     asteroids_status,
     asteroids_visible,
 )
@@ -407,6 +408,22 @@ def run():
         help="Also count asteroid records in the cached MPCORB file (slower)",
         action='store_true',
     )
+    show_parser = asteroid_subparsers.add_parser(
+        'show',
+        help="Show detailed info for an asteroid by name, MPC number, or packed designation",
+    )
+    show_parser.add_argument(
+        'query',
+        help="Proper name (e.g. Ceres), MPC number (e.g. 1), or packed designation",
+    )
+    show_parser.add_argument(
+        '--limit', type=int, default=20,
+        help="Max matches to list when the query is ambiguous (default: 20)",
+    )
+    show_parser.add_argument(
+        '--no-color', action='store_true',
+        help="Disable ANSI colors in the output",
+    )
     vis_parser = asteroid_subparsers.add_parser('visible', help="List asteroids visible during a night (magnitude and altitude filters)")
     vis_parser.add_argument("--date", help="Observation date YYYY-MM-DD", type=str, required=True)
     vis_parser.add_argument("--lat", help="Observer latitude (degrees)", type=float, required=True)
@@ -729,6 +746,8 @@ def run():
             return asteroids_load(args)
         if args.asteroid_command == "status":
             return asteroids_status(args)
+        if args.asteroid_command == "show":
+            return asteroids_show(args)
         if args.asteroid_command == "visible":
             return asteroids_visible(args)
         return asteroid_parser.print_help()

@@ -91,6 +91,10 @@ hevelius asteroid load
 
 # Or download and load in one step
 hevelius asteroid download --load
+
+# Look up one asteroid by proper name, MPC number, or packed designation
+hevelius asteroid show Ceres
+hevelius asteroid show 433
 ```
 
 The orbital parameters are cached locally (default: `~/.cache/hevelius/MPCORB.DAT`).

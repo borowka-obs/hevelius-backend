@@ -1,5 +1,12 @@
 -- Tags for asteroids (e.g. amor, neo, pha, fast rotator, visited by spacecraft).
 -- Many-to-many: an asteroid can carry multiple tags, a tag applies to many asteroids.
+-- Also adds the optional proper name column (from MPCORB readable designation).
+
+ALTER TABLE asteroids ADD COLUMN IF NOT EXISTS name VARCHAR(64);
+-- Case-insensitive exact lookups for CLI/API name search; partial ILIKE still
+-- needs a sequential scan (or pg_trgm later) at full catalogue scale.
+CREATE INDEX IF NOT EXISTS asteroids_name_lower_idx
+    ON asteroids (lower(name)) WHERE name IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS asteroid_tags (
     tag_id SERIAL PRIMARY KEY,

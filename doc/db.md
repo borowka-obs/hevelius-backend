@@ -20,8 +20,11 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
-### Schema version 24 (asteroid tags)
+### Schema version 24 (asteroid tags + proper names)
 
+- **asteroids** – Added optional **name** (varchar 64): proper name parsed from the
+  MPCORB readable designation field (e.g. `Ceres` from `(1) Ceres`). NULL for
+  unnamed / provisional objects. Index on `lower(name)` for exact lookups.
 - **asteroid_tags** – Shared tag vocabulary for asteroids (`name` unique, optional
   `description` / `color`). Examples: neo, pha, amor, fast rotator.
 - **asteroid_tag_map** – Many-to-many link (`asteroid_id`, `tag_id`) with cascade
