@@ -9,15 +9,19 @@ data source, the database schema, the CLI, and the visibility algorithm in detai
 
 Orbital elements come from the [MPC MPCORB database](https://minorplanetcenter.net/iau/MPCORB.html).
 The full catalogue is distributed as a gzip-compressed fixed-width text file
-(`MPCORB.DAT.gz`).  Download and load it with:
+(`MPCORB.DAT.gz`).  Typical workflow:
 
 ```
-hevelius asteroid download --load
+hevelius asteroid status                 # cache + DB counters
+hevelius asteroid download               # fetch MPCORB (skipped if < 7 days old)
+hevelius asteroid load                   # upsert into the asteroids table
+# or: hevelius asteroid download --load  # download then load
 ```
 
-The file is cached locally (default: `~/.cache/hevelius/MPCORB.DAT`).  To
-force a re-download use `--force`.  The `--limit N` flag restricts the load to
-the first *N* records, which is handy for testing.
+The file is cached locally (default: `~/.cache/hevelius/MPCORB.DAT`).  A
+download is skipped when that cache is younger than 7 days; use `--force` to
+re-download anyway.  The `--limit N` flag on `load` (or `download --load`)
+restricts the load to the first *N* records, which is handy for testing.
 
 ## Database schema
 
@@ -43,23 +47,33 @@ Indices exist on `absolute_magnitude`, `number`, and `designation`.
 ## CLI usage
 
 ```
+hevelius asteroid status
+hevelius asteroid download [--force] [--load] [--limit N]
+hevelius asteroid load [--file PATH] [--limit N]
 hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
     --mag-min 8 --mag-max 14 --alt-min 20
 ```
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `--date` | required | Observation date (YYYY-MM-DD) |
-| `--lat` | required | Observer latitude in degrees |
-| `--lon` | required | Observer longitude in degrees |
-| `--alt` | 0 | Observer altitude above sea level (metres) |
-| `--mag-min` | 8.0 | Minimum apparent magnitude |
-| `--mag-max` | 16.0 | Maximum apparent magnitude |
-| `--alt-min` | 20.0 | Minimum altitude above horizon (degrees) |
-| `--constraint` | — | Extra SQL filter, e.g. `'number < 3000'` |
-| `--order-by` | absolute\_magnitude | Sort column |
+| Command / option | Default | Description |
+|------------------|---------|-------------|
+| `status` | — | MPCORB cache location/age and DB asteroid counters |
+| `status --count-file` | off | Also count records in the cached MPCORB file |
+| `download` | — | Fetch MPCORB; skipped if cache younger than 7 days |
+| `download --force` | off | Re-download even if the cache is fresh |
+| `download --load` | off | After download, upsert into the DB |
+| `load` | — | Upsert asteroids from the cached (or `--file`) MPCORB |
+| `visible --date` | required | Observation date (YYYY-MM-DD) |
+| `visible --lat` | required | Observer latitude in degrees |
+| `visible --lon` | required | Observer longitude in degrees |
+| `visible --alt` | 0 | Observer altitude above sea level (metres) |
+| `visible --mag-min` | 8.0 | Minimum apparent magnitude |
+| `visible --mag-max` | 16.0 | Maximum apparent magnitude |
+| `visible --alt-min` | 20.0 | Minimum altitude above horizon (degrees) |
+| `visible --constraint` | — | Extra SQL filter, e.g. `'number < 3000'` |
+| `visible --order-by` | absolute\_magnitude | Sort column |
 
-Progress is printed to stderr so stdout output can be redirected to a file.
+Progress for `visible` is printed to stderr so stdout output can be redirected
+to a file.
 
 ## Visibility algorithm
 

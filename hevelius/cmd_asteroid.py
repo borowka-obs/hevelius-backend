@@ -3,10 +3,12 @@ Asteroid observation planning: download MPC orbits, list visible asteroids
 for a given night/location with magnitude and altitude filters.
 """
 
+import datetime
 import gzip
 import os
 import re
 import sys
+import urllib.error
 import urllib.request
 from typing import List, Optional, Tuple
 
@@ -54,6 +56,9 @@ MPCORB_COLS = {
 
 MPCORB_URL = "https://minorplanetcenter.net/iau/MPCORB/MPCORB.DAT.gz"
 
+# Skip re-download from MPC when the local cache is younger than this.
+MPCORB_MAX_AGE_DAYS = 7
+
 
 def _progress(msg: str) -> None:
     """Print progress message to stderr (so stdout stays clean for piping)."""
@@ -72,6 +77,53 @@ def _cache_dir() -> str:
 
 def _cache_path() -> str:
     return os.path.join(_cache_dir(), "MPCORB.DAT")
+
+
+def _format_age(seconds: float) -> str:
+    """Human-readable age from a duration in seconds."""
+    seconds = max(0, int(seconds))
+    days, rem = divmod(seconds, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes = rem // 60
+    if days > 0:
+        return f"{days}d {hours}h"
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    return f"{minutes}m"
+
+
+def _format_size(num_bytes: int) -> str:
+    """Human-readable file size."""
+    size = float(num_bytes)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if size < 1024.0 or unit == "GiB":
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{num_bytes} B"
+
+
+def mpcorb_cache_info(path: Optional[str] = None) -> Optional[dict]:
+    """
+    Return metadata about the cached MPCORB.DAT file, or None if missing.
+
+    Keys: path, size_bytes, mtime (datetime), age_seconds, fresh (bool).
+    """
+    if path is None:
+        path = _cache_path()
+    if not os.path.isfile(path):
+        return None
+    st = os.stat(path)
+    mtime = datetime.datetime.fromtimestamp(st.st_mtime)
+    age_seconds = (datetime.datetime.now() - mtime).total_seconds()
+    return {
+        "path": os.path.abspath(path),
+        "size_bytes": st.st_size,
+        "mtime": mtime,
+        "age_seconds": age_seconds,
+        "fresh": age_seconds < MPCORB_MAX_AGE_DAYS * 86400,
+    }
 
 
 def _parse_float(s: str) -> Optional[float]:
@@ -169,24 +221,77 @@ def download_mpcorb(force: bool = False) -> str:
     """
     Download MPCORB.DAT.gz from MPC to local cache. Returns path to cached file
     (gunzipped as MPCORB.DAT).
+
+    Skips the network download when a local cache exists and is younger than
+    MPCORB_MAX_AGE_DAYS, unless force=True. Always prints why download was
+    skipped or performed.
     """
+    def log(msg: str) -> None:
+        print(msg, flush=True)
+
     cache_dir = _cache_dir()
     os.makedirs(cache_dir, exist_ok=True)
     out_path = _cache_path()
-    if not force and os.path.isfile(out_path):
-        return out_path
+    info = mpcorb_cache_info(out_path)
+
+    if info is not None and not force:
+        age_str = _format_age(info["age_seconds"])
+        if info["fresh"]:
+            log(
+                f"Skipping MPC download: cached file is {age_str} old "
+                f"(younger than {MPCORB_MAX_AGE_DAYS} days)."
+            )
+            log(f"  Location: {info['path']}")
+            log(f"  Modified: {info['mtime'].isoformat(sep=' ', timespec='seconds')}")
+            log(f"  Size:     {_format_size(info['size_bytes'])}")
+            log("  Use --force to re-download anyway.")
+            return out_path
+        log(
+            f"Cached MPCORB is {age_str} old "
+            f"(older than {MPCORB_MAX_AGE_DAYS} days); re-downloading from MPC."
+        )
+        log(f"  Existing: {info['path']}")
+    elif info is not None and force:
+        age_str = _format_age(info["age_seconds"])
+        log(
+            f"Forcing re-download (--force). Existing cache is {age_str} old "
+            f"at {info['path']}."
+        )
+    else:
+        log(f"No local MPCORB cache found at {out_path}; downloading from MPC.")
+
     gz_path = out_path + ".gz"
-    print(f"Downloading {MPCORB_URL} ...")
-    urllib.request.urlretrieve(MPCORB_URL, gz_path)
-    with gzip.open(gz_path, "rb") as f_in:
-        with open(out_path, "wb") as f_out:
-            f_out.write(f_in.read())
+    log(f"Downloading {MPCORB_URL} ...")
     try:
-        os.remove(gz_path)
-    except OSError:
-        # Best-effort cleanup: ignore failure to remove temporary .gz file.
-        pass
-    print(f"Cached to {out_path}")
+        urllib.request.urlretrieve(MPCORB_URL, gz_path)
+    except urllib.error.URLError as exc:
+        print(f"ERROR: failed to download MPCORB from {MPCORB_URL}: {exc}",
+              file=sys.stderr, flush=True)
+        raise
+    except OSError as exc:
+        print(f"ERROR: failed to write download to {gz_path}: {exc}",
+              file=sys.stderr, flush=True)
+        raise
+
+    log("Decompressing ...")
+    try:
+        with gzip.open(gz_path, "rb") as f_in:
+            with open(out_path, "wb") as f_out:
+                f_out.write(f_in.read())
+    except OSError as exc:
+        print(f"ERROR: failed to decompress {gz_path}: {exc}",
+              file=sys.stderr, flush=True)
+        raise
+    finally:
+        try:
+            os.remove(gz_path)
+        except OSError:
+            # Best-effort cleanup: ignore failure to remove temporary .gz file.
+            pass
+
+    info_after = mpcorb_cache_info(out_path)
+    size_str = _format_size(info_after["size_bytes"]) if info_after else "?"
+    log(f"Cached to {out_path} ({size_str})")
     return out_path
 
 
@@ -207,6 +312,45 @@ def _asteroid_count_db(conn) -> int:
     out = cursor.fetchone()[0]
     cursor.close()
     return out
+
+
+def _asteroid_db_stats(conn) -> Optional[dict]:
+    """
+    Return aggregate asteroid stats from the DB, or None if the table is missing.
+    """
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            """
+            SELECT
+                count(*) AS total,
+                count(number) AS numbered,
+                count(*) FILTER (WHERE number IS NULL) AS unnumbered,
+                count(absolute_magnitude) AS with_h
+            FROM asteroids
+            """
+        )
+        total, numbered, unnumbered, with_h = cursor.fetchone()
+        stats = {
+            "total": total,
+            "numbered": numbered,
+            "unnumbered": unnumbered,
+            "with_absolute_magnitude": with_h,
+            "tags": None,
+            "tagged_asteroids": None,
+        }
+        # Tag tables exist from schema 24 onward.
+        if db.version_get(conn) >= 24:
+            cursor.execute("SELECT count(*) FROM asteroid_tags")
+            stats["tags"] = cursor.fetchone()[0]
+            cursor.execute("SELECT count(DISTINCT asteroid_id) FROM asteroid_tag_map")
+            stats["tagged_asteroids"] = cursor.fetchone()[0]
+        return stats
+    except BaseException:
+        conn.rollback()
+        return None
+    finally:
+        cursor.close()
 
 
 def load_mpcorb_into_db(conn, path: Optional[str] = None, limit: Optional[int] = None) -> int:
@@ -777,12 +921,98 @@ def compute_asteroid_visibility_curve(
 
 def asteroids_download(args):
     """CLI: download and optionally load MPCORB into DB."""
-    path = download_mpcorb(force=args.force)
-    if args.load:
+    try:
+        path = download_mpcorb(force=getattr(args, "force", False))
+    except (urllib.error.URLError, OSError):
+        return 1
+    if getattr(args, "load", False):
         conn = db.connect()
-        n = load_mpcorb_into_db(conn, path=path, limit=args.limit)
-        conn.close()
+        try:
+            n = load_mpcorb_into_db(conn, path=path, limit=getattr(args, "limit", None))
+            print(f"Loaded {n} asteroids into database.")
+        finally:
+            conn.close()
+    return 0
+
+
+def asteroids_load(args):
+    """CLI: create/update asteroid rows from the cached (or given) MPCORB file."""
+    path = getattr(args, "file", None) or _cache_path()
+    if not os.path.isfile(path):
+        print(
+            f"ERROR: MPCORB not found at {path}.\n"
+            "  Run 'hevelius asteroid download' first, or pass --file PATH.",
+            file=sys.stderr,
+        )
+        return 1
+    info = mpcorb_cache_info(path)
+    if info:
+        print(
+            f"Loading asteroids from {info['path']} "
+            f"({_format_size(info['size_bytes'])}, "
+            f"modified {info['mtime'].isoformat(sep=' ', timespec='seconds')})"
+        )
+    conn = db.connect()
+    try:
+        n = load_mpcorb_into_db(conn, path=path, limit=getattr(args, "limit", None))
         print(f"Loaded {n} asteroids into database.")
+    finally:
+        conn.close()
+    return 0
+
+
+def asteroids_status(args):
+    """CLI: report MPCORB cache freshness and asteroid DB counters."""
+    print("=== MPCORB cache ===")
+    info = mpcorb_cache_info()
+    if info is None:
+        print("  Status:   not downloaded")
+        print(f"  Expected: {_cache_path()}")
+        print("  Run:      hevelius asteroid download")
+    else:
+        fresh_label = (
+            f"yes (younger than {MPCORB_MAX_AGE_DAYS} days)"
+            if info["fresh"]
+            else f"no (older than {MPCORB_MAX_AGE_DAYS} days; re-download recommended)"
+        )
+        print("  Status:   present")
+        print(f"  Location: {info['path']}")
+        print(f"  Size:     {_format_size(info['size_bytes'])}")
+        print(f"  Modified: {info['mtime'].isoformat(sep=' ', timespec='seconds')}")
+        print(f"  Age:      {_format_age(info['age_seconds'])}")
+        print(f"  Fresh:    {fresh_label}")
+        print(f"  Source:   {MPCORB_URL}")
+        if getattr(args, "count_file", False):
+            print("  Counting asteroid records in file...")
+            print(f"  Records:  ~{_count_mpcorb_lines(info['path']):,}")
+
+    print()
+    print("=== Database ===")
+    try:
+        conn = db.connect()
+    except Exception as exc:
+        print(f"  ERROR: could not connect to database: {exc}")
+        return 1
+
+    try:
+        stats = _asteroid_db_stats(conn)
+        if stats is None:
+            print("  asteroids table not found (run DB migrations).")
+            return 1
+        print(f"  Total asteroids:       {stats['total']:,}")
+        print(f"  Numbered:              {stats['numbered']:,}")
+        print(f"  Unnumbered:            {stats['unnumbered']:,}")
+        print(f"  With absolute mag (H): {stats['with_absolute_magnitude']:,}")
+        if stats["tags"] is not None:
+            print(f"  Tags defined:          {stats['tags']:,}")
+            print(f"  Asteroids with tags:   {stats['tagged_asteroids']:,}")
+        else:
+            print("  Tags:                  (asteroid_tags not migrated yet)")
+        if stats["total"] == 0:
+            print("  Tip: run 'hevelius asteroid load' after downloading MPCORB.")
+    finally:
+        conn.close()
+    return 0
 
 
 def asteroids_visible(args):
