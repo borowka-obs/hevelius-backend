@@ -14,6 +14,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   tag CRUD plus attach/detach endpoints. List/detail expose `name`; list accepts
   `name` filter and `sort_by=name`.
 - CLI: asteroid download/load from MPCORB and bulk night visibility listing.
+- CLI: `hevelius asteroid list` prints catalogue rows (default: first 100 by
+  increasing MPC number) with `--sort-by` / `--sort-order` and filters for name,
+  designation, number, numbered/unnumbered, H magnitude range, and tags.
 - CLI: `hevelius asteroid show <query>` looks up by proper name, MPC number, or
   packed designation and prints a detailed (optionally colored) summary.
   With `--telescope` / `--telescope-id`, also prints a night altitude chart for

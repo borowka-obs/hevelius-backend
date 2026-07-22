@@ -1245,6 +1245,130 @@ def asteroids_visible(args):
     return len(results)
 
 
+_LIST_SORT_FIELDS = (
+    "number", "name", "designation", "absolute_magnitude",
+    "semimajor_axis", "eccentricity", "inclination", "mean_motion", "epoch",
+)
+
+
+def asteroids_list(args):
+    """
+    CLI: paginated catalogue listing with filters and sorting.
+
+    Defaults: first 100 rows, sorted by MPC number ascending.
+    """
+    sort_by = getattr(args, "sort_by", None) or "number"
+    sort_order = getattr(args, "sort_order", None) or "asc"
+    if sort_by not in _LIST_SORT_FIELDS:
+        print(
+            f"ERROR: invalid --sort-by {sort_by!r}. "
+            f"Choose from: {', '.join(_LIST_SORT_FIELDS)}",
+            file=sys.stderr,
+        )
+        return 1
+    if sort_order not in ("asc", "desc"):
+        print("ERROR: --sort-order must be 'asc' or 'desc'.", file=sys.stderr)
+        return 1
+
+    limit = getattr(args, "limit", 100)
+    if limit is None or limit < 1:
+        print("ERROR: --limit must be a positive integer.", file=sys.stderr)
+        return 1
+    offset = getattr(args, "offset", 0) or 0
+    if offset < 0:
+        print("ERROR: --offset must be >= 0.", file=sys.stderr)
+        return 1
+
+    numbered = getattr(args, "numbered", None)
+    if getattr(args, "unnumbered", False):
+        if numbered is True:
+            print("ERROR: use only one of --numbered / --unnumbered.", file=sys.stderr)
+            return 1
+        numbered = False
+
+    mag_min = getattr(args, "mag_min", None)
+    mag_max = getattr(args, "mag_max", None)
+    if mag_min is not None and mag_max is not None and mag_min > mag_max:
+        print("ERROR: --mag-min must be <= --mag-max.", file=sys.stderr)
+        return 1
+
+    tag_raw = getattr(args, "tags", None)
+    tag_names = None
+    if tag_raw:
+        tag_names = [t.strip() for t in tag_raw.split(",") if t.strip()] or None
+    tags_mode = getattr(args, "tags_mode", None) or "any"
+
+    try:
+        conn = db.connect()
+    except Exception as exc:
+        print(f"ERROR: could not connect to database: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        filters = dict(
+            designation=getattr(args, "designation", None) or None,
+            name=getattr(args, "name", None) or None,
+            number=getattr(args, "number", None),
+            numbered=numbered,
+            mag_min=mag_min,
+            mag_max=mag_max,
+            tag_names=tag_names,
+            tags_mode=tags_mode,
+        )
+        total = db.asteroids_count(conn, **filters)
+        rows = db.asteroids_search(
+            conn,
+            **filters,
+            sort_by=sort_by,
+            sort_order=sort_order,
+            limit=limit,
+            offset=offset,
+        )
+    finally:
+        conn.close()
+
+    color = not getattr(args, "no_color", False) and sys.stdout.isatty()
+
+    def dim(s):
+        return _ansi("2", s, color)
+
+    def bold(s):
+        return _ansi("1", s, color)
+
+    shown = len(rows or [])
+    end = offset + shown
+    print(
+        bold("Asteroids")
+        + dim(f"  showing {offset + 1 if shown else 0}–{end} of {total:,}")
+        + dim(f"  sort={sort_by} {sort_order}")
+    )
+    print(
+        f"{'Number':>8}  {'Name':<20}  {'Designation':<12}  {'H':>6}  "
+        f"{'a (AU)':>8}  {'e':>7}  {'i (°)':>7}"
+    )
+    print(dim("-" * 82))
+
+    if not rows:
+        print(dim("  (no matches)"))
+        return 0
+
+    for row in rows:
+        # id, number, designation, name, epoch, M, peri, node, i, e, n, a, H, G
+        _id, number, designation, name, _epoch, _M, _peri, _node, inc, ecc, _n, a, H, _G = row
+        num = f"{number}" if number is not None else "—"
+        nm = (name or "—")[:20]
+        des = (designation or "")[:12]
+        h = f"{H:.2f}" if H is not None else "—"
+        a_s = f"{a:.4f}" if a is not None else "—"
+        e_s = f"{ecc:.5f}" if ecc is not None else "—"
+        i_s = f"{inc:.2f}" if inc is not None else "—"
+        print(f"{num:>8}  {nm:<20}  {des:<12}  {h:>6}  {a_s:>8}  {e_s:>7}  {i_s:>7}")
+
+    if end < total:
+        print(dim(f"  … {total - end:,} more (use --offset {end} or raise --limit)"))
+    return 0
+
+
 def _ansi(code: str, text: str, enabled: bool) -> str:
     """Wrap text in an ANSI SGR sequence when color is enabled."""
     if not enabled:

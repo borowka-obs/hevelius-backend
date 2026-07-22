@@ -71,6 +71,9 @@ hevelius asteroid show Ceres
 hevelius asteroid show 433
 hevelius asteroid show Vesta --telescope-id 3
 hevelius asteroid show Vesta --telescope hakos-e180 --date 2026-07-22
+hevelius asteroid list
+hevelius asteroid list --name cer --limit 20
+hevelius asteroid list --numbered --sort-by absolute_magnitude --sort-order asc
 hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
     --mag-min 8 --mag-max 14 --alt-min 20
 ```
@@ -90,6 +93,17 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 | `show --step-minutes` | 10 | Chart sampling interval |
 | `show --limit` | 20 | Max candidates listed when the query is ambiguous |
 | `show --no-color` | off | Disable ANSI colors |
+| `list` | — | Catalogue listing (default first 100 by MPC number) |
+| `list --limit` | 100 | Max rows to print |
+| `list --offset` | 0 | Skip N rows before printing |
+| `list --sort-by` | number | number, name, designation, absolute_magnitude, … |
+| `list --sort-order` | asc | asc or desc |
+| `list --name` | — | Proper-name filter (partial) |
+| `list --designation` | — | Packed-designation filter (partial) |
+| `list --number` | — | Exact MPC number |
+| `list --numbered` / `--unnumbered` | — | Numbered-only / provisional-only |
+| `list --mag-min` / `--mag-max` | — | Absolute magnitude H range |
+| `list --tags` / `--tags-mode` | any | Tag filter (`any` or `all`) |
 | `visible --date` | required | Observation date (YYYY-MM-DD) |
 | `visible --lat` | required | Observer latitude in degrees |
 | `visible --lon` | required | Observer longitude in degrees |
