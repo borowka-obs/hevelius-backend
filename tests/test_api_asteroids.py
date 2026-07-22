@@ -30,13 +30,13 @@ class TestAsteroids(unittest.TestCase):
     def _insert_asteroids(self, cnx):
         db.run_query(cnx, """
             INSERT INTO asteroids (
-                number, designation, epoch, mean_anomaly, perihelion_arg,
+                number, designation, name, epoch, mean_anomaly, perihelion_arg,
                 ascending_node, inclination, eccentricity, mean_motion,
                 semimajor_axis, absolute_magnitude, slope_parameter
             ) VALUES
-            (1, '00001', 'K25A2', 10.5, 73.6, 80.3, 10.6, 0.078, 0.214, 2.77, 3.34, 0.12),
-            (2, '00002', 'K25A2', 20.1, 310.0, 173.1, 34.8, 0.229, 0.213, 2.77, 4.13, 0.11),
-            (NULL, 'K25A00A', 'K25A2', 55.2, 120.0, 200.0, 5.1, 0.15, 0.30, 2.10, 18.5, 0.15)
+            (1, '00001', 'Ceres', 'K25A2', 10.5, 73.6, 80.3, 10.6, 0.078, 0.214, 2.77, 3.34, 0.12),
+            (2, '00002', 'Pallas', 'K25A2', 20.1, 310.0, 173.1, 34.8, 0.229, 0.213, 2.77, 4.13, 0.11),
+            (NULL, 'K25A00A', NULL, 'K25A2', 55.2, 120.0, 200.0, 5.1, 0.15, 0.30, 2.10, 18.5, 0.15)
             RETURNING id
         """)
 
@@ -99,6 +99,14 @@ class TestAsteroids(unittest.TestCase):
         data = json.loads(response.data)
         self.assertEqual(data['total'], 1)
         self.assertIsNone(data['asteroids'][0]['number'])
+
+        # Filter by proper name (partial, case-insensitive)
+        response = self.app.get('/api/asteroids?name=cere', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['asteroids'][0]['name'], 'Ceres')
+        self.assertEqual(data['asteroids'][0]['number'], 1)
 
         # Filter by numbered=true / numbered=false
         response = self.app.get('/api/asteroids?numbered=true', headers=self.headers)

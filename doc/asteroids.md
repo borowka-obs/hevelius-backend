@@ -28,14 +28,19 @@ Permanent MPC numbers are unpacked from the packed designation in columns 1–7
 (plain digits, letter-coded forms for 100000–619999, and tilde/base-62 for
 ≥ 620000). Provisional designations leave `number` NULL.
 
+Proper names come from the MPCORB readable designation field (columns 167–194),
+e.g. `(1) Ceres` → `name = Ceres`. Unnamed and provisional objects store NULL.
+
 ## Database schema
 
-Orbital elements are stored in the `asteroids` table (migration **22**):
+Orbital elements are stored in the `asteroids` table (migration **22**, with
+`name` added in migration **24**):
 
 | Column | Type | Description |
 |--------|------|-------------|
 | `number` | integer | MPC number (NULL for unnumbered objects) |
 | `designation` | varchar(32) | Packed MPC designation (unique key) |
+| `name` | varchar(64) | Proper name (NULL if unnamed / provisional) |
 | `epoch` | varchar(16) | Epoch in MPC packed format |
 | `mean_anomaly` | double | Mean anomaly M at epoch (degrees) |
 | `perihelion_arg` | double | Argument of perihelion ω (degrees) |
@@ -47,7 +52,7 @@ Orbital elements are stored in the `asteroids` table (migration **22**):
 | `absolute_magnitude` | double | Absolute magnitude H |
 | `slope_parameter` | double | Phase slope parameter G (default 0.15) |
 
-Indices exist on `absolute_magnitude`, `number`, and `designation`.
+Indices exist on `absolute_magnitude`, `number`, `designation`, and `lower(name)`.
 
 ### Tags (migration 24)
 
@@ -62,6 +67,8 @@ same pattern as other shared catalogue metadata.
 hevelius asteroid status
 hevelius asteroid download [--force] [--load] [--limit N]
 hevelius asteroid load [--file PATH] [--limit N]
+hevelius asteroid show Ceres
+hevelius asteroid show 433
 hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
     --mag-min 8 --mag-max 14 --alt-min 20
 ```
@@ -74,6 +81,9 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 | `download --force` | off | Re-download even if the cache is fresh |
 | `download --load` | off | After download, upsert into the DB |
 | `load` | — | Upsert asteroids from the cached (or `--file`) MPCORB |
+| `show <query>` | — | Detail by proper name, MPC number, or packed designation |
+| `show --limit` | 20 | Max candidates listed when the query is ambiguous |
+| `show --no-color` | off | Disable ANSI colors |
 | `visible --date` | required | Observation date (YYYY-MM-DD) |
 | `visible --lat` | required | Observer latitude in degrees |
 | `visible --lon` | required | Observer longitude in degrees |
@@ -84,6 +94,10 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 | `visible --constraint` | — | Extra SQL filter, e.g. `'number < 3000'` |
 | `visible --order-by` | absolute\_magnitude | Sort column |
 
+`asteroid show` prefers exact name/number/designation matches. Ambiguous queries
+list candidates. When stdout is a TTY, the detail view uses ANSI colors
+(disable with `--no-color`).
+
 Progress for `visible` is printed to stderr so stdout output can be redirected
 to a file.
 
@@ -93,7 +107,7 @@ See `api/openapi.yaml` for the full contract. Summary:
 
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET/POST | `/api/asteroids` | Paginated list with filters (designation, number, magnitude, tags) |
+| GET/POST | `/api/asteroids` | Paginated list with filters (name, designation, number, magnitude, tags) |
 | GET | `/api/asteroids/{id}` | Detail including attached tags |
 | GET | `/api/asteroids/{id}/visibility` | Night altitude/azimuth/magnitude curve from a telescope |
 | GET/POST | `/api/asteroid-tags` | List / create tags |

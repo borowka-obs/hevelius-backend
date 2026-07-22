@@ -33,6 +33,7 @@ from hevelius.config import load_config
 # Columns 1-7: number or provisional designation (packed form)
 # 9-13: H, 15-19: G, 21-25: Epoch, 27-35: M, 38-46: omega, 49-57: Omega,
 # 60-68: i, 71-79: e, 81-91: n, 93-103: a
+# 167-194: readable designation (may include proper name, e.g. "(1) Ceres")
 MPCORB_COLS = {
     "designation": (0, 7),
     "H": (8, 13),
@@ -45,6 +46,7 @@ MPCORB_COLS = {
     "eccentricity": (70, 79),
     "mean_motion": (80, 91),
     "semimajor_axis": (92, 103),
+    "readable_designation": (166, 194),
 }
 
 MPCORB_URL = "https://minorplanetcenter.net/iau/MPCORB/MPCORB.DAT.gz"
@@ -250,6 +252,25 @@ def _unpack_epoch(packed: str) -> float:
         return 2451545.0
 
 
+def _extract_name_from_readable(readable: str) -> Optional[str]:
+    """
+    Extract the proper name from an MPC readable designation field.
+
+    Examples from MPCORB columns 167–194:
+      ``(1) Ceres`` → ``Ceres``
+      ``(433) Eros`` → ``Eros``
+      ``1960 SB1`` → None (provisional, no permanent name)
+    """
+    s = readable.strip()
+    if not s:
+        return None
+    match = re.match(r"^\(\d+\)\s+(.+)$", s)
+    if not match:
+        return None
+    name = match.group(1).strip()
+    return name[:64] if name else None
+
+
 def _parse_mpcorb_line(line: str) -> Optional[dict]:
     """Parse one line of MPCORB.DAT; return dict of fields or None if invalid."""
     if len(line) < 104:
@@ -271,9 +292,14 @@ def _parse_mpcorb_line(line: str) -> Optional[dict]:
         a = _parse_float(line[MPCORB_COLS["semimajor_axis"][0]: MPCORB_COLS["semimajor_axis"][1]])
         if M is None or peri is None or node is None or inc is None or e is None or n is None or a is None:
             return None
+        name = None
+        rd0, rd1 = MPCORB_COLS["readable_designation"]
+        if len(line) >= rd1:
+            name = _extract_name_from_readable(line[rd0:rd1])
         return {
             "number": number,
             "designation": designation[:32],
+            "name": name,
             "epoch": epoch[:16],
             "mean_anomaly": M,
             "perihelion_arg": peri,
@@ -455,17 +481,18 @@ def load_mpcorb_into_db(conn, path: Optional[str] = None, limit: Optional[int] =
                 cursor.execute(
                     """
                     INSERT INTO asteroids (
-                        number, designation, epoch, mean_anomaly, perihelion_arg,
+                        number, designation, name, epoch, mean_anomaly, perihelion_arg,
                         ascending_node, inclination, eccentricity, mean_motion,
                         semimajor_axis, absolute_magnitude, slope_parameter
                     ) VALUES (
-                        %(number)s, %(designation)s, %(epoch)s, %(mean_anomaly)s,
+                        %(number)s, %(designation)s, %(name)s, %(epoch)s, %(mean_anomaly)s,
                         %(perihelion_arg)s, %(ascending_node)s, %(inclination)s,
                         %(eccentricity)s, %(mean_motion)s, %(semimajor_axis)s,
                         %(absolute_magnitude)s, %(slope_parameter)s
                     )
                     ON CONFLICT (designation) DO UPDATE SET
                         number = EXCLUDED.number,
+                        name = EXCLUDED.name,
                         epoch = EXCLUDED.epoch,
                         mean_anomaly = EXCLUDED.mean_anomaly,
                         perihelion_arg = EXCLUDED.perihelion_arg,
@@ -752,7 +779,7 @@ def compute_visibility(
             order_clause = '"' + tokens[0] + '"' + direction
 
     query = (
-        "SELECT number, designation, epoch, mean_anomaly, perihelion_arg, "
+        "SELECT number, designation, name, epoch, mean_anomaly, perihelion_arg, "
         "ascending_node, inclination, eccentricity, mean_motion, "
         "semimajor_axis, absolute_magnitude, slope_parameter "
         "FROM asteroids WHERE " + " AND ".join(where_parts) + " ORDER BY " + order_clause
@@ -776,7 +803,7 @@ def compute_visibility(
             break
 
         for row in rows:
-            (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = row
+            (number, designation, name, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = row
             total_checked += 1
 
             if total_checked % PROGRESS_EVERY == 0:
@@ -877,6 +904,7 @@ def compute_visibility(
             visible.append({
                 "number": number,
                 "designation": designation,
+                "name": name,
                 "absolute_magnitude": H,
                 "apparent_magnitude": round(mag, 2),
                 "max_altitude_deg": round(alt_deg, 2),
@@ -906,7 +934,7 @@ def compute_asteroid_visibility_curve(
     orbital mechanics live here rather than being duplicated in a client.
 
     Args:
-        asteroid_row: (number, designation, epoch, mean_anomaly, perihelion_arg,
+        asteroid_row: (number, designation, name, epoch, mean_anomaly, perihelion_arg,
             ascending_node, inclination, eccentricity, mean_motion,
             semimajor_axis, absolute_magnitude, slope_parameter) as stored in
             the asteroids table (i.e. the row without its internal id).
@@ -922,7 +950,7 @@ def compute_asteroid_visibility_curve(
         above the geometric horizon), and has_magnitude_estimate (whether H
         was available to estimate apparent magnitude).
     """
-    (number, designation, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = asteroid_row
+    (number, designation, _name, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = asteroid_row
     G = G if G is not None else 0.15
 
     _configure_iers_for_planning()
@@ -1108,6 +1136,145 @@ def asteroids_visible(args):
     print(f"Found {len(results)} visible asteroid(s)")
     for r in results:
         num = r["number"] or ""
-        print(f"  {num:>6} {r['designation']:<12} mag={r['apparent_magnitude']:.2f} "
+        label = r.get("name") or r["designation"]
+        print(f"  {num:>6} {label:<20} mag={r['apparent_magnitude']:.2f} "
               f"max_alt={r['max_altitude_deg']:.1f}° at {r['max_altitude_time']}")
     return len(results)
+
+
+def _ansi(code: str, text: str, enabled: bool) -> str:
+    """Wrap text in an ANSI SGR sequence when color is enabled."""
+    if not enabled:
+        return text
+    return f"\033[{code}m{text}\033[0m"
+
+
+def _format_asteroid_title(number, designation, name) -> str:
+    if number is not None and name:
+        return f"({number}) {name}"
+    if number is not None:
+        return f"({number})"
+    if name:
+        return name
+    return designation
+
+
+def _print_asteroid_detail(row, tags, color: bool) -> None:
+    """Pretty-print one asteroid row (full SELECT shape) plus optional tags."""
+    (asteroid_id, number, designation, name, epoch, mean_anomaly, perihelion_arg,
+     ascending_node, inclination, eccentricity, mean_motion, semimajor_axis,
+     absolute_magnitude, slope_parameter) = row
+
+    def bold(s):
+        return _ansi("1", s, color)
+
+    def cyan(s):
+        return _ansi("36", s, color)
+
+    def dim(s):
+        return _ansi("2", s, color)
+
+    def yellow(s):
+        return _ansi("33", s, color)
+
+    def green(s):
+        return _ansi("32", s, color)
+
+    title = _format_asteroid_title(number, designation, name)
+    width = max(48, len(title) + 8)
+    rule = "─" * width
+
+    print()
+    print(cyan(bold(f"  {title}")))
+    print(dim(f"  {rule}"))
+
+    def field(label: str, value) -> None:
+        print(f"  {dim(f'{label:<22}')} {value}")
+
+    field("Database ID", asteroid_id)
+    field("MPC number", number if number is not None else dim("—"))
+    field("Proper name", name if name else dim("— (unnamed)"))
+    field("Packed designation", designation)
+    field("Epoch (packed)", epoch)
+
+    print()
+    print(f"  {yellow(bold('Orbital elements'))}")
+    field("Semi-major axis a", f"{semimajor_axis:.7f} AU")
+    field("Eccentricity e", f"{eccentricity:.7f}")
+    field("Inclination i", f"{inclination:.5f}°")
+    field("Ascending node Ω", f"{ascending_node:.5f}°")
+    field("Perihelion arg ω", f"{perihelion_arg:.5f}°")
+    field("Mean anomaly M", f"{mean_anomaly:.5f}°")
+    field("Mean motion n", f"{mean_motion:.8f} °/day")
+
+    print()
+    print(f"  {yellow(bold('Photometry'))}")
+    if absolute_magnitude is not None:
+        field("Absolute mag H", f"{absolute_magnitude:.2f}")
+    else:
+        field("Absolute mag H", dim("—"))
+    if slope_parameter is not None:
+        field("Slope param G", f"{slope_parameter:.2f}")
+    else:
+        field("Slope param G", dim("—"))
+
+    print()
+    print(f"  {yellow(bold('Tags'))}")
+    if tags:
+        for tag in tags:
+            tag_color = tag.get("color")
+            color_hint = f" {dim(f'[{tag_color}]')}" if tag_color else ""
+            desc = f" — {tag['description']}" if tag.get("description") else ""
+            print(f"  {green('•')} {tag['name']}{color_hint}{desc}")
+    else:
+        print(f"  {dim('(none)')}")
+    print()
+
+
+def asteroids_show(args):
+    """CLI: show detailed info for an asteroid looked up by name/number/designation."""
+    query = (args.query or "").strip()
+    if not query:
+        print("ERROR: provide a name, MPC number, or packed designation.", file=sys.stderr)
+        return 1
+
+    color = not getattr(args, "no_color", False) and sys.stdout.isatty()
+    limit = int(getattr(args, "limit", 20) or 20)
+
+    try:
+        conn = db.connect()
+    except Exception as exc:
+        print(f"ERROR: could not connect to database: {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        rows = db.asteroids_find_by_query(conn, query, limit=limit)
+        if not rows:
+            print(f"No asteroid matching {query!r}.")
+            return 1
+
+        if len(rows) > 1:
+            def bold(s):
+                return _ansi("1", s, color)
+
+            def dim(s):
+                return _ansi("2", s, color)
+
+            print(bold(f"Multiple matches for {query!r} (showing up to {limit}):"))
+            print(dim("  Refine with an exact name, number, or packed designation."))
+            print()
+            print(f"  {'Number':>8}  {'Name':<20}  {'Designation':<12}  {'H':>6}  id")
+            for row in rows:
+                _id, number, designation, name, *_rest, H, _G = row
+                num = f"{number}" if number is not None else "—"
+                nm = name or "—"
+                h = f"{H:.2f}" if H is not None else "—"
+                print(f"  {num:>8}  {nm:<20}  {designation:<12}  {h:>6}  {_id}")
+            print()
+            return 0
+
+        tags = db.asteroid_tags_for_asteroids(conn, [rows[0][0]]).get(rows[0][0], [])
+        _print_asteroid_detail(rows[0], tags, color=color)
+        return 0
+    finally:
+        conn.close()

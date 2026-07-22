@@ -13,10 +13,12 @@ def _mpcorb_line(designation: str, H: str = " 3.34", G: str = " 0.15",
                  M: str = " 10.00000", peri: str = " 73.00000",
                  node: str = " 80.00000", inc: str = " 10.00000",
                  e: str = " 0.0800000", n: str = " 0.21400000",
-                 a: str = "  2.7600000") -> str:
-    """Build a minimal fixed-width MPCORB line (>= 104 chars)."""
+                 a: str = "  2.7600000",
+                 readable: str = "") -> str:
+    """Build a minimal fixed-width MPCORB line (>= 104 chars; 194+ with readable)."""
     # Columns are 1-based in the MPC docs; slices below are 0-based.
-    line = [" "] * 104
+    length = 194 if readable else 104
+    line = [" "] * length
     des = designation.ljust(7)[:7]
     line[0:7] = list(des)
     line[8:13] = list(H.rjust(5)[:5])
@@ -29,6 +31,8 @@ def _mpcorb_line(designation: str, H: str = " 3.34", G: str = " 0.15",
     line[70:79] = list(e.rjust(9)[:9])
     line[80:91] = list(n.rjust(11)[:11])
     line[92:103] = list(a.rjust(11)[:11])
+    if readable:
+        line[166:194] = list(readable.ljust(28)[:28])
     return "".join(line)
 
 
@@ -84,6 +88,26 @@ class TestParseMpcorbLine(unittest.TestCase):
         self.assertIsNotNone(parsed)
         self.assertIsNone(parsed["number"])
         self.assertEqual(parsed["designation"], "K25A00A")
+        self.assertIsNone(parsed["name"])
+
+    def test_extracts_proper_name_from_readable_designation(self):
+        parsed = cmd_asteroid._parse_mpcorb_line(
+            _mpcorb_line("00001", readable="     (1) Ceres              ")
+        )
+        self.assertIsNotNone(parsed)
+        self.assertEqual(parsed["number"], 1)
+        self.assertEqual(parsed["name"], "Ceres")
+
+        parsed = cmd_asteroid._parse_mpcorb_line(
+            _mpcorb_line("00433", readable="   (433) Eros               ")
+        )
+        self.assertEqual(parsed["name"], "Eros")
+
+        # Provisional readable designation has no proper name
+        parsed = cmd_asteroid._parse_mpcorb_line(
+            _mpcorb_line("K25A00A", readable="           2025 AA           ")
+        )
+        self.assertIsNone(parsed["name"])
 
     def test_short_or_header_line_rejected(self):
         self.assertIsNone(cmd_asteroid._parse_mpcorb_line("too short"))
@@ -106,8 +130,9 @@ class TestApparentMagnitude(unittest.TestCase):
 class TestVisibilityCurve(unittest.TestCase):
     def test_curve_returns_samples_and_flags(self):
         # Ceres-like elements (approximate); epoch packed K25A2
+        # Tuple shape: number, designation, name, epoch, M, peri, node, i, e, n, a, H, G
         row = (
-            1, "00001", "K25A2",
+            1, "00001", "Ceres", "K25A2",
             10.5, 73.6, 80.3, 10.6, 0.078, 0.214, 2.77,
             3.34, 0.12,
         )
@@ -129,7 +154,7 @@ class TestVisibilityCurve(unittest.TestCase):
 
     def test_missing_h_skips_magnitude(self):
         row = (
-            1, "00001", "K25A2",
+            1, "00001", None, "K25A2",
             10.5, 73.6, 80.3, 10.6, 0.078, 0.214, 2.77,
             None, 0.15,
         )

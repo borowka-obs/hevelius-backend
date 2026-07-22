@@ -991,6 +991,10 @@ components:
         designation:
           type: string
           description: Packed MPC designation
+        name:
+          type: string
+          nullable: true
+          description: Proper name (null if unnamed)
         epoch:
           type: string
           description: Epoch in MPC packed format
@@ -3248,7 +3252,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [number, designation, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
+            enum: [number, designation, name, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
             default: number
         - name: sort_order
           in: query
@@ -3261,6 +3265,12 @@ paths:
         - name: designation
           in: query
           description: Filter by designation (partial match)
+          required: false
+          schema:
+            type: string
+        - name: name
+          in: query
+          description: Filter by proper name (partial match, case-insensitive)
           required: false
           schema:
             type: string
@@ -3339,7 +3349,7 @@ paths:
                 sort_by:
                   type: string
                   description: Field to sort by
-                  enum: [number, designation, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
+                  enum: [number, designation, name, absolute_magnitude, semimajor_axis, eccentricity, inclination, mean_motion, epoch]
                   default: number
                 sort_order:
                   type: string
@@ -3349,6 +3359,9 @@ paths:
                 designation:
                   type: string
                   description: Filter by designation (partial match)
+                name:
+                  type: string
+                  description: Filter by proper name (partial match, case-insensitive)
                 number:
                   type: integer
                   description: Filter by exact MPC number

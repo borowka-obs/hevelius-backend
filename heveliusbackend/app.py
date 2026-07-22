@@ -872,6 +872,7 @@ class AsteroidSchema(Schema):
     asteroid_id = fields.Integer(required=True, metadata={"description": "Asteroid ID"})
     number = fields.Integer(allow_none=True, metadata={"description": "MPC number (null for unnumbered/provisional objects)"})
     designation = fields.String(required=True, metadata={"description": "Packed MPC designation"})
+    name = fields.String(allow_none=True, metadata={"description": "Proper name (null if unnamed)"})
     epoch = fields.String(metadata={"description": "Epoch in MPC packed format"})
     mean_anomaly = fields.Float(metadata={"description": "Mean anomaly M at epoch (degrees)"})
     perihelion_arg = fields.Float(metadata={"description": "Argument of perihelion omega (degrees)"})
@@ -894,9 +895,9 @@ class AsteroidsListRequestSchema(Schema):
 
     # Sorting parameters
     sort_by = fields.String(missing='number', validate=validate.OneOf(
-        ['number', 'designation', 'absolute_magnitude', 'semimajor_axis',
+        ['number', 'designation', 'name', 'absolute_magnitude', 'semimajor_axis',
          'eccentricity', 'inclination', 'mean_motion', 'epoch'],
-        error="Invalid sort field. Must be one of: number, designation, absolute_magnitude, "
+        error="Invalid sort field. Must be one of: number, designation, name, absolute_magnitude, "
               "semimajor_axis, eccentricity, inclination, mean_motion, epoch"
     ))
     sort_order = fields.String(missing='asc', validate=validate.OneOf(['asc', 'desc']),
@@ -904,6 +905,7 @@ class AsteroidsListRequestSchema(Schema):
 
     # Filtering parameters
     designation = fields.String(metadata={"description": "Filter by designation (partial match)"})
+    name = fields.String(metadata={"description": "Filter by proper name (partial match, case-insensitive)"})
     number = fields.Integer(metadata={"description": "Filter by exact MPC number"})
     numbered = fields.Boolean(metadata={"description": "true: only numbered asteroids; false: only unnumbered/provisional"})
     mag_min = fields.Float(metadata={"description": "Minimum absolute magnitude (H)"})
@@ -3328,13 +3330,14 @@ class ObjectsListResource(MethodView):
 
 
 def _asteroid_row_to_dict(row, tags=None):
-    (asteroid_id, number, designation, epoch, mean_anomaly, perihelion_arg,
+    (asteroid_id, number, designation, name, epoch, mean_anomaly, perihelion_arg,
      ascending_node, inclination, eccentricity, mean_motion, semimajor_axis,
      absolute_magnitude, slope_parameter) = row
     return {
         'asteroid_id': asteroid_id,
         'number': number,
         'designation': designation,
+        'name': name,
         'epoch': epoch,
         'mean_anomaly': mean_anomaly,
         'perihelion_arg': perihelion_arg,
@@ -3392,6 +3395,7 @@ class AsteroidsListResource(MethodView):
         total_count = db.asteroids_count(
             cnx,
             designation=args.get('designation'),
+            name=args.get('name'),
             number=args.get('number'),
             numbered=args.get('numbered'),
             mag_min=args.get('mag_min'),
@@ -3402,6 +3406,7 @@ class AsteroidsListResource(MethodView):
         asteroids_list = db.asteroids_search(
             cnx,
             designation=args.get('designation'),
+            name=args.get('name'),
             number=args.get('number'),
             numbered=args.get('numbered'),
             mag_min=args.get('mag_min'),

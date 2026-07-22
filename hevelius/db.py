@@ -472,12 +472,12 @@ def catalog_objects_search(
 
 
 ASTEROID_SORT_FIELDS = {
-    "number", "designation", "absolute_magnitude", "semimajor_axis",
+    "number", "designation", "name", "absolute_magnitude", "semimajor_axis",
     "eccentricity", "inclination", "mean_motion", "epoch",
 }
 
 _ASTEROID_SELECT = """
-    SELECT id, number, designation, epoch, mean_anomaly, perihelion_arg,
+    SELECT id, number, designation, name, epoch, mean_anomaly, perihelion_arg,
            ascending_node, inclination, eccentricity, mean_motion,
            semimajor_axis, absolute_magnitude, slope_parameter
     FROM asteroids
@@ -486,6 +486,7 @@ _ASTEROID_SELECT = """
 
 def asteroids_build_where(
     designation: str = None,
+    name: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -510,6 +511,10 @@ def asteroids_build_where(
     if designation:
         where_clauses.append("designation ILIKE %s")
         params.append(f"%{designation}%")
+
+    if name:
+        where_clauses.append("name ILIKE %s")
+        params.append(f"%{name}%")
 
     if number is not None:
         where_clauses.append("number = %s")
@@ -552,6 +557,7 @@ def asteroids_build_where(
 def asteroids_count(
     conn,
     designation: str = None,
+    name: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -567,7 +573,7 @@ def asteroids_count(
     approximate counts, or requiring a filter if this becomes a bottleneck.
     """
     where, params = asteroids_build_where(
-        designation=designation, number=number, numbered=numbered,
+        designation=designation, name=name, number=number, numbered=numbered,
         mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
     query = "SELECT COUNT(*) FROM asteroids" + where
@@ -577,6 +583,7 @@ def asteroids_count(
 def asteroids_search(
     conn,
     designation: str = None,
+    name: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -595,7 +602,7 @@ def asteroids_search(
         sort_order = "asc"
 
     where, params = asteroids_build_where(
-        designation=designation, number=number, numbered=numbered,
+        designation=designation, name=name, number=number, numbered=numbered,
         mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
 
@@ -615,6 +622,55 @@ def asteroid_get_by_id(conn, asteroid_id: int):
     """Return a single asteroid row by its primary key, or None if not found."""
     rows = run_query(conn, _ASTEROID_SELECT + " WHERE id = %s", (asteroid_id,))
     return rows[0] if rows else None
+
+
+def asteroids_find_by_query(conn, query: str, limit: int = 20) -> List:
+    """
+    Resolve a user query (name, designation, or MPC number) to asteroid rows.
+
+    Preference order:
+      1. Exact MPC number (when query is an integer)
+      2. Exact case-insensitive proper name
+      3. Exact case-insensitive packed designation
+      4. Partial name / designation matches (ILIKE)
+    """
+    q = (query or "").strip()
+    if not q:
+        return []
+
+    if q.isdigit():
+        rows = run_query(
+            conn,
+            _ASTEROID_SELECT + " WHERE number = %s ORDER BY id ASC LIMIT %s",
+            (int(q), limit),
+        )
+        if rows:
+            return rows
+
+    exact_name = run_query(
+        conn,
+        _ASTEROID_SELECT + " WHERE lower(name) = lower(%s) ORDER BY number NULLS LAST, id ASC LIMIT %s",
+        (q, limit),
+    )
+    if exact_name:
+        return exact_name
+
+    exact_desig = run_query(
+        conn,
+        _ASTEROID_SELECT
+        + " WHERE lower(designation) = lower(%s) ORDER BY number NULLS LAST, id ASC LIMIT %s",
+        (q, limit),
+    )
+    if exact_desig:
+        return exact_desig
+
+    return run_query(
+        conn,
+        _ASTEROID_SELECT
+        + " WHERE name ILIKE %s OR designation ILIKE %s"
+        + " ORDER BY number NULLS LAST, id ASC LIMIT %s",
+        (f"%{q}%", f"%{q}%", limit),
+    )
 
 
 def asteroid_tags_for_asteroids(conn, asteroid_ids: List[int]) -> dict:
