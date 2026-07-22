@@ -69,6 +69,8 @@ hevelius asteroid download [--force] [--load] [--limit N]
 hevelius asteroid load [--file PATH] [--limit N]
 hevelius asteroid show Ceres
 hevelius asteroid show 433
+hevelius asteroid show Vesta --telescope-id 3
+hevelius asteroid show Vesta --telescope hakos-e180 --date 2026-07-22
 hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
     --mag-min 8 --mag-max 14 --alt-min 20
 ```
@@ -82,6 +84,10 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 | `download --load` | off | After download, upsert into the DB |
 | `load` | — | Upsert asteroids from the cached (or `--file`) MPCORB |
 | `show <query>` | — | Detail by proper name, MPC number, or packed designation |
+| `show --telescope` | — | Telescope name → night altitude chart from that site |
+| `show --telescope-id` | — | Telescope scope_id → night altitude chart |
+| `show --date` | today | Evening date for the visibility chart |
+| `show --step-minutes` | 10 | Chart sampling interval |
 | `show --limit` | 20 | Max candidates listed when the query is ambiguous |
 | `show --no-color` | off | Disable ANSI colors |
 | `visible --date` | required | Observation date (YYYY-MM-DD) |
@@ -96,7 +102,11 @@ hevelius asteroid visible --date 2026-06-15 --lat 52.2 --lon 21.0 \
 
 `asteroid show` prefers exact name/number/designation matches. Ambiguous queries
 list candidates. When stdout is a TTY, the detail view uses ANSI colors
-(disable with `--no-color`).
+(disable with `--no-color`). Pass `--telescope` or `--telescope-id` to compute
+a night altitude curve from that telescope's GPS coordinates and draw it as a
+console chart (`--date` defaults to today). The chart spans sunset→sunrise,
+lists sunset/sunrise and moonrise/moonset, and paints markers yellow while the
+Moon is above the horizon.
 
 Progress for `visible` is printed to stderr so stdout output can be redirected
 to a file.

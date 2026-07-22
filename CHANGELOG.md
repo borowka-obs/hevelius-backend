@@ -16,6 +16,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 - CLI: asteroid download/load from MPCORB and bulk night visibility listing.
 - CLI: `hevelius asteroid show <query>` looks up by proper name, MPC number, or
   packed designation and prints a detailed (optionally colored) summary.
+  With `--telescope` / `--telescope-id`, also prints a night altitude chart for
+  that site (`--date`, `--step-minutes` optional), including sunset/sunrise and
+  moonrise/moonset; chart markers are yellow while the Moon is above the horizon.
 - Fix: MPCORB permanent-number unpacking (plain, letter-coded, and tilde/base-62 forms).
 - API: The telescopes now have a default camera rotation. The projects now have camera rotation.
   If not specified, the default from the telescope is copied.

@@ -673,6 +673,64 @@ def asteroids_find_by_query(conn, query: str, limit: int = 20) -> List:
     )
 
 
+def telescope_resolve(conn, scope_id: int = None, name: str = None):
+    """
+    Resolve a telescope by scope_id and/or name.
+
+    Returns (scope_id, name, lat, lon, alt) or raises ValueError with a
+    user-facing message when the telescope cannot be uniquely resolved or
+    has no GPS coordinates.
+    """
+    if scope_id is None and not name:
+        raise ValueError("Specify --telescope-id or --telescope.")
+
+    if scope_id is not None:
+        rows = run_query(
+            conn,
+            "SELECT scope_id, name, lat, lon, alt FROM telescopes WHERE scope_id = %s",
+            (scope_id,),
+        )
+        if not rows:
+            raise ValueError(f"Telescope scope_id={scope_id} not found.")
+        row = rows[0]
+        if name and row[1] and row[1].lower() != name.strip().lower():
+            raise ValueError(
+                f"Telescope scope_id={scope_id} is named {row[1]!r}, "
+                f"not {name.strip()!r}."
+            )
+    else:
+        q = name.strip()
+        rows = run_query(
+            conn,
+            "SELECT scope_id, name, lat, lon, alt FROM telescopes "
+            "WHERE lower(name) = lower(%s) ORDER BY scope_id",
+            (q,),
+        )
+        if not rows:
+            rows = run_query(
+                conn,
+                "SELECT scope_id, name, lat, lon, alt FROM telescopes "
+                "WHERE name ILIKE %s ORDER BY scope_id LIMIT 10",
+                (f"%{q}%",),
+            )
+        if not rows:
+            raise ValueError(f"No telescope matching name {q!r}.")
+        if len(rows) > 1:
+            listing = ", ".join(f"{r[0]}:{r[1]}" for r in rows)
+            raise ValueError(
+                f"Multiple telescopes match {q!r} ({listing}). "
+                "Use --telescope-id for an exact match."
+            )
+        row = rows[0]
+
+    sid, tname, lat, lon, alt = row
+    if lat is None or lon is None:
+        raise ValueError(
+            f"Telescope {tname or sid} (scope_id={sid}) has no lat/lon configured."
+        )
+    return sid, tname, float(lat), float(lon), float(alt or 0.0)
+
+
 def asteroid_tags_for_asteroids(conn, asteroid_ids: List[int]) -> dict:
     """
     Batch-fetch tags for multiple asteroids in a single query (avoids N+1

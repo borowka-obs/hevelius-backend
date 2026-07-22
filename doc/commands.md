@@ -95,6 +95,10 @@ hevelius asteroid download --load
 # Look up one asteroid by proper name, MPC number, or packed designation
 hevelius asteroid show Ceres
 hevelius asteroid show 433
+
+# With a telescope, also print a night altitude chart for that site
+hevelius asteroid show Vesta --telescope-id 3
+hevelius asteroid show Vesta --telescope hakos-e180 --date 2026-07-22
 ```
 
 The orbital parameters are cached locally (default: `~/.cache/hevelius/MPCORB.DAT`).
