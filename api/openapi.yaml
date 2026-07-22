@@ -1056,7 +1056,10 @@ components:
           description: Display color (e.g. "#1976d2")
         asteroid_count:
           type: integer
-          description: Number of asteroids carrying this tag
+          description: >
+            Number of asteroids carrying this tag. Present on tag vocabulary
+            endpoints (list/create/get/patch); omitted when tags are embedded
+            on asteroid list/detail responses.
     AsteroidTagsList:
       type: object
       properties:
@@ -1192,7 +1195,9 @@ components:
           nullable: true
         visible:
           type: boolean
-          description: Whether the asteroid rises above the horizon during the night
+          description: >
+            True if max altitude during the night is above the geometric horizon
+            (altitude > 0°); no airmass or site horizon mask is applied
         has_magnitude_estimate:
           type: boolean
           description: Whether absolute_magnitude (H) was available
@@ -3404,7 +3409,9 @@ paths:
       description: >-
         Computes altitude, azimuth, and (if absolute magnitude H is known) estimated apparent
         magnitude across a night for one asteroid as seen from a telescope's location.
-        Defaults to tonight; pass `date` to check a different night.
+        Defaults to the server's local calendar date (not the telescope site's timezone);
+        pass `date` to check a different evening. `visible` means max altitude > 0°
+        (geometric horizon only). Smaller `step_minutes` values are more CPU-intensive.
       parameters:
         - name: asteroid_id
           in: path
@@ -3419,14 +3426,17 @@ paths:
             type: integer
         - name: date
           in: query
-          description: Evening date (YYYY-MM-DD) whose night to compute; defaults to tonight
+          description: >
+            Evening date (YYYY-MM-DD) whose night to compute; defaults to the server's
+            local calendar date (not the telescope site's timezone)
           required: false
           schema:
             type: string
             format: date
         - name: step_minutes
           in: query
-          description: Sampling interval across the night, in minutes
+          description: >
+            Sampling interval across the night, in minutes (smaller steps are more CPU-heavy)
           required: false
           schema:
             type: integer
@@ -3449,7 +3459,10 @@ paths:
   /api/asteroid-tags:
     get:
       summary: List asteroid tags
-      description: Returns all asteroid tags with the number of asteroids carrying each
+      description: >
+        Returns all asteroid tags with the number of asteroids carrying each.
+        Tag vocabulary is shared across the deployment; any authenticated user
+        may create, edit, delete, or attach tags.
       responses:
         '200':
           description: List of tags
@@ -3461,7 +3474,9 @@ paths:
         - bearerAuth: []
     post:
       summary: Create asteroid tag
-      description: Creates a new asteroid tag (e.g. amor, neo, pha, fast rotator, visited by spacecraft)
+      description: >
+        Creates a new asteroid tag (e.g. amor, neo, pha, fast rotator, visited by spacecraft).
+        Any authenticated user may create tags (shared catalogue vocabulary).
       requestBody:
         required: true
         content:
@@ -3501,7 +3516,10 @@ paths:
         - bearerAuth: []
     patch:
       summary: Edit asteroid tag
-      description: Partial update of an asteroid tag's name, description, or color
+      description: >
+        Partial update of an asteroid tag's name, description, or color.
+        Omit a field to leave it unchanged; send null for description/color to clear it.
+        Any authenticated user may edit tags (shared catalogue vocabulary).
       parameters:
         - name: tag_id
           in: path
@@ -3528,7 +3546,9 @@ paths:
         - bearerAuth: []
     delete:
       summary: Delete asteroid tag
-      description: Deletes the tag definition and removes it from any asteroids carrying it
+      description: >
+        Deletes the tag definition and removes it from any asteroids carrying it.
+        Any authenticated user may delete tags (shared catalogue vocabulary).
       parameters:
         - name: tag_id
           in: path
@@ -3542,12 +3562,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusMsg'
+        '404':
+          description: Tag not found
       security:
         - bearerAuth: []
   /api/asteroids/{asteroid_id}/tags:
     post:
       summary: Attach tag to asteroid
-      description: Attaches an existing asteroid tag to an asteroid (no-op if already attached)
+      description: >
+        Attaches an existing asteroid tag to an asteroid (no-op if already attached).
+        Any authenticated user may attach tags (shared catalogue vocabulary).
       parameters:
         - name: asteroid_id
           in: path
@@ -3567,17 +3591,21 @@ paths:
                   description: Tag ID to attach
       responses:
         '200':
-          description: Tag attached (or asteroid/tag not found, see status/msg)
+          description: Tag attached
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/StatusMsg'
+        '404':
+          description: Asteroid or tag not found
       security:
         - bearerAuth: []
   /api/asteroids/{asteroid_id}/tags/{tag_id}:
     delete:
       summary: Detach tag from asteroid
-      description: Detaches a tag from an asteroid (no-op if not attached)
+      description: >
+        Detaches a tag from an asteroid (no-op if not attached).
+        Any authenticated user may detach tags (shared catalogue vocabulary).
       parameters:
         - name: asteroid_id
           in: path
