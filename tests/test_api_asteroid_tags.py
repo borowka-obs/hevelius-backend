@@ -120,6 +120,18 @@ class TestAsteroidTags(unittest.TestCase):
         self.assertEqual(data['tag']['color'], '#3949ab')
         self.assertEqual(data['tag']['name'], 'amor')
 
+        # Explicit null clears nullable fields
+        response = self.app.patch(
+            f'/api/asteroid-tags/{tag_id}',
+            json={'description': None, 'color': None},
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertIsNone(data['tag']['description'])
+        self.assertIsNone(data['tag']['color'])
+        self.assertEqual(data['tag']['name'], 'amor')
+
         # Renaming to a name already used by another tag fails
         self._create_tag('apollo')
         response = self.app.patch(
@@ -157,6 +169,9 @@ class TestAsteroidTags(unittest.TestCase):
 
         response = self.app.get(f'/api/asteroids/{asteroid_ids[0]}', headers=self.headers)
         self.assertEqual(json.loads(response.data)['asteroid']['tags'], [])
+
+        response = self.app.delete('/api/asteroid-tags/999999', headers=self.headers)
+        self.assertEqual(response.status_code, 404)
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
@@ -219,14 +234,12 @@ class TestAsteroidTags(unittest.TestCase):
         response = self.app.post(
             '/api/asteroids/999999/tags', json={'tag_id': tag_id}, headers=self.headers
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(json.loads(response.data)['status'])
+        self.assertEqual(response.status_code, 404)
 
         response = self.app.post(
             f'/api/asteroids/{asteroid_ids[0]}/tags', json={'tag_id': 999999}, headers=self.headers
         )
-        self.assertEqual(response.status_code, 200)
-        self.assertFalse(json.loads(response.data)['status'])
+        self.assertEqual(response.status_code, 404)
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
@@ -245,6 +258,8 @@ class TestAsteroidTags(unittest.TestCase):
         asteroids = {a['asteroid_id']: a for a in json.loads(response.data)['asteroids']}
         self.assertEqual(len(asteroids[asteroid_ids[0]]['tags']), 1)
         self.assertEqual(asteroids[asteroid_ids[0]]['tags'][0]['name'], 'neo')
+        # Embedded tags omit asteroid_count (vocabulary endpoints include it)
+        self.assertNotIn('asteroid_count', asteroids[asteroid_ids[0]]['tags'][0])
         self.assertEqual(asteroids[asteroid_ids[1]]['tags'], [])
 
         os.environ.pop('HEVELIUS_DB_NAME')
