@@ -597,20 +597,115 @@ def _apparent_magnitude(H: float, G: float, r_au: float, delta_au: float, phase_
     return H + 5 * np.log10(r_au * delta_au) - 2.5 * np.log10(phi)
 
 
-def _get_night_times(location: EarthLocation, obs_time: Time) -> Tuple[Time, Time]:
-    """Return (start, end) of night in UTC (sun 18 deg below horizon)."""
-    from astropy.coordinates import AltAz
-    midnight = obs_time + 0.5 * u.day
-    times = midnight + np.linspace(-12, 12, 200) * u.hour
+def _altitude_series(body_fn, location: EarthLocation, t0: Time, t1: Time, n: int = 481):
+    """
+    Sample altitude (degrees) of a solar-system body from t0 to t1 inclusive.
+
+    body_fn(times) -> SkyCoord (e.g. get_sun, or lambda t: get_body('moon', t)).
+    """
+    duration_h = (t1 - t0).to(u.hour).value
+    times = t0 + np.linspace(0.0, duration_h, n) * u.hour
     frame = AltAz(obstime=times, location=location)
-    sun = get_sun(times)
-    sun_altaz = sun.transform_to(frame)
-    below = np.where(sun_altaz.alt < -18 * u.deg)[0]
-    if len(below) == 0:
-        return midnight - 6 * u.hour, midnight + 6 * u.hour
-    start_idx = below[0]
-    end_idx = below[-1]
-    return times[start_idx], times[end_idx]
+    alt = body_fn(times).transform_to(frame).alt.to(u.deg).value
+    return times, np.asarray(alt, dtype=float)
+
+
+def _find_zero_crossings(times: Time, alts: np.ndarray, level: float = 0.0):
+    """
+    Linearly interpolate times where altitude crosses `level`.
+
+    Returns list of (Time, direction) with direction 'up' or 'down'.
+    """
+    crossings = []
+    for i in range(len(alts) - 1):
+        a0, a1 = alts[i] - level, alts[i + 1] - level
+        if a0 == 0:
+            # Exact hit: infer direction from the next sample when possible.
+            if a1 > 0:
+                crossings.append((times[i], "up"))
+            elif a1 < 0:
+                crossings.append((times[i], "down"))
+            continue
+        if a0 * a1 > 0:
+            continue
+        if a0 * a1 == 0 and a1 == 0:
+            continue
+        frac = abs(a0) / (abs(a0) + abs(a1) + 1e-20)
+        t_cross = times[i] + frac * (times[i + 1] - times[i])
+        crossings.append((t_cross, "up" if a1 > a0 else "down"))
+    return crossings
+
+
+def _get_night_times(location: EarthLocation, obs_time: Time) -> Tuple[Time, Time]:
+    """
+    Return (sunset, sunrise) in UTC for the night beginning on obs_time's date.
+
+    The night runs from geometric sunset (sun altitude crossing 0° downward)
+    on the evening of that calendar date through geometric sunrise the next
+    morning. This matches observer "night" even when astronomical twilight
+    never occurs (e.g. mid-latitude summer).
+
+    If the Sun never sets (polar day), falls back to a 12-hour window centred
+    on local solar midnight as a last resort. If the Sun never rises (polar
+    night), returns noon→next-noon.
+    """
+    # Search from noon UTC on the evening date through noon the next day.
+    date_str = obs_time.iso[:10]
+    noon = Time(f"{date_str} 12:00:00")
+    times, alts = _altitude_series(get_sun, location, noon, noon + 24 * u.hour, n=577)
+    crossings = _find_zero_crossings(times, alts, level=0.0)
+
+    sunset = next((t for t, d in crossings if d == "down"), None)
+    sunrise = None
+    if sunset is not None:
+        sunrise = next((t for t, d in crossings if d == "up" and t > sunset), None)
+
+    if sunset is not None and sunrise is not None and sunrise > sunset:
+        return sunset, sunrise
+
+    # Polar night: sun always below horizon across the window.
+    if np.all(alts < 0):
+        return noon, noon + 24 * u.hour
+
+    # Polar day / no clear night: last-resort evening-centred window (NOT daytime).
+    midnight = noon + 12 * u.hour
+    return midnight - 6 * u.hour, midnight + 6 * u.hour
+
+
+def _moon_rise_set(location: EarthLocation, night_start: Time, night_end: Time):
+    """
+    Find moonrise/moonset near the given night.
+
+    Searches a padded window around the night so events just outside sunset/
+    sunrise are still reported. Returns (moonrise, moonset) as Time or None.
+    """
+    pad = 6 * u.hour
+    times, alts = _altitude_series(
+        lambda t: get_body("moon", t),
+        location,
+        night_start - pad,
+        night_end + pad,
+        n=721,
+    )
+    crossings = _find_zero_crossings(times, alts, level=0.0)
+    rises = [t for t, d in crossings if d == "up"]
+    sets = [t for t, d in crossings if d == "down"]
+
+    moonrise = next((r for r in rises if r <= night_end + pad), None)
+    moonset = None
+    if moonrise is not None:
+        moonset = next((s for s in sets if s > moonrise), None)
+    elif sets:
+        # Moon already up at window start: report the upcoming set.
+        moonset = sets[0]
+
+    return moonrise, moonset
+
+
+def _moon_altitudes(location: EarthLocation, times: Time) -> np.ndarray:
+    """Moon altitude in degrees at each sample time."""
+    frame = AltAz(obstime=times, location=location)
+    return get_body("moon", times).transform_to(frame).alt.to(u.deg).value
 
 
 def _xyz_to_radec(x: float, y: float, z: float) -> Tuple[float, float]:
@@ -964,6 +1059,8 @@ def compute_asteroid_visibility_curve(
 
     with solar_system_ephemeris.set("builtin"):
         earth_positions = get_body("earth", times)
+        moon_alt = _moon_altitudes(location, times)
+        moonrise, moonset = _moon_rise_set(location, night_start, night_end)
     ex = earth_positions.cartesian.x.to(u.AU).value
     ey = earth_positions.cartesian.y.to(u.AU).value
     ez = earth_positions.cartesian.z.to(u.AU).value
@@ -1005,6 +1102,8 @@ def compute_asteroid_visibility_curve(
             "altitude_deg": round(float(alt_deg[i]), 2),
             "azimuth_deg": round(float(az_deg[i]), 2),
             "apparent_magnitude": round(mag, 2) if mag is not None else None,
+            "moon_up": bool(moon_alt[i] > 0),
+            "moon_altitude_deg": round(float(moon_alt[i]), 2),
         })
 
     max_idx = int(np.argmax(alt_deg))
@@ -1012,6 +1111,10 @@ def compute_asteroid_visibility_curve(
     return {
         "night_start": night_start.iso,
         "night_end": night_end.iso,
+        "sunset": night_start.iso,
+        "sunrise": night_end.iso,
+        "moonrise": moonrise.iso if moonrise is not None else None,
+        "moonset": moonset.iso if moonset is not None else None,
         "samples": samples,
         "max_altitude_deg": round(float(alt_deg[max_idx]), 2),
         "max_altitude_time": times[max_idx].iso,
@@ -1159,6 +1262,190 @@ def _format_asteroid_title(number, designation, name) -> str:
     return designation
 
 
+def _resample_series(values, width: int):
+    """Pick `width` evenly spaced samples from a sequence."""
+    if width <= 0 or not values:
+        return []
+    if len(values) == 1:
+        return [values[0]] * width
+    if len(values) <= width:
+        return list(values)
+    out = []
+    last = len(values) - 1
+    for i in range(width):
+        idx = int(round(i * last / (width - 1)))
+        out.append(values[idx])
+    return out
+
+
+def _format_hhmm(iso_time: str) -> str:
+    """Extract HH:MM from an astropy/ISO timestamp string."""
+    # Examples: "2026-07-22 20:15:00.000" or "2026-07-22 20:15:00.000000"
+    parts = iso_time.strip().split()
+    if len(parts) < 2:
+        return iso_time
+    return parts[1][:5]
+
+
+def render_altitude_chart(
+    samples,
+    width: int = 56,
+    height: int = 12,
+    alt_min: float = -30.0,
+    alt_max: float = 90.0,
+    color: bool = False,
+) -> List[str]:
+    """
+    Render a night altitude curve as Unicode block-chart lines.
+
+    When a sample has moon_up=True, the marker/stem for that column is drawn
+    in yellow (if color is enabled). Returns a list of printable lines.
+    """
+    if not samples:
+        return ["  (no visibility samples)"]
+
+    alts = _resample_series([s["altitude_deg"] for s in samples], width)
+    times = _resample_series([s["time"] for s in samples], width)
+    moon_up = _resample_series([bool(s.get("moon_up")) for s in samples], width)
+    span = alt_max - alt_min
+    if span <= 0:
+        span = 1.0
+
+    # Grid of characters: height rows x width cols
+    grid = [[" "] * width for _ in range(height)]
+    horizon_row = None
+    if alt_min <= 0 <= alt_max:
+        horizon_row = int(round((alt_max - 0.0) / span * (height - 1)))
+        horizon_row = max(0, min(height - 1, horizon_row))
+        for c in range(width):
+            grid[horizon_row][c] = "─"
+
+    point_rows = [0] * width
+    for c, alt in enumerate(alts):
+        clipped = max(alt_min, min(alt_max, float(alt)))
+        row = int(round((alt_max - clipped) / span * (height - 1)))
+        row = max(0, min(height - 1, row))
+        point_rows[c] = row
+        if horizon_row is not None:
+            lo, hi = sorted((row, horizon_row))
+            for r in range(lo, hi + 1):
+                if grid[r][c] == "─":
+                    continue
+                grid[r][c] = "│" if r != row else "●"
+        grid[row][c] = "●"
+
+    def dim(s):
+        return _ansi("2", s, color)
+
+    def cyan(s):
+        return _ansi("36", s, color)
+
+    def green(s):
+        return _ansi("32", s, color)
+
+    def yellow(s):
+        return _ansi("33", s, color)
+
+    lines = []
+    label_w = 4
+    for r in range(height):
+        alt_label = alt_max - (r / (height - 1)) * span
+        label = f"{alt_label:4.0f}"
+        row_chars = []
+        for c, ch in enumerate(grid[r]):
+            if ch == "●":
+                paint = yellow if moon_up[c] else green
+                row_chars.append(paint(ch) if color else ch)
+            elif ch == "│":
+                paint = yellow if moon_up[c] else cyan
+                row_chars.append(paint(ch) if color else ch)
+            elif ch == "─":
+                row_chars.append(dim(ch) if color else ch)
+            else:
+                row_chars.append(ch)
+        suffix = "  horizon" if horizon_row is not None and r == horizon_row else ""
+        lines.append(f"  {dim(label)}│{''.join(row_chars)}{dim(suffix)}")
+
+    axis = " " * label_w + "└" + "─" * width
+    lines.append("  " + (dim(axis) if color else axis))
+
+    t_start = _format_hhmm(times[0])
+    t_mid = _format_hhmm(times[len(times) // 2])
+    t_end = _format_hhmm(times[-1])
+    pad = width
+    labels_line = [" "] * pad
+    for text, pos in ((t_start, 0), (t_mid, pad // 2 - len(t_mid) // 2), (t_end, pad - len(t_end))):
+        pos = max(0, min(pad - len(text), pos))
+        for i, ch in enumerate(text):
+            labels_line[pos + i] = ch
+    time_row = "".join(labels_line)
+    lines.append("  " + (" " * label_w) + " " + (dim(time_row) if color else time_row))
+    if color:
+        lines.append(
+            "  " + (" " * label_w) + " "
+            + green("●") + dim(" asteroid  ")
+            + yellow("●") + dim(" asteroid + moon up")
+        )
+    return lines
+
+
+def _fmt_event(iso_or_none) -> str:
+    if not iso_or_none:
+        return "—"
+    return _format_hhmm(iso_or_none)
+
+
+def _print_visibility_section(curve, scope_id, scope_name, lat, lon, alt, obs_date, color: bool) -> None:
+    """Print visibility summary + altitude chart for one asteroid/telescope/night."""
+
+    def bold(s):
+        return _ansi("1", s, color)
+
+    def cyan(s):
+        return _ansi("36", s, color)
+
+    def dim(s):
+        return _ansi("2", s, color)
+
+    def yellow(s):
+        return _ansi("33", s, color)
+
+    def green(s):
+        return _ansi("32", s, color)
+
+    def red(s):
+        return _ansi("31", s, color)
+
+    label = scope_name or f"scope_id={scope_id}"
+    print(f"  {yellow(bold('Visibility'))}  {cyan(label)} {dim(f'(scope_id={scope_id})')}")
+    print(f"  {dim('Site')}                  {lat:.4f}°, {lon:.4f}°  alt {alt:.0f} m")
+    print(f"  {dim('Evening date')}          {obs_date}")
+    print(
+        f"  {dim('Night (UTC)')}           "
+        f"{_fmt_event(curve.get('sunset') or curve['night_start'])} → "
+        f"{_fmt_event(curve.get('sunrise') or curve['night_end'])}"
+    )
+    print(f"  {dim('Sunset')}                {_fmt_event(curve.get('sunset') or curve['night_start'])} UTC")
+    print(f"  {dim('Sunrise')}               {_fmt_event(curve.get('sunrise') or curve['night_end'])} UTC")
+    print(f"  {dim('Moonrise')}              {_fmt_event(curve.get('moonrise'))} UTC")
+    print(f"  {dim('Moonset')}               {_fmt_event(curve.get('moonset'))} UTC")
+    print(
+        f"  {dim('Max altitude')}          {curve['max_altitude_deg']:.1f}° "
+        f"at {_format_hhmm(curve['max_altitude_time'])}"
+    )
+    if curve.get("has_magnitude_estimate") and curve.get("apparent_magnitude_at_max") is not None:
+        print(f"  {dim('Apparent mag @ max')}   {curve['apparent_magnitude_at_max']:.2f}")
+    else:
+        print(f"  {dim('Apparent mag @ max')}   {dim('— (no H)')}")
+    visible = curve.get("visible")
+    vis_label = green("yes") if visible else red("no")
+    print(f"  {dim('Above horizon')}         {vis_label}")
+    print()
+    for line in render_altitude_chart(curve.get("samples") or [], color=color):
+        print(line)
+    print()
+
+
 def _print_asteroid_detail(row, tags, color: bool) -> None:
     """Pretty-print one asteroid row (full SELECT shape) plus optional tags."""
     (asteroid_id, number, designation, name, epoch, mean_anomaly, perihelion_arg,
@@ -1240,6 +1527,9 @@ def asteroids_show(args):
 
     color = not getattr(args, "no_color", False) and sys.stdout.isatty()
     limit = int(getattr(args, "limit", 20) or 20)
+    telescope_id = getattr(args, "telescope_id", None)
+    telescope_name = getattr(args, "telescope", None)
+    want_visibility = telescope_id is not None or bool(telescope_name)
 
     try:
         conn = db.connect()
@@ -1275,6 +1565,30 @@ def asteroids_show(args):
 
         tags = db.asteroid_tags_for_asteroids(conn, [rows[0][0]]).get(rows[0][0], [])
         _print_asteroid_detail(rows[0], tags, color=color)
+
+        if not want_visibility:
+            return 0
+
+        try:
+            scope_id, scope_name, lat, lon, alt = db.telescope_resolve(
+                conn, scope_id=telescope_id, name=telescope_name,
+            )
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+
+        from datetime import date as date_cls
+        obs_date = getattr(args, "date", None) or date_cls.today().isoformat()
+        step_minutes = int(getattr(args, "step_minutes", 10) or 10)
+        location = EarthLocation(lat=lat * u.deg, lon=lon * u.deg, height=alt * u.m)
+
+        # Row without internal id — matches compute_asteroid_visibility_curve contract.
+        curve = compute_asteroid_visibility_curve(
+            rows[0][1:], location, obs_date, step_minutes=step_minutes,
+        )
+        _print_visibility_section(
+            curve, scope_id, scope_name, lat, lon, alt, obs_date, color=color,
+        )
         return 0
     finally:
         conn.close()

@@ -424,6 +424,22 @@ def run():
         '--no-color', action='store_true',
         help="Disable ANSI colors in the output",
     )
+    show_parser.add_argument(
+        '--telescope-id', type=int, default=None, dest='telescope_id',
+        help="Telescope scope_id for a night visibility chart",
+    )
+    show_parser.add_argument(
+        '--telescope', type=str, default=None,
+        help="Telescope name for a night visibility chart (exact or unique partial match)",
+    )
+    show_parser.add_argument(
+        '--date', type=str, default=None,
+        help="Evening date YYYY-MM-DD for the visibility chart (default: today)",
+    )
+    show_parser.add_argument(
+        '--step-minutes', type=int, default=10, dest='step_minutes',
+        help="Visibility sampling interval in minutes (default: 10)",
+    )
     vis_parser = asteroid_subparsers.add_parser('visible', help="List asteroids visible during a night (magnitude and altitude filters)")
     vis_parser.add_argument("--date", help="Observation date YYYY-MM-DD", type=str, required=True)
     vis_parser.add_argument("--lat", help="Observer latitude (degrees)", type=float, required=True)
