@@ -14,7 +14,7 @@ from hevelius.cli.basic import db_version, hevelius_version, config_show, backup
 from hevelius.stats import stats, histogram_show, groups
 from hevelius.cli.db_migrate import migrate
 from hevelius.cli.repo import repo
-from hevelius.cli.catalog import catalog, format_get
+from hevelius.cli.task_search import task_search, format_get
 from hevelius.cli.catalogs import list_catalogs, find_catalog_objects
 from hevelius.cli.users import list_users, add_user, disable_user, enable_user, edit_user_profile
 from hevelius.equipment import (
@@ -90,24 +90,23 @@ def run():
     data_subparsers = data_parser.add_subparsers(help="Commands related to data", dest="data_command")
     data_subparsers.add_parser('distrib', help="Shows photos distribution")  # distrib_parser
 
-    # Default values set to the first Messier object
-    catalog_parser = data_subparsers.add_parser('catalog', help="Finds astronomical objects in a catalog")
-    catalog_parser.add_argument('-r', "--ra", help="Right Ascension (HH MM [SS] format)", type=str, default="05 34 31")
-    catalog_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
-    catalog_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
-    catalog_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
-    catalog_parser.add_argument('-o', "--object", help="catalog object to look for", type=str, default="")
-    catalog_parser.add_argument('-b', "--bin", help="filtering: binning of the frames to look for (1..4, 0 means any)", type=int, default=0)
-    catalog_parser.add_argument("--focal", help="filtering: focal length (mm)", type=int, default=0)
-    catalog_parser.add_argument("--resx", help="filtering: X resolution (pixels)", type=int, default=0)
-    catalog_parser.add_argument("--resy", help="filtering: y resolution (pixels)", type=int, default=0)
-    catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
-    catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
-
     task_parser = subparsers.add_parser('task', help="Task-related commands")
     task_sub = task_parser.add_subparsers(dest='task_command', help="Task subcommand")
     task_groups = task_sub.add_parser('groups', help="Shows frames' groups")
     task_groups.add_argument("-m", "--min", help="Minimum number of frames in a group", type=int, default=200)
+    # Default RA/Dec set to the first Messier object
+    task_search_parser = task_sub.add_parser('search', help="Search frames near sky coordinates")
+    task_search_parser.add_argument('-r', "--ra", help="Right Ascension (HH MM [SS] format)", type=str, default="05 34 31")
+    task_search_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
+    task_search_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
+    task_search_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
+    task_search_parser.add_argument('-o', "--object", help="Resolve centre from catalog object name (instead of --ra/--decl)", type=str, default="")
+    task_search_parser.add_argument('-b', "--bin", help="filtering: binning of the frames to look for (1..4, 0 means any)", type=int, default=0)
+    task_search_parser.add_argument("--focal", help="filtering: focal length (mm)", type=int, default=0)
+    task_search_parser.add_argument("--resx", help="filtering: X resolution (pixels)", type=int, default=0)
+    task_search_parser.add_argument("--resy", help="filtering: y resolution (pixels)", type=int, default=0)
+    task_search_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
+    task_search_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
     catalog_mgmt_parser = subparsers.add_parser('catalog', help="List catalogs or search catalog objects")
     catalog_mgmt_sub = catalog_mgmt_parser.add_subparsers(dest='catalog_command', help="Catalog subcommand")
@@ -514,12 +513,12 @@ def run():
     if args.command == "data":
         if args.data_command == "distrib":
             return histogram_show(args)  # see cmd_stats.py
-        if args.data_command == "catalog":
-            return catalog(args)  # see cmd_catalog.py
         return parser.print_help()
     if args.command == "task":
         if args.task_command == "groups":
             return groups(args)  # see cmd_stats.py
+        if args.task_command == "search":
+            return task_search(args)
         return task_parser.print_help() or 1
     if args.command == "catalog":
         if args.catalog_command == "list":

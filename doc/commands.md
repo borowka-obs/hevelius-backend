@@ -53,6 +53,54 @@ hevelius task groups
 hevelius task groups --min 50
 ```
 
+## Task search — frames near sky coordinates
+
+`hevelius task search` finds frames (completed tasks) near a sky position.
+Use `--object` to resolve the centre from a catalog name, or pass `--ra` /
+`--decl` directly. Search radius is `--proximity` (default: 1 degree).
+
+Use `--format` for the frames list output: `none`, `filenames`, `csv`,
+`brief`, `full`, or `pixinsight`.
+
+The `pixinsight` format is intended for PixInsight's SubframeSelector. To
+import the list, open PixInsight, menu Process → ImageInspection →
+SubframeSelector, then click **edit instance source code** (square icon at the
+bottom), and paste the content into `P.subframes`.
+
+```shell
+python bin/hevelius task search --object C38 --proximity 0.5 --format full
+python bin/hevelius task search --ra "05 34 31" --decl "+22 00 52" --format brief
+```
+
+```shell
+$ python bin/hevelius task search --help
+usage: hevelius task search [-h] [-r RA] [-d DECL] [-p PROXIMITY] [-f FORMAT]
+                            [-o OBJECT] [-b BIN] [--focal FOCAL]
+                            [--resx RESX] [--resy RESY] [--sensor SENSOR]
+                            [--sensor-id SENSOR_ID]
+
+options:
+  -h, --help            show this help message and exit
+  -r, --ra RA           Right Ascension (HH MM [SS] format)
+  -d, --decl DECL       Declination of the image searched (+DD MM SS format)
+  -p, --proximity PROXIMITY
+                        radius of an area to look at (in degrees)
+  -f, --format FORMAT   format of the frames list output: none, filenames,
+                        csv, brief, full
+  -o, --object OBJECT   Resolve centre from catalog object name (instead of
+                        --ra/--decl)
+  -b, --bin BIN         filtering: binning of the frames to look for (1..4, 0
+                        means any)
+  --focal FOCAL         filtering: focal length (mm)
+  --resx RESX           filtering: X resolution (pixels)
+  --resy RESY           filtering: y resolution (pixels)
+  --sensor SENSOR       filtering: specifies sensor by its name (name in
+                        sensors table)
+  --sensor-id SENSOR_ID
+                        filtering: specifies sensor by its id (sensor_id in
+                        sensors table)
+```
+
 ## Catalog — list installed catalogs and search objects
 
 ```shell
@@ -67,57 +115,6 @@ hevelius catalog search --ra "0 42 44" --dec "+41 16 09" --radius 2.0 --limit 5
 ```
 
 See [catalogs.md](catalogs.md) for full search options and API equivalents.
-
-## Data catalog — frames near a catalog object
-
-`hevelius data catalog` finds frames in the database near a catalog object (or
-near given coordinates).
-
-There are two ways to locate the centre. First is by catalog name:
-`--object M1`. If the object is found, its coordinates are then used. The
-alternative is to specify coordinates directly:
-`--ra "11 22 33" --decl "-22 33 44"`. In both cases you can set the search
-radius with `--proximity` (default: 1 degree).
-
-Use `--format XXX` for the frames list output. As of writing, supported formats
-include: `none`, `filenames`, `csv`, `brief`, `full`, `pixinsight`.
-
-The `pixinsight` format is intended for PixInsight's SubframeSelector. To
-import the list, open PixInsight, menu Process → ImageInspection →
-SubframeSelector, then click **edit instance source code** (square icon at the
-bottom), and paste the content into `P.subframes`.
-
-```shell
-python bin/hevelius data catalog --object C38 --proximity 0.5 --format full
-```
-
-```shell
-$ python bin/hevelius data catalog --help
-usage: hevelius data catalog [-h] [-r RA] [-d DECL] [-p PROXIMITY] [-f FORMAT]
-                             [-o OBJECT] [-b BIN] [--focal FOCAL]
-                             [--resx RESX] [--resy RESY] [--sensor SENSOR]
-                             [--sensor-id SENSOR_ID]
-
-options:
-  -h, --help            show this help message and exit
-  -r, --ra RA           Right Ascension (HH MM [SS] format)
-  -d, --decl DECL       Declination of the image searched (+DD MM SS format)
-  -p, --proximity PROXIMITY
-                        radius of an area to look at (in degrees)
-  -f, --format FORMAT   format of the frames list output: none, filenames,
-                        csv, brief, full
-  -o, --object OBJECT   catalog object to look for
-  -b, --bin BIN         filtering: binning of the frames to look for (1..4, 0
-                        means any)
-  --focal FOCAL         filtering: focal length (mm)
-  --resx RESX           filtering: X resolution (pixels)
-  --resy RESY           filtering: y resolution (pixels)
-  --sensor SENSOR       filtering: specifies sensor by its name (name in
-                        sensors table)
-  --sensor-id SENSOR_ID
-                        filtering: specifies sensor by its id (sensor_id in
-                        sensors table)
-```
 
 ## Asteroids
 
