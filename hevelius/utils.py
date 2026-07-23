@@ -206,29 +206,23 @@ def parse_dec(dec: str) -> float:
 
 def format_ra(ra: float) -> str:
     """Formats Right Ascension as HH MM SS, returns str"""
-    h = int(ra)
-
-    min = int((ra - h)*60)
-
-    sec = (ra - h - min/60)*3600
-
-    return f"{h:02} {min:02} {sec:04.1f}"
+    # Round to 0.1s in total tenths-of-a-second to avoid 60.0s carry.
+    total_tenths = int(round(abs(ra) * 3600.0 * 10.0))
+    hours = (total_tenths // 36000) % 24
+    rem = total_tenths % 36000
+    minutes = rem // 600
+    sec = (rem % 600) / 10.0
+    return f"{hours:02} {minutes:02} {sec:04.1f}"
 
 
 def format_dec(decl: float) -> str:
     """Formats declination as DD MM SS, returns str"""
     minus = decl < 0
-
-    decl = abs(decl)
-
-    h = int(decl)
-
-    min = int((decl - h)*60)
-
-    sec = (decl - h - min/60)*3600
+    total_tenths = int(round(abs(decl) * 3600.0 * 10.0))
+    degrees = total_tenths // 36000
+    rem = total_tenths % 36000
+    minutes = rem // 600
+    sec = (rem % 600) / 10.0
     if minus:
-        h = -h
-        # need to have a bit wider hour (extra char for minus)
-        return f"{h:03} {min:02} {sec:04.1f}"
-    else:
-        return f"{h:02} {min:02} {sec:04.1f}"
+        return f"-{degrees:02} {minutes:02} {sec:04.1f}"
+    return f"{degrees:02} {minutes:02} {sec:04.1f}"

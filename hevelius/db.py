@@ -294,7 +294,7 @@ def catalog_radius_get(conn, ra: float, decl: float, radius: float, order: str =
 
     # Haversine formula in SQL
     query = """
-        SELECT object_id, name, altname, ra, decl
+        SELECT object_id, name, altname, ra, decl, catalog
         FROM objects
         WHERE degrees(2 * asin(sqrt(
             pow(sin(radians(decl - {decl}) / 2), 2) +
