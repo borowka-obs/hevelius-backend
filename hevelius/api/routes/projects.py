@@ -12,7 +12,7 @@ from flask_smorest import abort
 from hevelius import db
 from hevelius.equipment import find_similar_project_names
 from hevelius.api.auth_utils import (
-    _jwt_user_id_int,
+    jwt_user_id_int,
 )
 from hevelius.api.blueprint import blp
 from hevelius.api.schemas import (
@@ -511,7 +511,7 @@ class ProjectTaskResource(MethodView):
     @jwt_required()
     def post(self, project_id, task_id):
         """Add a task to a project. Task must exist and be owned by the current user."""
-        current_user_id = _jwt_user_id_int()
+        current_user_id = jwt_user_id_int()
         cnx = db.connect()
         task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
         if not task_row:
@@ -531,7 +531,7 @@ class ProjectTaskResource(MethodView):
     @jwt_required()
     def delete(self, project_id, task_id):
         """Remove a task from a project. Task must exist and be owned by the current user."""
-        current_user_id = _jwt_user_id_int()
+        current_user_id = jwt_user_id_int()
         cnx = db.connect()
         task_row = db.run_query(cnx, "SELECT user_id FROM tasks WHERE task_id = %s", (task_id,))
         if not task_row:

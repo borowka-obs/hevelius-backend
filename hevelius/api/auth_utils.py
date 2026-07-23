@@ -1,11 +1,8 @@
 """JWT and auth helpers for the Hevelius REST API."""
 import hashlib
-import re
 from datetime import timedelta
 
 from flask_jwt_extended import get_jwt, get_jwt_identity
-
-_MD5_HEX_RE = re.compile(r"^[a-fA-F0-9]{32}$")
 
 PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
 
@@ -65,12 +62,3 @@ def login_success_payload(access_token, user_id, firstname, lastname, share, pho
         "aavso_id": aavso_id,
         "msg": "Welcome",
     }
-
-
-# Backwards-compatible private aliases (used by routes during migration)
-_normalize_jwt_secret = normalize_jwt_secret
-_jwt_identity_to_string = jwt_identity_to_string
-_password_reset_token_hash = password_reset_token_hash
-_jwt_user_id_int = jwt_user_id_int
-_jwt_permissions_int = jwt_permissions_int
-_login_success_payload = login_success_payload

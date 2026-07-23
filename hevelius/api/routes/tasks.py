@@ -10,7 +10,7 @@ from flask_jwt_extended import jwt_required
 from hevelius import db, config as hevelius_config
 from hevelius.version import VERSION
 from hevelius.api.auth_utils import (
-    _jwt_user_id_int,
+    jwt_user_id_int,
 )
 from hevelius.api.blueprint import blp
 from hevelius.api.schemas import (
@@ -51,7 +51,7 @@ class TaskAddResource(MethodView):
     def post(self, task_data):
         """Add new astronomical observation task"""
         # Get user ID from JWT token
-        current_user_id = _jwt_user_id_int()
+        current_user_id = jwt_user_id_int()
 
         # Optional: verify that the user_id in the request matches the token
         # Allow adding for other users in testing mode
@@ -487,7 +487,7 @@ class TaskUpdateResource(MethodView):
     @blp.response(200, TaskUpdateResponseSchema)
     def post(self, task_data):
         """Update existing astronomical observation task"""
-        current_user_id = _jwt_user_id_int()
+        current_user_id = jwt_user_id_int()
         task_id = task_data.pop('task_id')  # Remove task_id from update fields
         project_ids = task_data.pop('project_ids', None)  # Not a tasks column; handled below
         project_id = task_data.pop('project_id', None)
