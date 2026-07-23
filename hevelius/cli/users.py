@@ -164,7 +164,7 @@ def edit_user_profile(login_or_id, firstname=None, lastname=None, email=None, aa
 
 
 def enable_user(login_or_id, password):
-    """Set pass_d from password; clears legacy pass."""
+    """Set pass_d from password; clears unused pass column."""
     if not password:
         print("Error: password is required to enable a user.")
         return False

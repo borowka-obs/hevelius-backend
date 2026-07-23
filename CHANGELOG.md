@@ -5,6 +5,7 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.6.0 (unreleased)
 
+- Auth: drop legacy MD5 `pass_d` login/change support; argon2id only.
 - Refactor: REST API moved to `hevelius.api` (run with `python -m hevelius.api`);
   CLI handlers under `hevelius.cli`; shared domain modules (`passwords`, `equipment`,
   `catalogs`, `asteroid`, `stats`). Removed top-level `heveliusbackend` package.

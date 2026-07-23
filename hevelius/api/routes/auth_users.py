@@ -1,9 +1,6 @@
 """Login, password reset, and user profile API routes."""
 
 import logging
-import hashlib
-import hmac
-import re
 import secrets
 from datetime import datetime, timezone
 
@@ -41,10 +38,6 @@ from hevelius.api.schemas import (
 
 logger = logging.getLogger(__name__)
 
-# Legacy pass_d values may be 32-char MD5 hex; detect then verify with usedforsecurity=False
-# and upgrade to argon2id on success. Not used for new password storage.
-_MD5_HEX_RE = re.compile(r"^[a-fA-F0-9]{32}$")
-
 
 @blp.route("/login")
 class LoginResource(MethodView):
@@ -75,49 +68,26 @@ class LoginResource(MethodView):
 
         user_id, pass_db, _, firstname, lastname, share, phone, email, permissions, aavso_id = db_resp[0]
 
-        # Legacy: `pass_d` stored as MD5 hex (case-insensitive). Upgrade to argon2id lazily
-        # after successful login.
-        if pass_db is None:
-            print(f"Login: Missing pass_d for user ({user})")
+        if not (isinstance(pass_db, str) and pass_db.startswith("$argon2")):
+            print(f"Login: Missing or unsupported pass_d for user ({user})")
             return {'status': False, 'msg': 'Invalid credentials'}
 
-        if isinstance(pass_db, str) and _MD5_HEX_RE.fullmatch(pass_db):
-            # Legacy check only (not for new storage). usedforsecurity=False marks this as
-            # non-cryptographic verification of historical digests before argon2id upgrade.
-            legacy_md5 = hashlib.md5(
-                password.encode("utf-8"), usedforsecurity=False
-            ).hexdigest()
-            if not hmac.compare_digest(legacy_md5.lower(), pass_db.lower()):
-                print(f"Login: Invalid legacy MD5 password for user ({user})")
-                return {'status': False, 'msg': 'Invalid credentials'}
+        try:
+            password_hasher.verify(pass_db, password)
+        except (VerifyMismatchError, InvalidHashError):
+            print(f"Login: Invalid argon2id password for user ({user})")
+            return {'status': False, 'msg': 'Invalid credentials'}
 
-            # Successful legacy verification: replace with argon2id hash.
-            pass_d_new = password_hasher.hash(password)
-            cnx = db.connect()
-            db.run_query(cnx, "UPDATE users SET pass_d=%s WHERE user_id=%s", (pass_d_new, user_id))
-            cnx.close()
-        else:
-            # New format: argon2id hash string (stored format is self-describing).
-            if not (isinstance(pass_db, str) and pass_db.startswith("$argon2")):
-                print(f"Login: Unsupported pass_d format for user ({user})")
-                return {'status': False, 'msg': 'Invalid credentials'}
-
-            try:
-                password_hasher.verify(pass_db, password)
-            except (VerifyMismatchError, InvalidHashError):
-                print(f"Login: Invalid argon2id password for user ({user})")
-                return {'status': False, 'msg': 'Invalid credentials'}
-
-            # Future re-hashing: upgrade transparently if params are weak/changed.
-            try:
-                if password_hasher.check_needs_rehash(pass_db):
-                    pass_d_new = password_hasher.hash(password)
-                    cnx = db.connect()
-                    db.run_query(cnx, "UPDATE users SET pass_d=%s WHERE user_id=%s", (pass_d_new, user_id))
-                    cnx.close()
-            except InvalidHashError:
-                print(f"Login: Invalid argon2id hash for user ({user})")
-                return {'status': False, 'msg': 'Invalid credentials'}
+        # Re-hash transparently if hasher params are weak/changed.
+        try:
+            if password_hasher.check_needs_rehash(pass_db):
+                pass_d_new = password_hasher.hash(password)
+                cnx = db.connect()
+                db.run_query(cnx, "UPDATE users SET pass_d=%s WHERE user_id=%s", (pass_d_new, user_id))
+                cnx.close()
+        except InvalidHashError:
+            print(f"Login: Invalid argon2id hash for user ({user})")
+            return {'status': False, 'msg': 'Invalid credentials'}
 
         # Create JWT access token
         access_token = create_access_token(
@@ -284,15 +254,12 @@ class UsersMePasswordResource(MethodView):
         if not (pass_d and str(pass_d).strip()):
             abort(400, message="Account has no password set; use the password reset flow.")
         current = body["current_password"]
-        if isinstance(pass_d, str) and _MD5_HEX_RE.fullmatch(pass_d):
-            abort(400, message="Legacy password format detected; use the password reset flow.")
-        elif isinstance(pass_d, str) and pass_d.startswith("$argon2"):
-            try:
-                password_hasher.verify(pass_d, current)
-            except (VerifyMismatchError, InvalidHashError):
-                abort(400, message="Current password is incorrect.")
-        else:
+        if not (isinstance(pass_d, str) and pass_d.startswith("$argon2")):
             abort(400, message="Unsupported password format; use the password reset flow.")
+        try:
+            password_hasher.verify(pass_d, current)
+        except (VerifyMismatchError, InvalidHashError):
+            abort(400, message="Current password is incorrect.")
         new_hash = password_hasher.hash(body["new_password"])
         cnx = db.connect()
         db.run_query(cnx, "UPDATE users SET pass = NULL, pass_d = %s WHERE user_id = %s", (new_hash, uid))
