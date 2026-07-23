@@ -6,16 +6,17 @@ The command-line can be accessed the following way:
 ```shell
 $ python bin/hevelius --help
 usage: hevelius [-h]
-                {config,version,db,repo,data,catalog,filter,sensor,project,telescope,user,asteroid} ...
+                {config,version,db,repo,data,task,catalog,filter,sensor,project,telescope,user,asteroid} ...
 
 positional arguments:
-  {config,version,db,repo,data,catalog,filter,sensor,project,telescope,user,asteroid}
+  {config,version,db,repo,data,task,catalog,filter,sensor,project,telescope,user,asteroid}
                         commands
     config              Shows current Hevelius (DB,file repository) configuration.
     version             Shows the current Hevelius version.
     db                  Manages database
     repo                Manages files repository on local storage.
     data                Explores, analyses and digs through available data (data mining)
+    task                Task-related commands
     catalog             List catalogs or search catalog objects
     filter              List, add, edit, or set active state of a filter
     sensor              List, add, or edit a sensor (camera)
@@ -40,6 +41,16 @@ hevelius sensor list
 hevelius project list
 hevelius telescope list
 hevelius user list
+```
+
+## Task groups
+
+Show clusters of frames that share similar coordinates (useful for finding
+large observation sets):
+
+```shell
+hevelius task groups
+hevelius task groups --min 50
 ```
 
 ## Catalog — list installed catalogs and search objects

@@ -71,6 +71,8 @@ class TestFormat(unittest.TestCase):
         """Tests if Right Ascension can be formatted properly"""
         self.assertEqual(format_ra(8.3156), '08 18 56.2')
         self.assertEqual(format_ra(17.25), '17 15 00.0')
+        # Degree-bucket centres (integer degrees / 15) must not print 60.0s
+        self.assertEqual(format_ra(83 / 15), '05 32 00.0')
 
     def test_format_dec(self):
         """Tests if declination can be formatted properly"""
