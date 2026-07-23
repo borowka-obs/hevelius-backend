@@ -3,6 +3,7 @@
 import logging
 import hashlib
 import hmac
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -17,12 +18,11 @@ from hevelius import db
 from hevelius.passwords import password_hasher
 from hevelius.user_admin_audit import log_user_admin_action
 from hevelius.api.auth_utils import (
-    _MD5_HEX_RE,
     PASSWORD_RESET_TOKEN_TTL,
-    _password_reset_token_hash,
-    _jwt_user_id_int,
-    _jwt_permissions_int,
-    _login_success_payload,
+    password_reset_token_hash,
+    jwt_user_id_int,
+    jwt_permissions_int,
+    login_success_payload,
 )
 from hevelius.api.blueprint import blp
 from hevelius.api.schemas import (
@@ -40,6 +40,10 @@ from hevelius.api.schemas import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Legacy pass_d values may be 32-char MD5 hex; detect then verify with usedforsecurity=False
+# and upgrade to argon2id on success. Not used for new password storage.
+_MD5_HEX_RE = re.compile(r"^[a-fA-F0-9]{32}$")
 
 
 @blp.route("/login")
@@ -78,7 +82,11 @@ class LoginResource(MethodView):
             return {'status': False, 'msg': 'Invalid credentials'}
 
         if isinstance(pass_db, str) and _MD5_HEX_RE.fullmatch(pass_db):
-            legacy_md5 = hashlib.md5(password.encode("utf-8")).hexdigest()
+            # Legacy check only (not for new storage). usedforsecurity=False marks this as
+            # non-cryptographic verification of historical digests before argon2id upgrade.
+            legacy_md5 = hashlib.md5(
+                password.encode("utf-8"), usedforsecurity=False
+            ).hexdigest()
             if not hmac.compare_digest(legacy_md5.lower(), pass_db.lower()):
                 print(f"Login: Invalid legacy MD5 password for user ({user})")
                 return {'status': False, 'msg': 'Invalid credentials'}
@@ -121,7 +129,7 @@ class LoginResource(MethodView):
         )
 
         print(f"User {user} logged in successfully, generated JWT token.")
-        return _login_success_payload(
+        return login_success_payload(
             access_token, user_id, firstname, lastname, share, phone, email,
             permissions, aavso_id,
         )
@@ -151,7 +159,7 @@ class AuthPasswordResetResource(MethodView):
     @blp.response(200, StatusMsgSchema)
     def post(self, body):
         """Apply password reset using a token issued by an administrator."""
-        token_hash = _password_reset_token_hash(body["token"])
+        token_hash = password_reset_token_hash(body["token"])
         cnx = db.connect()
         rows = db.run_query(
             cnx,
@@ -187,7 +195,7 @@ class UsersMeResource(MethodView):
     @blp.response(200, UserAdminDetailSchema)
     def get(self):
         """Current user profile (from JWT); no password fields."""
-        uid = _jwt_user_id_int()
+        uid = jwt_user_id_int()
         if uid is None:
             abort(401, message="Invalid token identity")
         cnx = db.connect()
@@ -221,7 +229,7 @@ class UsersMeResource(MethodView):
     @blp.response(200, UserAdminDetailSchema)
     def patch(self, body):
         """Update own profile: firstname, lastname, email (optional, may be empty), aavso_id."""
-        uid = _jwt_user_id_int()
+        uid = jwt_user_id_int()
         if uid is None:
             abort(401, message="Invalid token identity")
         cnx = db.connect()
@@ -264,7 +272,7 @@ class UsersMePasswordResource(MethodView):
     @blp.response(200, StatusMsgSchema)
     def post(self, body):
         """Change own password. current_password must match the stored credential."""
-        uid = _jwt_user_id_int()
+        uid = jwt_user_id_int()
         if uid is None:
             abort(401, message="Invalid token identity")
         cnx = db.connect()
@@ -299,7 +307,7 @@ class UsersAuditLogResource(MethodView):
     @blp.response(200, UsersAuditLogResponseSchema)
     def get(self):
         """Recent user-administration audit entries (administrators only)."""
-        if (_jwt_permissions_int() & 1) == 0:
+        if (jwt_permissions_int() & 1) == 0:
             abort(403, message="Administrator permission required (permissions bit 0).")
         page = max(1, int(request.args.get("page", 1)))
         per_page = min(500, max(1, int(request.args.get("per_page", 50))))
@@ -354,7 +362,7 @@ class UserPasswordResetTokenResource(MethodView):
     @blp.response(200, PasswordResetTokenIssueResponseSchema)
     def post(self, user_id):
         """Issue a one-time password reset token for a user (administrators only)."""
-        if (_jwt_permissions_int() & 1) == 0:
+        if (jwt_permissions_int() & 1) == 0:
             abort(403, message="Administrator permission required (permissions bit 0).")
         cnx = db.connect()
         row = db.run_query(cnx, "SELECT user_id FROM users WHERE user_id = %s", (user_id,))
@@ -367,7 +375,7 @@ class UserPasswordResetTokenResource(MethodView):
             (user_id,),
         )
         raw = secrets.token_urlsafe(32)
-        th = _password_reset_token_hash(raw)
+        th = password_reset_token_hash(raw)
         expires_at = datetime.now(timezone.utc) + PASSWORD_RESET_TOKEN_TTL
         db.run_query(
             cnx,
@@ -376,7 +384,7 @@ class UserPasswordResetTokenResource(MethodView):
             (user_id, th, expires_at),
         )
         cnx.close()
-        actor = _jwt_user_id_int()
+        actor = jwt_user_id_int()
         log_user_admin_action(
             "api",
             "users.password_reset_token_issue",
@@ -399,12 +407,12 @@ class UsersAdminListResource(MethodView):
     @blp.response(200, UsersAdminListResponseSchema)
     def get(self):
         """Full user list without passwords; requires permissions bit 0 (administrator)."""
-        if (_jwt_permissions_int() & 1) == 0:
+        if (jwt_permissions_int() & 1) == 0:
             abort(403, message="Administrator permission required (permissions bit 0).")
         log_user_admin_action(
             "api",
             "users.list_full",
-            actor_user_id=_jwt_user_id_int(),
+            actor_user_id=jwt_user_id_int(),
             target_user_id=None,
             details={},
         )

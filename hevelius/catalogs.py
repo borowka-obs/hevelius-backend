@@ -36,11 +36,6 @@ def object_row_to_dict(row) -> Dict[str, Any]:
     }
 
 
-# Private aliases for callers that used underscore names
-_catalog_row_to_dict = catalog_row_to_dict
-_object_row_to_dict = object_row_to_dict
-
-
 def fetch_installed_catalogs(sort_by: str = "entries", sort_order: str = "desc") -> List[Dict[str, Any]]:
     """Return installed catalogs as a list of dicts."""
     cnx = db.connect()
