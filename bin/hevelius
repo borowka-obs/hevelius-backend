@@ -106,73 +106,73 @@ def run():
     catalog_parser.add_argument("--sensor", help="filtering: specifies sensor by its name (name in sensors table)", type=str, default="")
     catalog_parser.add_argument("--sensor-id", help="filtering: specifies sensor by its id (sensor_id in sensors table)", type=int, default=0)
 
-    catalogs_parser = subparsers.add_parser('catalogs', help="List installed astronomical catalogs")
-    catalogs_parser.add_argument(
+    catalog_mgmt_parser = subparsers.add_parser('catalog', help="List catalogs or search catalog objects")
+    catalog_mgmt_sub = catalog_mgmt_parser.add_subparsers(dest='catalog_command', help="Catalog subcommand")
+    catalog_list = catalog_mgmt_sub.add_parser('list', help="List installed astronomical catalogs")
+    catalog_list.add_argument(
         '--sort',
         choices=['entries', 'name'],
         default='entries',
         help="Sort by object count (entries, default) or catalog name (name)",
     )
-
-    catalog_search_parser = subparsers.add_parser('catalog', help="Search astronomical catalog objects")
-    catalog_search_parser.add_argument(
+    catalog_search = catalog_mgmt_sub.add_parser('search', help="Search astronomical catalog objects")
+    catalog_search.add_argument(
         'name',
         nargs='?',
         default=None,
         help="Object name to search for (partial match on name or altname)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--catalog',
         dest='catalog',
         metavar='SHORTNAME',
         help="Filter by catalog short name (e.g. NGC, M, C)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--const',
         metavar='CODE',
         help="Filter by constellation code (e.g. Cyg, Ori)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '-r', '--ra',
         help="Right Ascension (HH MM [SS] format); requires --dec",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '-d', '--dec',
         help="Declination (+DD MM [SS] format); requires --ra",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--radius',
         type=float,
         default=None,
         help="Search radius in degrees with --ra and --dec (default: 1.0)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--sort',
         choices=['catalog', 'name', 'ra', 'decl', 'const', 'type', 'magn'],
         default='name',
         help="Sort results by field (default: name)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--sort-order',
         choices=['asc', 'desc'],
         default='asc',
         help="Sort order (default: asc)",
     )
-    catalog_search_parser.add_argument(
+    catalog_search.add_argument(
         '--limit',
         type=int,
         default=None,
         help="Maximum number of objects to return",
     )
 
-    filters_parser = subparsers.add_parser('filters', help="List optical filters")
-    filters_parser.add_argument('--active-only', action='store_true', help="Show only active filters")
-    filters_parser.add_argument('--sort-by', choices=['filter_id', 'short_name', 'full_name', 'active'],
-                                default='filter_id', help="Sort by field")
-    filters_parser.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
-
-    filter_parser = subparsers.add_parser('filter', help="Add, edit, or set active state of a filter")
+    filter_parser = subparsers.add_parser('filter', help="List, add, edit, or set active state of a filter")
     filter_sub = filter_parser.add_subparsers(dest='filter_command', help="Filter subcommand")
+    filter_list = filter_sub.add_parser('list', help="List optical filters")
+    filter_list.add_argument('--active-only', action='store_true', help="Show only active filters")
+    filter_list.add_argument('--sort-by', choices=['filter_id', 'short_name', 'full_name', 'active'],
+                             default='filter_id', help="Sort by field")
+    filter_list.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
     filter_add = filter_sub.add_parser('add', help="Add a new filter (short_name full_name)")
     filter_add.add_argument('short_name', help="Short name (max 8 chars)")
     filter_add.add_argument('full_name', nargs='?', default=None, help="Full filter name (e.g. H-alpha)")
@@ -187,14 +187,13 @@ def run():
     filter_edit.add_argument('--active', action='store_true', help="Set filter active")
     filter_edit.add_argument('--inactive', action='store_true', help="Set filter inactive")
 
-    sensors_parser = subparsers.add_parser('sensors', help="List sensors (cameras)")
-    sensors_parser.add_argument('--active-only', action='store_true', help="Show only active sensors")
-    sensors_parser.add_argument('--sort-by', choices=['pixel_x', 'pixel_y', 'name', 'vendor', 'width', 'height', 'resx', 'resy', 'sensor_id'],
-                                default='sensor_id', help="Sort by field")
-    sensors_parser.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
-
-    sensor_parser = subparsers.add_parser('sensor', help="Add or edit a sensor (camera)")
+    sensor_parser = subparsers.add_parser('sensor', help="List, add, or edit a sensor (camera)")
     sensor_sub = sensor_parser.add_subparsers(dest='sensor_command', help="Sensor subcommand")
+    sensor_list = sensor_sub.add_parser('list', help="List sensors (cameras)")
+    sensor_list.add_argument('--active-only', action='store_true', help="Show only active sensors")
+    sensor_list.add_argument('--sort-by', choices=['pixel_x', 'pixel_y', 'name', 'vendor', 'width', 'height', 'resx', 'resy', 'sensor_id'],
+                             default='sensor_id', help="Sort by field")
+    sensor_list.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
     sensor_add = sensor_sub.add_parser('add', help="Add a new sensor (resx, resy, pixel-x, pixel-y required)")
     sensor_add.add_argument('name', help="Sensor/camera name")
     sensor_add.add_argument('--resx', type=int, required=True, help="Resolution X (pixels)")
@@ -223,13 +222,11 @@ def run():
     sensor_edit.add_argument('--active', action='store_true', help="Set sensor active")
     sensor_edit.add_argument('--inactive', action='store_true', help="Set sensor inactive")
 
-    projects_parser = subparsers.add_parser('projects', help="List projects")
-    projects_parser.add_argument('project_id', nargs='?', type=int, help="If given, show single project by ID")
-    projects_parser.add_argument('--scope-id', type=int, default=None, help="Filter by telescope (scope) ID")
-    projects_parser.add_argument('--active-only', action='store_true', help="(Reserved for future use)")
-
-    project_parser = subparsers.add_parser('project', help="Add, edit, show project or manage subframes")
+    project_parser = subparsers.add_parser('project', help="List, add, edit, show project or manage subframes")
     project_sub = project_parser.add_subparsers(dest='project_command', help="Project subcommand")
+    project_list = project_sub.add_parser('list', help="List projects")
+    project_list.add_argument('--scope-id', type=int, default=None, help="Filter by telescope (scope) ID")
+    project_list.add_argument('--active-only', action='store_true', help="(Reserved for future use)")
     project_add = project_sub.add_parser('add', help="Add a new project (name and scope_id required; ra/dec from catalog if omitted)")
     project_add.add_argument('name', help="Project name (used for catalog lookup if ra/dec not given)")
     project_add.add_argument('--scope-id', type=int, required=True, help="Telescope (scope) ID")
@@ -295,12 +292,11 @@ def run():
     project_task_remove.add_argument('project_id', type=int, help="Project ID")
     project_task_remove.add_argument('task_id', type=int, help="Task ID to remove from the project")
 
-    telescopes_parser = subparsers.add_parser('telescopes', help="List telescopes")
-    telescopes_parser.add_argument('--sort-by', choices=['scope_id', 'name', 'focal', 'active'], default='scope_id', help="Sort by field")
-    telescopes_parser.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
-
-    telescope_parser = subparsers.add_parser('telescope', help="Add, edit, show telescope or manage sensor/filters")
+    telescope_parser = subparsers.add_parser('telescope', help="List, add, edit, show telescope or manage sensor/filters")
     telescope_sub = telescope_parser.add_subparsers(dest='telescope_command', help="Telescope subcommand")
+    telescope_list = telescope_sub.add_parser('list', help="List telescopes")
+    telescope_list.add_argument('--sort-by', choices=['scope_id', 'name', 'focal', 'active'], default='scope_id', help="Sort by field")
+    telescope_list.add_argument('--sort-order', choices=['asc', 'desc'], default='asc', help="Sort order")
     t_add = telescope_sub.add_parser('add', help="Add a new telescope (scope_id auto-assigned if not given)")
     t_add.add_argument('name', help="Telescope name")
     t_add.add_argument('--scope-id', type=int, default=None, help="Telescope ID (optional; next available if omitted)")
@@ -344,10 +340,9 @@ def run():
     t_remfilter.add_argument('scope_id', type=int, help="Telescope scope_id")
     t_remfilter.add_argument('filter_id', type=int, help="Filter ID to remove")
 
-    subparsers.add_parser('users', help="List all users")
-
-    user_parser = subparsers.add_parser('user', help="Add, enable, or disable a user")
+    user_parser = subparsers.add_parser('user', help="List, add, enable, or disable a user")
     user_sub = user_parser.add_subparsers(dest='user_command', help="User subcommand")
+    user_list = user_sub.add_parser('list', help="List all users")
     user_add = user_sub.add_parser('add', help="Add a new user (login + password)")
     user_add.add_argument('login', help="Login name (unique)")
     user_add.add_argument('--password', required=True, help="Initial password (stored as argon2id in pass_d)")
@@ -521,20 +516,22 @@ def run():
         if args.data_command == "catalog":
             return catalog(args)  # see cmd_catalog.py
         return parser.print_help()
-    if args.command == "catalogs":
-        return list_catalogs(args)
     if args.command == "catalog":
-        return find_catalog_objects(args)
+        if args.catalog_command == "list":
+            return list_catalogs(args)
+        if args.catalog_command == "search":
+            return find_catalog_objects(args)
+        return catalog_mgmt_parser.print_help() or 1
     if args.command == "config":
         return config_show()  # see cmd_basic.py
     if args.command == "repo":
         return repo(args)  # see cmd_repo.py
     if args.command == "version":
         return version()
-    if args.command == "filters":
-        list_filters(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
-        return 0
     if args.command == "filter":
+        if args.filter_command == "list":
+            list_filters(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
+            return 0
         if args.filter_command == "add":
             active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
             return 0 if add_filter(args.short_name, args.full_name, args.url, active) is not None else 1
@@ -546,10 +543,10 @@ def run():
                 active = False
             return 0 if edit_filter(args.filter_id, args.short_name, args.full_name, args.url, active) else 1
         return filter_parser.print_help() or 1
-    if args.command == "sensors":
-        list_sensors(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
-        return 0
     if args.command == "sensor":
+        if args.sensor_command == "list":
+            list_sensors(active_only=args.active_only, sort_by=args.sort_by, sort_order=args.sort_order)
+            return 0
         if args.sensor_command == "add":
             active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
             return 0 if add_sensor(
@@ -586,12 +583,10 @@ def run():
                 active=active
             ) else 1
         return sensor_parser.print_help() or 1
-    if args.command == "projects":
-        if args.project_id is not None:
-            return show_project(args.project_id) or 0
-        list_projects(scope_id=getattr(args, 'scope_id', None))
-        return 0
     if args.command == "project":
+        if args.project_command == "list":
+            list_projects(scope_id=getattr(args, 'scope_id', None))
+            return 0
         if args.project_command == "add":
             similar = find_similar_project_names(args.name)
             for s in similar:
@@ -716,10 +711,10 @@ def run():
                 return 0 if remove_project_subframe(args.project_id, args.subframe_id) else 1
             return subframe_parser.print_help() or 1
         return project_parser.print_help() or 1
-    if args.command == "telescopes":
-        list_telescopes(sort_by=args.sort_by, sort_order=args.sort_order)
-        return 0
     if args.command == "telescope":
+        if args.telescope_command == "list":
+            list_telescopes(sort_by=args.sort_by, sort_order=args.sort_order)
+            return 0
         if args.telescope_command == "add":
             active = getattr(args, 'active', True) and not getattr(args, 'inactive', False)
             return 0 if add_telescope(
@@ -773,10 +768,10 @@ def run():
         if args.telescope_command == "remove-filter":
             return 0 if remove_telescope_filter(args.scope_id, args.filter_id) else 1
         return telescope_parser.print_help() or 1
-    if args.command == "users":
-        list_users()
-        return 0
     if args.command == "user":
+        if args.user_command == "list":
+            list_users()
+            return 0
         if args.user_command == "add":
             uid = add_user(
                 args.login,
