@@ -10,6 +10,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   `telescope list`, `user list`). Catalog object search is now
   `hevelius catalog search`.
 - CLI: `hevelius data groups` renamed to `hevelius task groups`.
+- CLI: `hevelius data catalog` renamed to `hevelius task search` (frame search
+  only; nearby catalog object listing removed). `hevelius catalog search`
+  remains the catalog object search.
 - Auth: drop legacy MD5 `pass_d` login/change support; argon2id only.
 - Refactor: REST API moved to `hevelius.api` (run with `python -m hevelius.api`);
   CLI handlers under `hevelius.cli`; shared domain modules (`passwords`, `equipment`,
