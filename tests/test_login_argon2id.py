@@ -17,7 +17,8 @@ class TestLoginArgon2id(unittest.TestCase):
         self.client.testing = True
 
     @use_repository(load_test_data=None)
-    def test_lazy_migration_from_md5(self, config):
+    def test_md5_passwords_are_rejected(self, config):
+        """MD5 digests in pass_d are no longer accepted after migration."""
         os.environ["HEVELIUS_DB_NAME"] = config["database"]
 
         plaintext_password = "correct horse battery staple"
@@ -44,7 +45,7 @@ class TestLoginArgon2id(unittest.TestCase):
                 "legacy@example.com",
                 1,
                 "AAVSO",
-                legacy_md5.upper(),  # ensure case-insensitive compare
+                legacy_md5,
             ),
         )
         cnx.close()
@@ -57,19 +58,17 @@ class TestLoginArgon2id(unittest.TestCase):
         data = json.loads(response.data)
 
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(data["status"])
-        self.assertIn("token", data)
+        self.assertFalse(data["status"])
+        self.assertEqual(data.get("msg"), "Invalid credentials")
 
         cnx = db.connect(config)
         pass_d_after = db.run_query(
             cnx, "SELECT pass_d FROM users WHERE user_id=%s", (200,)
         )[0][0]
         cnx.close()
+        # Stored value must remain unchanged (no silent upgrade).
+        self.assertEqual(pass_d_after.lower(), legacy_md5.lower())
 
-        self.assertTrue(isinstance(pass_d_after, str))
-        self.assertTrue(pass_d_after.startswith("$argon2id$"))
-
-        # Clean up to match other tests' behavior.
         os.environ.pop("HEVELIUS_DB_NAME")
 
     @use_repository(load_test_data=None)
