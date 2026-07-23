@@ -5,6 +5,10 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.6.0 (unreleased)
 
+- CLI: plural list commands folded into singular noun + `list`
+  (`catalog list`, `filter list`, `sensor list`, `project list`,
+  `telescope list`, `user list`). Catalog object search is now
+  `hevelius catalog search`.
 - Auth: drop legacy MD5 `pass_d` login/change support; argon2id only.
 - Refactor: REST API moved to `hevelius.api` (run with `python -m hevelius.api`);
   CLI handlers under `hevelius.cli`; shared domain modules (`passwords`, `equipment`,

@@ -73,7 +73,7 @@ def _validate_ra_dec_pair(ra_value, dec_value) -> Optional[tuple]:
 
 
 def list_catalogs(args) -> int:
-    """CLI handler for 'hevelius catalogs'."""
+    """CLI handler for 'hevelius catalog list'."""
     sort_by = getattr(args, "sort", "entries") or "entries"
     if sort_by not in CATALOGS_SORT_CHOICES:
         print(f"Error: invalid --sort value '{sort_by}'. Use 'entries' or 'name'.", file=sys.stderr)
@@ -86,7 +86,7 @@ def list_catalogs(args) -> int:
 
 
 def find_catalog_objects(args) -> int:
-    """CLI handler for 'hevelius catalog'."""
+    """CLI handler for 'hevelius catalog search'."""
     coords = _validate_ra_dec_pair(getattr(args, "ra", None), getattr(args, "dec", None))
 
     sort_by = getattr(args, "sort", "name") or "name"

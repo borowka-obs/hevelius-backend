@@ -13,8 +13,8 @@ Barnard (B), Sharpless (Sh2), Lynds bright/dark nebulae (LBN, LDN), and others.
 List catalogs installed in the database (with object counts):
 
 ```bash
-python bin/hevelius catalogs
-python bin/hevelius catalogs --sort name
+python bin/hevelius catalog list
+python bin/hevelius catalog list --sort name
 ```
 
 `--sort` may be `entries` (default, by number of objects) or `name`.
@@ -22,10 +22,10 @@ python bin/hevelius catalogs --sort name
 Search catalog objects (all filters are optional; combine as needed):
 
 ```bash
-python bin/hevelius catalog M31
-python bin/hevelius catalog --catalog NGC --const Cyg
-python bin/hevelius catalog 7000 --catalog NGC
-python bin/hevelius catalog --ra "0 42 44" --dec "+41 16 09" --radius 2.0 --limit 5
+python bin/hevelius catalog search M31
+python bin/hevelius catalog search --catalog NGC --const Cyg
+python bin/hevelius catalog search 7000 --catalog NGC
+python bin/hevelius catalog search --ra "0 42 44" --dec "+41 16 09" --radius 2.0 --limit 5
 ```
 
 - Positional `name` — partial match on `name` or `altname`.
