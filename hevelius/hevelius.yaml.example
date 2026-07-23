@@ -8,6 +8,8 @@ database:
 
 paths:
   repo-path: /mnt/volume1/astro
+
+  # The path where to store DB backups.
   backup-path: /mnt/volume1/astro/backup
 
 jwt:

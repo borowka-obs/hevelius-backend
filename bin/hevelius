@@ -17,7 +17,7 @@ from hevelius.cli.repo import repo
 from hevelius.cli.catalog import catalog, format_get
 from hevelius.cli.catalogs import list_catalogs, find_catalog_objects
 from hevelius.cli.users import list_users, add_user, disable_user, enable_user, edit_user_profile
-from hevelius.cli.equipment import (
+from hevelius.equipment import (
     list_filters,
     list_sensors,
     list_projects,
