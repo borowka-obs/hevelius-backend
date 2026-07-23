@@ -345,7 +345,7 @@ def run():
 
     user_parser = subparsers.add_parser('user', help="List, add, enable, or disable a user")
     user_sub = user_parser.add_subparsers(dest='user_command', help="User subcommand")
-    user_list = user_sub.add_parser('list', help="List all users")
+    user_sub.add_parser('list', help="List all users")
     user_add = user_sub.add_parser('add', help="Add a new user (login + password)")
     user_add.add_argument('login', help="Login name (unique)")
     user_add.add_argument('--password', required=True, help="Initial password (stored as argon2id in pass_d)")
