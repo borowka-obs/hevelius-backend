@@ -20,10 +20,9 @@ def send_email(to_addr: str, subject: str, body: str) -> bool:
     host = cfg.get("host")
 
     if not host or not to_addr:
-        logger.info(
-            "SMTP not configured (or no recipient); email not sent. To=%s Subject=%s\n%s",
-            to_addr, subject, body,
-        )
+        # Deliberately omit the body: it may carry a sensitive one-time token
+        # (e.g. a password-reset link), which must never land in cleartext logs.
+        logger.info("SMTP not configured (or no recipient); email not sent. To=%s Subject=%s", to_addr, subject)
         return False
 
     msg = EmailMessage()
