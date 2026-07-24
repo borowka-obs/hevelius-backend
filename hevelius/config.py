@@ -100,10 +100,13 @@ def load_config(return_metadata=False):
     return config_dict.copy()
 
 
-def config_db_get(cfg={}):
+def config_db_get(cfg=None):
     """
     Returns a dictionary with database connection parameters, with defaults filled in.
     """
+
+    if cfg is None:
+        cfg = {}
 
     loaded_config = load_config()
 
