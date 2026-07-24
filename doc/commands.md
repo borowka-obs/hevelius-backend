@@ -43,6 +43,18 @@ hevelius telescope list
 hevelius user list
 ```
 
+## Task list
+
+List tasks (default: latest 100 by `task_id` descending), with the same
+pagination footer style as `asteroid list`:
+
+```shell
+hevelius task list
+hevelius task list --limit 20 --offset 100
+hevelius task list --object M31 --state DONE
+hevelius task list --user thomson --scope-id 3 --sort-by created --sort-order desc
+```
+
 ## Task groups
 
 Show clusters of frames that share similar coordinates (useful for finding

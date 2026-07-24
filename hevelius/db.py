@@ -167,6 +167,153 @@ def task_exists(conn, task_id):
     return v[0][0] == 1
 
 
+TASK_LIST_SORT_FIELDS = {
+    "task_id", "state", "object", "exposure", "ra", "decl",
+    "created", "performed", "user_id", "scope_id",
+}
+
+_TASK_LIST_SORT_SQL = {
+    "task_id": "t.task_id",
+    "state": "t.state",
+    "object": "t.object",
+    "exposure": "t.exposure",
+    "ra": "t.ra",
+    "decl": "t.decl",
+    "created": "t.created",
+    "performed": "t.performed",
+    "user_id": "t.user_id",
+    "scope_id": "t.scope_id",
+}
+
+_TASK_LIST_FROM = """
+    FROM tasks t
+    JOIN users u ON t.user_id = u.user_id
+    LEFT JOIN telescopes tel ON t.scope_id = tel.scope_id
+    LEFT JOIN task_states ts ON t.state = ts.id
+"""
+
+
+def tasks_build_where(
+    object_name: str = None,
+    user_id: int = None,
+    user_login: str = None,
+    scope_id: int = None,
+    state: int = None,
+    project_id: int = None,
+):
+    """Build WHERE clause and params for task list queries."""
+    where_clauses = []
+    params = []
+
+    if object_name:
+        where_clauses.append("t.object ILIKE %s")
+        params.append(f"%{object_name}%")
+    if user_id is not None:
+        where_clauses.append("t.user_id = %s")
+        params.append(user_id)
+    if user_login:
+        where_clauses.append("u.login ILIKE %s")
+        params.append(user_login)
+    if scope_id is not None:
+        where_clauses.append("t.scope_id = %s")
+        params.append(scope_id)
+    if state is not None:
+        where_clauses.append("t.state = %s")
+        params.append(state)
+    if project_id is not None:
+        where_clauses.append(
+            "t.task_id IN (SELECT task_id FROM task_projects WHERE project_id = %s)"
+        )
+        params.append(project_id)
+
+    where = (" WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+    return where, params
+
+
+def tasks_count(
+    conn,
+    object_name: str = None,
+    user_id: int = None,
+    user_login: str = None,
+    scope_id: int = None,
+    state: int = None,
+    project_id: int = None,
+) -> int:
+    """Return number of tasks matching filters."""
+    where, params = tasks_build_where(
+        object_name=object_name,
+        user_id=user_id,
+        user_login=user_login,
+        scope_id=scope_id,
+        state=state,
+        project_id=project_id,
+    )
+    query = "SELECT COUNT(*)" + _TASK_LIST_FROM + where
+    rows = run_query(conn, query, tuple(params) if params else None)
+    return int(rows[0][0]) if rows else 0
+
+
+def tasks_list(
+    conn,
+    object_name: str = None,
+    user_id: int = None,
+    user_login: str = None,
+    scope_id: int = None,
+    state: int = None,
+    project_id: int = None,
+    sort_by: str = "task_id",
+    sort_order: str = "desc",
+    limit: int = None,
+    offset: int = None,
+) -> List:
+    """
+    Return task rows for CLI listing.
+
+    Each row:
+      (task_id, state_id, state_name, object, login, scope_id, telescope_name,
+       exposure, filter, binning, created, performed, ra, decl)
+    """
+    if sort_by not in TASK_LIST_SORT_FIELDS:
+        sort_by = "task_id"
+    if sort_order not in ("asc", "desc"):
+        sort_order = "desc"
+
+    where, params = tasks_build_where(
+        object_name=object_name,
+        user_id=user_id,
+        user_login=user_login,
+        scope_id=scope_id,
+        state=state,
+        project_id=project_id,
+    )
+    sort_sql = _TASK_LIST_SORT_SQL[sort_by]
+    query = f"""
+        SELECT t.task_id, t.state, ts.name, t.object, u.login, t.scope_id, tel.name,
+               t.exposure, t.filter, t.binning, t.created, t.performed, t.ra, t.decl
+        {_TASK_LIST_FROM}
+        {where}
+        ORDER BY {sort_sql} {sort_order.upper()} NULLS LAST, t.task_id DESC
+    """
+    if limit is not None:
+        query += " LIMIT %s"
+        params.append(limit)
+    if offset is not None:
+        query += " OFFSET %s"
+        params.append(offset)
+
+    return run_query(conn, query, tuple(params) if params else None)
+
+
+def task_state_id_by_name(conn, name: str):
+    """Resolve task_states.name (case-insensitive) to id, or None."""
+    rows = run_query(
+        conn,
+        "SELECT id FROM task_states WHERE lower(name) = lower(%s)",
+        (name.strip(),),
+    )
+    return rows[0][0] if rows else None
+
+
 def tasks_get_filter(conn, criteria):
     query = "SELECT state,task_id, imagename, object, he_solved_ra, he_solved_dec, exposure, filter, binning, he_fwhm, eccentricity "\
         "FROM tasks "\

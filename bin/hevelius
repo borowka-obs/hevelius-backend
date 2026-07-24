@@ -15,6 +15,7 @@ from hevelius.stats import stats, histogram_show, groups
 from hevelius.cli.db_migrate import migrate
 from hevelius.cli.repo import repo
 from hevelius.cli.task_search import task_search, format_get
+from hevelius.cli.tasks import list_tasks
 from hevelius.cli.catalogs import list_catalogs, find_catalog_objects
 from hevelius.cli.users import list_users, add_user, disable_user, enable_user, edit_user_profile
 from hevelius.equipment import (
@@ -92,6 +93,44 @@ def run():
 
     task_parser = subparsers.add_parser('task', help="Task-related commands")
     task_sub = task_parser.add_subparsers(dest='task_command', help="Task subcommand")
+    task_list = task_sub.add_parser(
+        'list',
+        help="List tasks (default: latest 100 by task_id)",
+    )
+    task_list.add_argument(
+        '--limit', type=int, default=100,
+        help="Max rows to print (default: 100)",
+    )
+    task_list.add_argument(
+        '--offset', type=int, default=0,
+        help="Skip this many rows before printing (default: 0)",
+    )
+    task_list.add_argument(
+        '--sort-by', dest='sort_by', default='task_id',
+        choices=[
+            'task_id', 'state', 'object', 'exposure', 'ra', 'decl',
+            'created', 'performed', 'user_id', 'scope_id',
+        ],
+        help="Sort field (default: task_id)",
+    )
+    task_list.add_argument(
+        '--sort-order', dest='sort_order', default='desc', choices=['asc', 'desc'],
+        help="Sort direction (default: desc = latest first)",
+    )
+    task_list.add_argument('--object', type=str, default=None,
+                           help="Filter by object name (partial, case-insensitive)")
+    task_list.add_argument('--user', type=str, default=None,
+                           help="Filter by user login (partial, case-insensitive)")
+    task_list.add_argument('--user-id', type=int, default=None, dest='user_id',
+                           help="Filter by user_id")
+    task_list.add_argument('--scope-id', type=int, default=None, dest='scope_id',
+                           help="Filter by telescope scope_id")
+    task_list.add_argument('--state', type=str, default=None,
+                           help="Filter by state id or name (e.g. 6 or DONE)")
+    task_list.add_argument('--project-id', type=int, default=None, dest='project_id',
+                           help="Filter by project_id")
+    task_list.add_argument('--no-color', action='store_true',
+                           help="Disable ANSI colors in the output")
     task_groups = task_sub.add_parser('groups', help="Shows frames' groups")
     task_groups.add_argument("-m", "--min", help="Minimum number of frames in a group", type=int, default=200)
     # Default RA/Dec set to the first Messier object
@@ -515,6 +554,8 @@ def run():
             return histogram_show(args)  # see cmd_stats.py
         return parser.print_help()
     if args.command == "task":
+        if args.task_command == "list":
+            return list_tasks(args)
         if args.task_command == "groups":
             return groups(args)  # see cmd_stats.py
         if args.task_command == "search":
