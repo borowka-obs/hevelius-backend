@@ -3,7 +3,34 @@
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project versioning adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.6.0 (unreleased)
+## 0.6.0 (2026-07-24)
+
+Asteroids
+- API: asteroid list/detail (`GET`/`POST /api/asteroids`, `GET /api/asteroids/{id}`),
+  per-asteroid night visibility curve (`GET /api/asteroids/{id}/visibility`), and
+  tag CRUD plus attach/detach endpoints. List/detail expose `name`; list accepts
+  `name` filter and `sort_by=name`.
+- CLI: asteroid download/load from MPCORB and bulk night visibility listing.
+- CLI: `hevelius asteroid list` prints catalogue rows (default: first 100 by
+  increasing MPC number) with `--sort-by` / `--sort-order` and filters for name,
+  designation, number, numbered/unnumbered, H magnitude range, and tags.
+- CLI: `hevelius asteroid show <query>` looks up by proper name, MPC number, or
+  packed designation and prints a detailed (optionally colored) summary.
+  With `--telescope` / `--telescope-id`, also prints a night altitude chart for
+  that site (`--date`, `--step-minutes` optional), including sunset/sunrise and
+  moonrise/moonset; chart markers are yellow while the Moon is above the horizon.
+- Fix: MPCORB permanent-number unpacking (plain, letter-coded, and tilde/base-62 forms).
+- CLI: `hevelius asteroid download` skips MPC when the local cache is younger than 7 days
+  (prints the reason); use `--force` to re-download. Download failures are logged clearly.
+- CLI: `hevelius asteroid status` reports MPCORB cache location/age and DB asteroid counters.
+- CLI: `hevelius asteroid load` upserts orbital elements from the cached MPCORB file into the DB.
+- DB: schema bumped to 22: asteroids data now available.
+- DB: schema bumped to 23: camera rotation, camera details in the projects.
+  families / NEO / PHA / etc., with list filtering by tag (`any` / `all`); asteroids
+  gain optional proper `name` (from MPCORB readable designation).
+- DB: schema bumped to 24: asteroid tags (`asteroid_tags`, `asteroid_tag_map`) for
+
+SkyMap
 
 - API: `PATCH /api/users/me` now also accepts `phone`, so users can self-edit
   firstname, lastname, phone, email, and aavso_id (previously phone was
@@ -16,7 +43,17 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   accounts. New `smtp` / `web.base-url` config sections control mail delivery
   and the link's frontend URL; without an `smtp.host` configured, the
   reset email is logged instead of sent.
+- CLI: It's possible to specify default rotation for a telescope, and an image rotation for
+  a project.
+- API: The telescopes now have a default camera rotation. The projects now have camera rotation.
+  If not specified, the default from the telescope is copied.
+
+User details
+
 - CLI: `hevelius user profile-edit` gained `--phone`.
+
+Commands clean-up
+
 - Docs: `api/openapi.yaml` now documents `PATCH /api/users/me`,
   `POST /api/users/me/password`, and `POST /api/auth/forgot-password`.
 - CLI: plural list commands folded into singular noun + `list`
@@ -37,33 +74,6 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 - Refactor: REST API moved to `hevelius.api` (run with `python -m hevelius.api`);
   CLI handlers under `hevelius.cli`; shared domain modules (`passwords`, `equipment`,
   `catalogs`, `asteroid`, `stats`). Removed top-level `heveliusbackend` package.
-- DB: schema bumped to 22: asteroids data now available.
-- DB: schema bumped to 23: camera rotation, camera details in the projects.
-- DB: schema bumped to 24: asteroid tags (`asteroid_tags`, `asteroid_tag_map`) for
-  families / NEO / PHA / etc., with list filtering by tag (`any` / `all`); asteroids
-  gain optional proper `name` (from MPCORB readable designation).
-- API: asteroid list/detail (`GET`/`POST /api/asteroids`, `GET /api/asteroids/{id}`),
-  per-asteroid night visibility curve (`GET /api/asteroids/{id}/visibility`), and
-  tag CRUD plus attach/detach endpoints. List/detail expose `name`; list accepts
-  `name` filter and `sort_by=name`.
-- CLI: asteroid download/load from MPCORB and bulk night visibility listing.
-- CLI: `hevelius asteroid list` prints catalogue rows (default: first 100 by
-  increasing MPC number) with `--sort-by` / `--sort-order` and filters for name,
-  designation, number, numbered/unnumbered, H magnitude range, and tags.
-- CLI: `hevelius asteroid show <query>` looks up by proper name, MPC number, or
-  packed designation and prints a detailed (optionally colored) summary.
-  With `--telescope` / `--telescope-id`, also prints a night altitude chart for
-  that site (`--date`, `--step-minutes` optional), including sunset/sunrise and
-  moonrise/moonset; chart markers are yellow while the Moon is above the horizon.
-- Fix: MPCORB permanent-number unpacking (plain, letter-coded, and tilde/base-62 forms).
-- API: The telescopes now have a default camera rotation. The projects now have camera rotation.
-  If not specified, the default from the telescope is copied.
-- CLI: It's possible to specify default rotation for a telescope, and an image rotation for
-  a project.
-- CLI: `hevelius asteroid download` skips MPC when the local cache is younger than 7 days
-  (prints the reason); use `--force` to re-download. Download failures are logged clearly.
-- CLI: `hevelius asteroid status` reports MPCORB cache location/age and DB asteroid counters.
-- CLI: `hevelius asteroid load` upserts orbital elements from the cached MPCORB file into the DB.
 
 ## 0.5.1 (2026-05-26)
 

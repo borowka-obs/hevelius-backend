@@ -11,37 +11,41 @@ PC that controls the telescope).
 
 ## Current capabilities (command-line)
 
-Status as of May 2026:
+Status as of July 2026:
 
-- **Scan FITS repository on disk**: Hevelius is able to scan a local disk for FITS files, extract some data from found files
-  (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
-  characteristics.
-- **Full sky histogram**: `GET /api/tasks/histogram` returns a sparse 1° sky
-  density map of completed plate-solved frames.
-- **Points of interest**: Generate a list of the most commonly photographed coordinates in the sky.
+- **Cameras**: You can define cameras - list, add, edit, assign filters
+  to them, etc.
+- **Filters**: You can define filters - list, add, edit assign them to
+  cameras, etc.
+- **Telescopes**: You can define telescopes, with specific camera and
+  filters.
+- **Projects**: Specify what objects to image with target list of
+  subframes, which telescope to use and more.
 - **Objects and frames search**: Ability to find catalog objects and frames based on specified RA/DEC coordinates and radius.
 - **Many Catalogs**: NGC, IC, Messier, and Caldwell and also some less popular ones. See below for a full list.
-- **PixInsight integration**: This is in the very early stages. The idea is that Hevelius will be able to offload certain
-  tasks to Pix or at least export/import data in a format that's compatible with PixInsight.
-- **Command line iterface**: Currently Hevelius has a command line interface written in `python`.
-- **Web interface**.
-- **Rest API**.
+- **Asteroid observation planning**: Download MPC orbital elements for 1M+ asteroids and find which ones are
+  visible from your site on a given night, with magnitude and altitude filters.
+- **CLI**: Hevelius has a command line interface.
+- **API**: Hevelius has a Rest API that's being used by Hevelius web
+  interface.
+- **Users**: Users can be added (via CLI only for now), they can log in
+  using the web interface and use the system. They can also tweak their
+  own parameters and reset password, if forgotten.
 - **Ability to search based on distance**. Implemented proper Haversine formula.
 - **Database management**: Schema versioning and upgrades, backup, etc.
 - **Configuration**: Config file support and some limited environment variables.
-- **Asteroid observation planning**: Download MPC orbital elements for 1M+ asteroids and find which ones are
-  visible from your site on a given night, with magnitude and altitude filters.
 
-## Current capabilities (REST API)
+## Hevelius web interface
 
-- Log in users, with strong, modern crypto (Argon2id)
-- Observation tasks management (with pagination, filtering, and sorting)
-- Observation projects management (a campaign of many subframes of the same object)
-- Telescopes management (add, edit telescopes)
-- Filters management (add, edit, activate/deactivate filters)
-- Catalogs support: List objects, search objects, filter objects by name, catalog, constellation
-- Search objects in catalogs
-- Display heat map of the sky (sky map colored with number of photos taken in each square degree)
+Hevelius provides a nice web interface. See
+https://github.com/borowka-obs/hevelius-web for details.
+
+## Hevelius runner
+
+Hevelius runner is a small tool that's supposed to run on a machine which
+controls the telescope. It provides various capabilities, such as
+reporting acquired frames, reporting statistics etc. For details, see
+https://github.com/borowka-obs/hevelius-runner
 
 ## Catalogs
 
