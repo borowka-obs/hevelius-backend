@@ -1,11 +1,9 @@
 import sys
 
 import numpy as np
-import pandas as pd
-import plotly.express as px
 
 from hevelius import db
-from hevelius.utils import deg2rah, format_dec, format_ra
+from hevelius.utils import format_dec, format_ra
 
 
 # ANSI foreground codes for catalog labels (stable per shortname).
@@ -234,36 +232,3 @@ def groups(args):
             f"{r['frames']:>{w_frames}}  {r['ra']:<{w_ra}}  {r['dec']:<{w_dec}}  "
             f"{r['obj']:>{w_obj}}  {r['tasks']:>{w_tasks}}  {r['names']}"
         )
-
-
-def histogram_figure_get(args):
-    """
-    Generates plotly figure with histogram data.
-    """
-
-    histo = histogram(args)
-
-    y_labels = list(range(90, -90, -1))
-    y_labels = list(map(lambda a: str(a), y_labels))
-
-    x_labels = list(map(lambda a: deg2rah(a), range(0, 360, 1)))
-
-    labels = dict(x="Right Ascension (h:m/deg)",
-                  y="Declination (deg)", color="# of frames")
-
-    pandas = pd.DataFrame(histo)
-    fig = px.imshow(pandas, labels=labels, y=y_labels, x=x_labels)
-
-    fig['layout']['yaxis']['autorange'] = "reversed"
-
-    return fig
-
-
-def histogram_show(args):
-    """
-    Shows a histogram of image density for the whole sky
-    """
-
-    fig = histogram_figure_get(args)
-
-    fig.show()

@@ -17,8 +17,7 @@ Status as of May 2026:
   (from filenames and FITS header) and put this information into PostgreSQL DB. Then the DB is used to report various
   characteristics.
 - **Full sky histogram**: `GET /api/tasks/histogram` returns a sparse 1° sky
-  density map of completed plate-solved frames (also available as an interactive
-  Plotly page at `/histo`).
+  density map of completed plate-solved frames.
 - **Points of interest**: Generate a list of the most commonly photographed coordinates in the sky.
 - **Objects and frames search**: Ability to find catalog objects and frames based on specified RA/DEC coordinates and radius.
 - **Many Catalogs**: NGC, IC, Messier, and Caldwell and also some less popular ones. See below for a full list.

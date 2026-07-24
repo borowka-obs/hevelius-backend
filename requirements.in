@@ -1,8 +1,6 @@
 astropy
 psycopg2-binary
-pandas
 numpy
-plotly
 flask
 flask-cors
 flask-smorest
