@@ -14,3 +14,16 @@ paths:
 
 jwt:
   secret-key: your-secret-key-here  # Change this in production! Make it at least 32 characters long.
+
+web:
+  # Base URL of the hevelius-web frontend, used to build links in emails (e.g. password reset).
+  base-url: https://hevelius.example.com
+
+smtp:
+  # Leave host unset to disable outgoing email (reset tokens are logged instead of mailed).
+  host: smtp.example.com
+  port: 587
+  username: noreply@example.com
+  password: secret2
+  use-tls: true
+  from-addr: noreply@example.com

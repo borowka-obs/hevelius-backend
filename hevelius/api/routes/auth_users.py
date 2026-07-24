@@ -1,8 +1,6 @@
 """Login, password reset, and user profile API routes."""
 
 import logging
-import secrets
-from datetime import datetime, timezone
 
 from flask import request
 from flask.views import MethodView
@@ -12,10 +10,12 @@ from argon2.exceptions import VerifyMismatchError, InvalidHashError  # type: ign
 
 
 from hevelius import db
+from hevelius.config import load_config
+from hevelius.mailer import send_password_reset_email
 from hevelius.passwords import password_hasher
 from hevelius.user_admin_audit import log_user_admin_action
 from hevelius.api.auth_utils import (
-    PASSWORD_RESET_TOKEN_TTL,
+    issue_password_reset_token,
     password_reset_token_hash,
     jwt_user_id_int,
     jwt_permissions_int,
@@ -26,6 +26,7 @@ from hevelius.api.schemas import (
     LoginRequestSchema,
     LoginResponseSchema,
     PasswordResetCompleteBodySchema,
+    PasswordResetRequestSchema,
     PasswordResetTokenIssueResponseSchema,
     StatusMsgSchema,
     UserAdminDetailSchema,
@@ -123,6 +124,54 @@ class LoginRefreshResource(MethodView):
         return {'status': True, 'token': access_token, 'user_id': int(user_id), 'msg': 'Token refreshed'}
 
 
+@blp.route("/auth/forgot-password")
+class AuthForgotPasswordResource(MethodView):
+    @blp.arguments(PasswordResetRequestSchema)
+    @blp.response(200, StatusMsgSchema)
+    def post(self, body):
+        """Request a password reset link by login or email. Does not require authentication.
+
+        Always returns a generic success message, whether or not the account exists,
+        so this endpoint cannot be used to enumerate registered accounts.
+        """
+        identifier = body["login_or_email"].strip()
+        generic = {"status": True, "msg": "If that account exists, a password reset email has been sent."}
+        if not identifier:
+            return generic
+
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            "SELECT user_id, email FROM users WHERE login = %s OR email = %s",
+            (identifier, identifier),
+        )
+        if not rows:
+            cnx.close()
+            return generic
+
+        user_id, email = rows[0]
+        if not email:
+            # No address to deliver the token to; nothing more we can do here.
+            cnx.close()
+            return generic
+
+        raw_token, _expires_at = issue_password_reset_token(cnx, user_id)
+        cnx.close()
+
+        base_url = (load_config().get("web") or {}).get("base-url", "").rstrip("/")
+        reset_url = f"{base_url}/reset-password?token={raw_token}"
+        send_password_reset_email(email, reset_url)
+
+        log_user_admin_action(
+            "api",
+            "auth.password_reset_request",
+            actor_user_id=None,
+            target_user_id=user_id,
+            details={},
+        )
+        return generic
+
+
 @blp.route("/auth/password-reset")
 class AuthPasswordResetResource(MethodView):
     @blp.arguments(PasswordResetCompleteBodySchema)
@@ -198,7 +247,7 @@ class UsersMeResource(MethodView):
     @blp.arguments(UserProfileUpdateSchema, location="json")
     @blp.response(200, UserAdminDetailSchema)
     def patch(self, body):
-        """Update own profile: firstname, lastname, email (optional, may be empty), aavso_id."""
+        """Update own profile: firstname, lastname, phone, email (optional, may be empty), aavso_id."""
         uid = jwt_user_id_int()
         if uid is None:
             abort(401, message="Invalid token identity")
@@ -208,7 +257,7 @@ class UsersMeResource(MethodView):
             abort(404, message="User not found")
         updates = []
         args = []
-        for key in ("firstname", "lastname", "aavso_id"):
+        for key in ("firstname", "lastname", "phone", "aavso_id"):
             if key in body:
                 updates.append(f"{key} = %s")
                 args.append(body[key] or None)
@@ -336,20 +385,7 @@ class UserPasswordResetTokenResource(MethodView):
         if not row:
             cnx.close()
             abort(404, message="User not found")
-        db.run_query(
-            cnx,
-            "DELETE FROM password_reset_tokens WHERE user_id = %s AND consumed_at IS NULL",
-            (user_id,),
-        )
-        raw = secrets.token_urlsafe(32)
-        th = password_reset_token_hash(raw)
-        expires_at = datetime.now(timezone.utc) + PASSWORD_RESET_TOKEN_TTL
-        db.run_query(
-            cnx,
-            """INSERT INTO password_reset_tokens (user_id, token_hash, expires_at)
-               VALUES (%s, %s, %s)""",
-            (user_id, th, expires_at),
-        )
+        raw, expires_at = issue_password_reset_token(cnx, user_id)
         cnx.close()
         actor = jwt_user_id_int()
         log_user_admin_action(

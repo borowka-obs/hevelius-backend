@@ -5,6 +5,20 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.6.0 (unreleased)
 
+- API: `PATCH /api/users/me` now also accepts `phone`, so users can self-edit
+  firstname, lastname, phone, email, and aavso_id (previously phone was
+  admin-only).
+- API: self-service forgot-password flow. `POST /api/auth/forgot-password`
+  looks up an account by login or email and, if found, emails a one-time
+  reset link (same token mechanism as the existing admin-issued reset,
+  completed via `POST /api/auth/password-reset`). The response is always a
+  generic success message so the endpoint cannot be used to enumerate
+  accounts. New `smtp` / `web.base-url` config sections control mail delivery
+  and the link's frontend URL; without an `smtp.host` configured, the
+  reset email is logged instead of sent.
+- CLI: `hevelius user profile-edit` gained `--phone`.
+- Docs: `api/openapi.yaml` now documents `PATCH /api/users/me`,
+  `POST /api/users/me/password`, and `POST /api/auth/forgot-password`.
 - CLI: plural list commands folded into singular noun + `list`
   (`catalog list`, `filter list`, `sensor list`, `project list`,
   `telescope list`, `user list`). Catalog object search is now

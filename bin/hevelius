@@ -400,6 +400,7 @@ def run():
     user_profile_edit.add_argument('login_or_id', help="Login name or numeric user_id")
     user_profile_edit.add_argument('--firstname', default=None, help="First name")
     user_profile_edit.add_argument('--lastname', default=None, help="Last name")
+    user_profile_edit.add_argument('--phone', default=None, help="Phone number")
     user_profile_edit.add_argument('--email', default=None, help="Email address (empty string to clear)")
     user_profile_edit.add_argument('--aavso-id', default=None, dest='aavso_id', help="AAVSO observer ID")
 
@@ -832,6 +833,7 @@ def run():
                 args.login_or_id,
                 firstname=getattr(args, 'firstname', None),
                 lastname=getattr(args, 'lastname', None),
+                phone=getattr(args, 'phone', None),
                 email=getattr(args, 'email', None),
                 aavso_id=getattr(args, 'aavso_id', None),
             )

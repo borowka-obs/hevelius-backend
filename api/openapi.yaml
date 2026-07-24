@@ -1452,11 +1452,56 @@ components:
       properties:
         token:
           type: string
-          description: One-time token from administrator
+          description: One-time token (administrator-issued or from the forgot-password flow)
         new_password:
           type: string
           minLength: 8
           description: New password (argon2id stored in pass_d)
+    PasswordResetRequest:
+      type: object
+      required:
+        - login_or_email
+      properties:
+        login_or_email:
+          type: string
+          description: Account login or email address
+    UserProfileUpdate:
+      type: object
+      description: Fields the authenticated user may edit on their own profile. All fields optional.
+      properties:
+        firstname:
+          type: string
+          nullable: true
+          maxLength: 32
+        lastname:
+          type: string
+          nullable: true
+          maxLength: 32
+        phone:
+          type: string
+          nullable: true
+          maxLength: 32
+        email:
+          type: string
+          nullable: true
+          maxLength: 64
+        aavso_id:
+          type: string
+          nullable: true
+          maxLength: 5
+    UserPasswordChange:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+          description: Current password
+        new_password:
+          type: string
+          minLength: 8
+          description: New password
     StatusMsg:
       type: object
       properties:
@@ -1529,12 +1574,34 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VersionResponse'
+  /api/auth/forgot-password:
+    post:
+      summary: Request a password reset email
+      description: |
+        Looks up an account by login or email and, if found and it has an email address on
+        file, emails a one-time reset link (consumed via POST /api/auth/password-reset).
+        Does not require authentication. Always returns a generic success message regardless
+        of whether the account exists, to avoid account enumeration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        '200':
+          description: Generic success message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
   /api/auth/password-reset:
     post:
-      summary: Complete password reset with admin-issued token
+      summary: Complete password reset with a one-time token
       description: |
         Sets pass_d from new_password using a one-time token returned by
-        POST /api/users/{user_id}/password-reset-token. Does not require authentication.
+        POST /api/users/{user_id}/password-reset-token (administrator) or
+        POST /api/auth/forgot-password (self-service). Does not require authentication.
       requestBody:
         required: true
         content:
@@ -1559,6 +1626,57 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/UserAdminDetail'
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: User row missing
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update own profile
+      description: |
+        Updates the authenticated user's firstname, lastname, phone, email, and/or aavso_id.
+        Only fields present in the request body are changed; email may be set to null/empty
+        to clear it.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserProfileUpdate'
+      responses:
+        '200':
+          description: Updated user profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserAdminDetail'
+        '401':
+          description: Missing or invalid JWT
+        '404':
+          description: User row missing
+      security:
+        - bearerAuth: []
+  /api/users/me/password:
+    post:
+      summary: Change own password
+      description: |
+        Sets a new password after verifying current_password against the stored credential.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPasswordChange'
+      responses:
+        '200':
+          description: Password updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusMsg'
+        '400':
+          description: Current password incorrect, or account has no password set
         '401':
           description: Missing or invalid JWT
         '404':
