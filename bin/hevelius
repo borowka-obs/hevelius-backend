@@ -138,7 +138,8 @@ def run():
     task_search_parser.add_argument('-r', "--ra", help="Right Ascension (HH MM [SS] format)", type=str, default="05 34 31")
     task_search_parser.add_argument('-d', "--decl", help="Declination of the image searched (+DD MM SS format)", type=str, default="+22 00 52")
     task_search_parser.add_argument('-p', "--proximity", help="radius of an area to look at (in degrees)", type=float, default=1.0)
-    task_search_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full", type=format_get, default="brief")
+    task_search_parser.add_argument('-f', "--format", help="format of the frames list output: none, filenames, csv, brief, full",
+                                    type=format_get, default="brief")
     task_search_parser.add_argument('-o', "--object", help="Resolve centre from catalog object name (instead of --ra/--decl)", type=str, default="")
     task_search_parser.add_argument('-b', "--bin", help="filtering: binning of the frames to look for (1..4, 0 means any)", type=int, default=0)
     task_search_parser.add_argument("--focal", help="filtering: focal length (mm)", type=int, default=0)
