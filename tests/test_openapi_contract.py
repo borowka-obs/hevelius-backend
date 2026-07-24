@@ -46,6 +46,7 @@ class TestOpenAPISpec(unittest.TestCase):
             "/api/users",
             "/api/task-add",
             "/api/tasks",
+            "/api/tasks/histogram",
             "/api/task-find-by-filename",
             "/api/tasks-filename-list",
             "/api/task-get",

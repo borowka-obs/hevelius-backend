@@ -181,6 +181,65 @@ components:
         pages:
           type: integer
           description: Total number of pages
+    TasksHistogramCell:
+      type: object
+      required: [ra_deg, decl_deg, count]
+      properties:
+        ra_deg:
+          type: integer
+          description: Right Ascension bin centre in degrees (0–359)
+          minimum: 0
+          maximum: 359
+        decl_deg:
+          type: integer
+          description: Declination bin centre in degrees (−90–90)
+          minimum: -90
+          maximum: 90
+        count:
+          type: integer
+          description: Number of completed plate-solved frames in this bin
+          minimum: 0
+    TasksHistogram:
+      type: object
+      required:
+        - resolution_deg
+        - ra_bins
+        - decl_bins
+        - ra_unit
+        - total_frames
+        - nonempty_cells
+        - cells
+      description: >
+        Sky density of completed (state=6), plate-solved tasks in 1°×1° bins.
+        RA is in degrees (0–359). Declination rows cover +90…−89 (180 bins).
+        Only non-empty bins are returned in `cells`.
+      properties:
+        resolution_deg:
+          type: integer
+          description: Bin size in degrees (currently always 1)
+          example: 1
+        ra_bins:
+          type: integer
+          description: Number of RA bins (0..ra_bins-1 degrees)
+          example: 360
+        decl_bins:
+          type: integer
+          description: Number of declination bins
+          example: 180
+        ra_unit:
+          type: string
+          enum: [deg]
+          description: Unit of ra_deg values
+        total_frames:
+          type: integer
+          description: Total frames included in the histogram
+        nonempty_cells:
+          type: integer
+          description: Number of bins with count > 0
+        cells:
+          type: array
+          items:
+            $ref: '#/components/schemas/TasksHistogramCell'
     TaskFindByFilenameMatch:
       type: object
       required:
@@ -1808,6 +1867,21 @@ paths:
                     type: integer
                   msg:
                     type: string
+      security:
+        - bearerAuth: []
+  /api/tasks/histogram:
+    get:
+      summary: Sky density histogram of completed tasks
+      description: >
+        Returns a sparse 1°×1° histogram of completed (state=6), plate-solved
+        frames across the sky (RA/Dec). Suitable for heatmap visualisation.
+      responses:
+        '200':
+          description: Sky histogram data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TasksHistogram'
       security:
         - bearerAuth: []
   /api/tasks:

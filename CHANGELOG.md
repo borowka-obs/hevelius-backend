@@ -15,6 +15,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   remains the catalog object search.
 - CLI: `hevelius task list` lists tasks (default: latest 100) with filters,
   sorting, and pagination footer (`--offset` / `--limit`).
+- API: `GET /api/tasks/histogram` returns a sparse 1° sky density histogram of
+  completed plate-solved frames (replaces CLI `hevelius data distrib`).
+- CLI: removed `hevelius data` / `data distrib` (use the histogram API or `/histo`).
 - Auth: drop legacy MD5 `pass_d` login/change support; argon2id only.
 - Refactor: REST API moved to `hevelius.api` (run with `python -m hevelius.api`);
   CLI handlers under `hevelius.cli`; shared domain modules (`passwords`, `equipment`,

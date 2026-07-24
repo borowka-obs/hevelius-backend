@@ -11,7 +11,7 @@ sys.path.append(".")
 
 # pylint: disable=wrong-import-position
 from hevelius.cli.basic import db_version, hevelius_version, config_show, backup
-from hevelius.stats import stats, histogram_show, groups
+from hevelius.stats import stats, groups
 from hevelius.cli.db_migrate import migrate
 from hevelius.cli.repo import repo
 from hevelius.cli.task_search import task_search, format_get
@@ -86,10 +86,6 @@ def run():
     repo_parser.add_argument("--min-task-id", help="Minimum task ID to check (for sanity-db)", type=int)
     repo_parser.add_argument("--max-task-id", help="Maximum task ID to check (for sanity-db)", type=int)
     repo_parser.add_argument("--delete-invalid", help="Delete invalid tasks (no filename or missing file) when using sanity-db", action='store_true')
-
-    data_parser = subparsers.add_parser('data', help="Explores, analyses and digs through available data (data mining)")
-    data_subparsers = data_parser.add_subparsers(help="Commands related to data", dest="data_command")
-    data_subparsers.add_parser('distrib', help="Shows photos distribution")  # distrib_parser
 
     task_parser = subparsers.add_parser('task', help="Task-related commands")
     task_sub = task_parser.add_subparsers(dest='task_command', help="Task subcommand")
@@ -549,10 +545,6 @@ def run():
             return backup(args)  # see cmd_backup.py
         if args.db_command == "stats":
             return stats()  # see cmd_stats.py
-        return parser.print_help()
-    if args.command == "data":
-        if args.data_command == "distrib":
-            return histogram_show(args)  # see cmd_stats.py
         return parser.print_help()
     if args.command == "task":
         if args.task_command == "list":

@@ -60,31 +60,78 @@ def stats():
     cnx.close()
 
 
-def histogram(args):
+def histogram(args=None):
     """
     Generates frequency of photo frames for the whole sky.
-    Buckets are 1x1 degree.
-
-    :param args: _description_
-    :type args: _type_
-    :return: _description_
-    :rtype: _type_
+    Buckets are 1x1 degree. Returns a numpy array of shape (180, 360)
+    where row 0 is decl +90° and column 0 is RA 0°.
     """
+    return np.array(sky_histogram_grid()[0], dtype=float)
 
-    cnx = db.connect()
-    tasks = db.tasks_get_filter(cnx, "imagename is not null AND he_solved_ra is not null AND state = 6")
-    cnx.close()
 
-    # This gets a list of coords (0-359, -90..90)
+def sky_histogram_grid(conn=None):
+    """
+    Build a 1°×1° sky density grid for completed plate-solved tasks.
 
-    # decl (89.99 .. -16)
-    histo = np.zeros((180, 360))
-    for t in tasks:
-        ra = int(t[4])
-        decl = int(t[5])
-        histo[90 - decl][ra] += 1
+    Returns (grid, total_frames) where grid is a list of 180 rows × 360 cols
+    (ints). Row i corresponds to declination (90 - i) degrees; column j is RA j°.
+    """
+    close = False
+    if conn is None:
+        conn = db.connect()
+        close = True
+    try:
+        rows = db.run_query(
+            conn,
+            """SELECT he_solved_ra, he_solved_dec FROM tasks
+               WHERE imagename IS NOT NULL
+                 AND he_solved_ra IS NOT NULL
+                 AND state = 6""",
+        )
+    finally:
+        if close:
+            conn.close()
 
-    return histo
+    grid = [[0] * 360 for _ in range(180)]
+    total = 0
+    for ra_f, decl_f in rows or []:
+        try:
+            ra = int(ra_f)
+            decl = int(decl_f)
+        except (TypeError, ValueError):
+            continue
+        if ra < 0 or ra >= 360:
+            continue
+        row = 90 - decl
+        if row < 0 or row >= 180:
+            continue
+        grid[row][ra] += 1
+        total += 1
+    return grid, total
+
+
+def sky_histogram_payload(conn=None):
+    """JSON-serialisable sparse sky histogram for the REST API."""
+    grid, total = sky_histogram_grid(conn)
+    cells = []
+    for row_idx, row in enumerate(grid):
+        decl_deg = 90 - row_idx
+        for ra_deg, count in enumerate(row):
+            if count:
+                cells.append({
+                    "ra_deg": ra_deg,
+                    "decl_deg": decl_deg,
+                    "count": int(count),
+                })
+    return {
+        "resolution_deg": 1,
+        "ra_bins": 360,
+        "decl_bins": 180,
+        "ra_unit": "deg",
+        "total_frames": int(total),
+        "nonempty_cells": len(cells),
+        "cells": cells,
+    }
 
 
 def _ansi(code: str, text: str, enabled: bool) -> str:

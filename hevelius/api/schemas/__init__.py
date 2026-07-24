@@ -240,6 +240,22 @@ class TasksList(Schema):
     pages = fields.Integer(required=True, metadata={"description": "Total number of pages"})
 
 
+class TasksHistogramCellSchema(Schema):
+    ra_deg = fields.Integer(required=True, metadata={"description": "RA bin in degrees (0–359)"})
+    decl_deg = fields.Integer(required=True, metadata={"description": "Declination bin in degrees"})
+    count = fields.Integer(required=True, metadata={"description": "Frame count in this bin"})
+
+
+class TasksHistogramSchema(Schema):
+    resolution_deg = fields.Integer(required=True)
+    ra_bins = fields.Integer(required=True)
+    decl_bins = fields.Integer(required=True)
+    ra_unit = fields.String(required=True)
+    total_frames = fields.Integer(required=True)
+    nonempty_cells = fields.Integer(required=True)
+    cells = fields.List(fields.Nested(TasksHistogramCellSchema), required=True)
+
+
 class TaskFindByFilenameQuerySchema(Schema):
     filename = fields.String(
         required=True,
