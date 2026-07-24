@@ -3,6 +3,7 @@
 # and it's caused by one of our dependencies.
 
 import unittest
+import unittest.mock
 import os
 import json
 import time
@@ -2619,15 +2620,90 @@ class TestUsersAPI(unittest.TestCase):
         os.environ.pop("HEVELIUS_DB_NAME")
 
     @use_repository
-    def test_users_me_patch_profile(self, config):
-        """PATCH /api/users/me updates firstname, lastname, email, and aavso_id."""
+    def test_forgot_password_by_login_issues_token(self, config):
+        """POST /api/auth/forgot-password with a known login creates a usable reset token."""
         os.environ["HEVELIUS_DB_NAME"] = config["database"]
-        body = {"firstname": "Alice", "lastname": "Smith", "email": "alice@example.com", "aavso_id": "AA001"}
+        with unittest.mock.patch("hevelius.api.routes.auth_users.send_password_reset_email") as mock_send:
+            response = self.app.post(
+                "/api/auth/forgot-password",
+                data=json.dumps({"login_or_email": "user1"}),
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get("status"))
+        mock_send.assert_called_once()
+        to_addr, reset_url = mock_send.call_args[0]
+        self.assertEqual(to_addr, "jan.kowalski@example.com")
+        token = reset_url.rsplit("token=", 1)[1]
+
+        response2 = self.app.post(
+            "/api/auth/password-reset",
+            data=json.dumps({"token": token, "new_password": "brandnewpass123"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(response2.status_code, 200)
+        self.assertTrue(json.loads(response2.data).get("status"))
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_forgot_password_by_email_issues_token(self, config):
+        """POST /api/auth/forgot-password also accepts the account's email address."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        with unittest.mock.patch("hevelius.api.routes.auth_users.send_password_reset_email") as mock_send:
+            response = self.app.post(
+                "/api/auth/forgot-password",
+                data=json.dumps({"login_or_email": "jan.kowalski@example.com"}),
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(response.status_code, 200)
+        mock_send.assert_called_once()
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_forgot_password_unknown_identifier_generic_response(self, config):
+        """Unknown login/email returns the same generic message and does not error or send mail."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        with unittest.mock.patch("hevelius.api.routes.auth_users.send_password_reset_email") as mock_send:
+            response = self.app.post(
+                "/api/auth/forgot-password",
+                data=json.dumps({"login_or_email": "no-such-user@example.com"}),
+                headers={"Content-Type": "application/json"},
+            )
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertTrue(data.get("status"))
+        mock_send.assert_not_called()
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_forgot_password_does_not_require_auth(self, config):
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        response = self.app.post(
+            "/api/auth/forgot-password",
+            data=json.dumps({"login_or_email": "user1"}),
+            headers={"Content-Type": "application/json"},
+        )
+        self.assertEqual(response.status_code, 200)
+        os.environ.pop("HEVELIUS_DB_NAME")
+
+    @use_repository
+    def test_users_me_patch_profile(self, config):
+        """PATCH /api/users/me updates firstname, lastname, phone, email, and aavso_id."""
+        os.environ["HEVELIUS_DB_NAME"] = config["database"]
+        body = {
+            "firstname": "Alice",
+            "lastname": "Smith",
+            "phone": "+1 555 0100",
+            "email": "alice@example.com",
+            "aavso_id": "AA001",
+        }
         response = self.app.patch("/api/users/me", data=json.dumps(body), headers=self.headers_no_admin)
         self.assertEqual(response.status_code, 200)
         data = json.loads(response.data)
         self.assertEqual(data["firstname"], "Alice")
         self.assertEqual(data["lastname"], "Smith")
+        self.assertEqual(data["phone"], "+1 555 0100")
         self.assertEqual(data["email"], "alice@example.com")
         self.assertEqual(data["aavso_id"], "AA001")
         self.assertNotIn("pass_d", data)

@@ -133,8 +133,8 @@ def disable_user(login_or_id):
     return True
 
 
-def edit_user_profile(login_or_id, firstname=None, lastname=None, email=None, aavso_id=None):
-    """Update profile fields (firstname, lastname, email, aavso_id) for a user.
+def edit_user_profile(login_or_id, firstname=None, lastname=None, phone=None, email=None, aavso_id=None):
+    """Update profile fields (firstname, lastname, phone, email, aavso_id) for a user.
     Pass empty string for email to clear it. Returns True on success."""
     cnx = db.connect()
     row = _resolve_user(cnx, login_or_id)
@@ -145,7 +145,7 @@ def edit_user_profile(login_or_id, firstname=None, lastname=None, email=None, aa
     uid, login = row
     updates = []
     args = []
-    for key, val in (("firstname", firstname), ("lastname", lastname), ("aavso_id", aavso_id)):
+    for key, val in (("firstname", firstname), ("lastname", lastname), ("phone", phone), ("aavso_id", aavso_id)):
         if val is not None:
             updates.append(f"{key} = %s")
             args.append(val or None)

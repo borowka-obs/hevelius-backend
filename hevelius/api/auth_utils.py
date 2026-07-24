@@ -1,8 +1,11 @@
 """JWT and auth helpers for the Hevelius REST API."""
 import hashlib
-from datetime import timedelta
+import secrets
+from datetime import datetime, timedelta, timezone
 
 from flask_jwt_extended import get_jwt, get_jwt_identity
+
+from hevelius import db
 
 PASSWORD_RESET_TOKEN_TTL = timedelta(hours=1)
 
@@ -23,6 +26,27 @@ def jwt_identity_to_string(identity):
 def password_reset_token_hash(raw_token: str) -> str:
     """SHA-256 hex digest of a password-reset token for DB storage."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def issue_password_reset_token(cnx, user_id: int):
+    """Invalidate any pending reset tokens for user_id and issue a new one.
+
+    Returns (raw_token, expires_at); the raw token is only ever available here.
+    """
+    db.run_query(
+        cnx,
+        "DELETE FROM password_reset_tokens WHERE user_id = %s AND consumed_at IS NULL",
+        (user_id,),
+    )
+    raw = secrets.token_urlsafe(32)
+    token_hash = password_reset_token_hash(raw)
+    expires_at = datetime.now(timezone.utc) + PASSWORD_RESET_TOKEN_TTL
+    db.run_query(
+        cnx,
+        "INSERT INTO password_reset_tokens (user_id, token_hash, expires_at) VALUES (%s, %s, %s)",
+        (user_id, token_hash, expires_at),
+    )
+    return raw, expires_at
 
 
 def jwt_user_id_int():

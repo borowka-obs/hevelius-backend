@@ -20,7 +20,18 @@ DEFAULT_CONFIG = {
     },
     'jwt': {
         'secret-key': None,
-    }
+    },
+    'web': {
+        'base-url': 'http://localhost:3000',
+    },
+    'smtp': {
+        'host': None,
+        'port': 587,
+        'username': None,
+        'password': None,
+        'use-tls': True,
+        'from-addr': 'noreply@hevelius.local',
+    },
 }
 
 
@@ -66,6 +77,12 @@ def load_config(return_metadata=False):
         'HEVELIUS_REPO_PATH': ('paths', 'repo-path'),
         'HEVELIUS_BACKUP_PATH': ('paths', 'backup-path'),
         'JWT_SECRET_KEY': ('jwt', 'secret-key'),
+        'HEVELIUS_WEB_BASE_URL': ('web', 'base-url'),
+        'HEVELIUS_SMTP_HOST': ('smtp', 'host'),
+        'HEVELIUS_SMTP_PORT': ('smtp', 'port'),
+        'HEVELIUS_SMTP_USERNAME': ('smtp', 'username'),
+        'HEVELIUS_SMTP_PASSWORD': ('smtp', 'password'),
+        'HEVELIUS_SMTP_FROM': ('smtp', 'from-addr'),
     }
 
     for env_var, (section, key) in env_mapping.items():

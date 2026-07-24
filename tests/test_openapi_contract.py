@@ -36,10 +36,12 @@ class TestOpenAPISpec(unittest.TestCase):
         paths = set(self.spec["paths"].keys())
         expected = {
             "/api/version",
+            "/api/auth/forgot-password",
             "/api/auth/password-reset",
             "/api/login",
             "/api/login/refresh",
             "/api/users/me",
+            "/api/users/me/password",
             "/api/users/audit-log",
             "/api/users/logins",
             "/api/users/{user_id}/password-reset-token",

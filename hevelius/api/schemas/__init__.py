@@ -991,6 +991,7 @@ class UsersAdminListResponseSchema(Schema):
 class UserProfileUpdateSchema(Schema):
     firstname = fields.String(allow_none=True, validate=validate.Length(max=32))
     lastname = fields.String(allow_none=True, validate=validate.Length(max=32))
+    phone = fields.String(allow_none=True, validate=validate.Length(max=32))
     email = fields.String(allow_none=True, validate=validate.Length(max=64))
     aavso_id = fields.String(allow_none=True, validate=validate.Length(max=5))
 
@@ -1001,6 +1002,14 @@ class UserPasswordChangeSchema(Schema):
         required=True,
         validate=validate.Length(min=8, error="Password must be at least 8 characters"),
         metadata={"description": "New password"},
+    )
+
+
+class PasswordResetRequestSchema(Schema):
+    login_or_email = fields.String(
+        required=True,
+        validate=validate.Length(min=1, max=64),
+        metadata={"description": "Account login or email address"},
     )
 
 
