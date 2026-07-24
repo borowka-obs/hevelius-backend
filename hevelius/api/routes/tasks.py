@@ -8,6 +8,7 @@ from flask_jwt_extended import jwt_required
 
 
 from hevelius import db, config as hevelius_config
+from hevelius import stats
 from hevelius.version import VERSION
 from hevelius.api.auth_utils import (
     jwt_user_id_int,
@@ -25,6 +26,7 @@ from hevelius.api.schemas import (
     TaskUpdateResponseSchema,
     TasksFilenameListQuerySchema,
     TasksFilenameListResponseSchema,
+    TasksHistogramSchema,
     TasksList,
     TasksRequestSchema,
     VersionResponseSchema,
@@ -139,6 +141,19 @@ class TaskAddResource(MethodView):
                 'status': False,
                 'msg': f'Error creating task: {str(e)}'
             }
+
+
+@blp.route("/tasks/histogram")
+class TasksHistogramResource(MethodView):
+    @jwt_required()
+    @blp.response(200, TasksHistogramSchema)
+    def get(self):
+        """Sky density histogram of completed plate-solved tasks (1° bins)."""
+        cnx = db.connect()
+        try:
+            return stats.sky_histogram_payload(cnx)
+        finally:
+            cnx.close()
 
 
 @blp.route("/tasks")
