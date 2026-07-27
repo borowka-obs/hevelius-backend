@@ -27,3 +27,8 @@ smtp:
   password: secret2
   use-tls: true
   from-addr: noreply@example.com
+
+logs:
+  # Directory where the gunicorn access/error logs are written
+  # (see doc/gunicorn-hevelius.service). Used by `hevelius doctor`.
+  path: /var/log/hevelius

@@ -11,6 +11,7 @@ sys.path.append(".")
 
 # pylint: disable=wrong-import-position
 from hevelius.cli.basic import db_version, hevelius_version, config_show, backup
+from hevelius.cli.doctor import doctor
 from hevelius.stats import stats, groups
 from hevelius.cli.db_migrate import migrate
 from hevelius.cli.repo import repo
@@ -66,6 +67,10 @@ def run():
 
     subparsers.add_parser('config', help="Shows current Hevelius (DB,file repository) configuration.")
     subparsers.add_parser('version', help="Shows the current Hevelius version.")
+
+    doctor_parser = subparsers.add_parser('doctor', help="Checks that Hevelius is configured and running correctly.")
+    doctor_parser.add_argument("--mail-check", metavar="EMAIL", help="Send a test email to EMAIL using the configured SMTP settings.")
+    doctor_parser.add_argument("--no-color", help="Disable ANSI colors in the output", action='store_true')
 
     db_parser = subparsers.add_parser('db', help="Manages database")
     db_subparsers = db_parser.add_subparsers(help="Commands related to database", dest="db_command")
@@ -563,6 +568,8 @@ def run():
         return catalog_mgmt_parser.print_help() or 1
     if args.command == "config":
         return config_show()  # see cmd_basic.py
+    if args.command == "doctor":
+        return doctor(args)  # see cli/doctor.py
     if args.command == "repo":
         return repo(args)  # see cmd_repo.py
     if args.command == "version":
@@ -864,4 +871,4 @@ def version():
 
 
 if __name__ == '__main__':
-    run()
+    sys.exit(run())

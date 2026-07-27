@@ -6,6 +6,18 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 ## 0.7.0 (unreleased)
 
 - Bug: Fixed hevelius db migrate command - it does not throw anymore.
+- CLI: `hevelius doctor` checks whether the tool starts, where the config was
+  loaded from, DB connectivity and schema version (against `db/*.psql`),
+  presence of and recent errors in the gunicorn access/error logs, and
+  whether `jwt.secret-key`, `web.base-url`, and `smtp.*` were changed from
+  their example/default values. `hevelius doctor --mail-check EMAIL` sends a
+  real test email through the configured SMTP server. New `logs.path` config
+  section (`HEVELIUS_LOG_PATH` env var, default `/var/log/hevelius`).
+- Bug: `hevelius.config.load_config()` deep-copies its defaults now, so an
+  env var override no longer leaks into later `load_config()` calls in the
+  same process after the env var is unset.
+- Bug: `bin/hevelius` now propagates command exit codes via `sys.exit()`
+  instead of always exiting 0.
 
 ## 0.6.0 (2026-07-24)
 
