@@ -6,13 +6,14 @@ The command-line can be accessed the following way:
 ```shell
 $ python bin/hevelius --help
 usage: hevelius [-h]
-                {config,version,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid} ...
+                {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid} ...
 
 positional arguments:
-  {config,version,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid}
+  {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid}
                         commands
     config              Shows current Hevelius (DB,file repository) configuration.
     version             Shows the current Hevelius version.
+    doctor              Checks that Hevelius is configured and running correctly.
     db                  Manages database
     repo                Manages files repository on local storage.
     task                Task-related commands
@@ -40,6 +41,32 @@ hevelius sensor list
 hevelius project list
 hevelius telescope list
 hevelius user list
+```
+
+## Doctor
+
+`hevelius doctor` runs a series of sanity checks on the local installation
+and prints an `OK` / `WARN` / `FAIL` report: whether the tool starts, where
+the config file was loaded from, whether the database is reachable and on
+the latest schema, whether the gunicorn access/error logs are present and
+free of recent errors, and whether `jwt.secret-key`, `web.base-url`, and
+the `smtp.*` settings have been changed from their example/default values.
+It exits with status 1 if any check fails.
+
+```shell
+hevelius doctor
+hevelius doctor --no-color
+```
+
+Log files are looked up under `logs.path` in the config (`HEVELIUS_LOG_PATH`
+env var), which defaults to `/var/log/hevelius` (matching
+`doc/gunicorn-hevelius.service`).
+
+Use `--mail-check EMAIL` to actually send a test message through the
+configured SMTP server, to verify outgoing email works end to end:
+
+```shell
+hevelius doctor --mail-check you@example.com
 ```
 
 ## Task list

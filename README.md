@@ -34,6 +34,8 @@ Status as of July 2026:
 - **Ability to search based on distance**. Implemented proper Haversine formula.
 - **Database management**: Schema versioning and upgrades, backup, etc.
 - **Configuration**: Config file support and some limited environment variables.
+- **Doctor**: `hevelius doctor` checks that the install is configured correctly (config, DB
+  connectivity/schema, logs, JWT/web-url/SMTP settings) and can send a test email.
 
 ## Hevelius web interface
 

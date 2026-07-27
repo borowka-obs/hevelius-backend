@@ -1,3 +1,4 @@
+import copy
 import os
 import yaml
 from pathlib import Path
@@ -32,6 +33,9 @@ DEFAULT_CONFIG = {
         'use-tls': True,
         'from-addr': 'noreply@hevelius.local',
     },
+    'logs': {
+        'path': '/var/log/hevelius',
+    },
 }
 
 
@@ -44,7 +48,11 @@ def load_config(return_metadata=False):
     # if loaded_config:
     #     return loaded_config.copy()
 
-    config_dict = DEFAULT_CONFIG.copy()
+    # Deep copy: DEFAULT_CONFIG's nested dicts must never be mutated in place,
+    # or an env var override picked up in one call would leak into every
+    # later load_config() call in this process, even after the env var is
+    # unset (a shallow .copy() only copies the top-level section keys).
+    config_dict = copy.deepcopy(DEFAULT_CONFIG)
     metadata = {
         'base_source': 'defaults',
         'base_config_path': None,
@@ -83,6 +91,7 @@ def load_config(return_metadata=False):
         'HEVELIUS_SMTP_USERNAME': ('smtp', 'username'),
         'HEVELIUS_SMTP_PASSWORD': ('smtp', 'password'),
         'HEVELIUS_SMTP_FROM': ('smtp', 'from-addr'),
+        'HEVELIUS_LOG_PATH': ('logs', 'path'),
     }
 
     for env_var, (section, key) in env_mapping.items():
