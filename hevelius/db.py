@@ -634,6 +634,7 @@ _ASTEROID_SELECT = """
 def asteroids_build_where(
     designation: str = None,
     name: str = None,
+    search: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -645,6 +646,10 @@ def asteroids_build_where(
     Build WHERE clause and parameters for asteroid queries.
 
     Returns (where_suffix, params) where where_suffix is '' or ' WHERE ...'.
+
+    search matches designation, proper name, or MPC number in a single quick
+    search box, unlike designation/name which are precise, independent
+    filters used by the advanced filter form.
 
     tag_names/tags_mode filter by tag membership: "any" (default) matches
     asteroids carrying at least one of the given tags, "all" requires every
@@ -662,6 +667,16 @@ def asteroids_build_where(
     if name:
         where_clauses.append("name ILIKE %s")
         params.append(f"%{name}%")
+
+    search = (search or "").strip()
+    if search:
+        search_clauses = ["designation ILIKE %s", "name ILIKE %s"]
+        search_params = [f"%{search}%", f"%{search}%"]
+        if search.isdigit():
+            search_clauses.append("number = %s")
+            search_params.append(int(search))
+        where_clauses.append("(" + " OR ".join(search_clauses) + ")")
+        params.extend(search_params)
 
     if number is not None:
         where_clauses.append("number = %s")
@@ -705,6 +720,7 @@ def asteroids_count(
     conn,
     designation: str = None,
     name: str = None,
+    search: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -720,7 +736,7 @@ def asteroids_count(
     approximate counts, or requiring a filter if this becomes a bottleneck.
     """
     where, params = asteroids_build_where(
-        designation=designation, name=name, number=number, numbered=numbered,
+        designation=designation, name=name, search=search, number=number, numbered=numbered,
         mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
     query = "SELECT COUNT(*) FROM asteroids" + where
@@ -731,6 +747,7 @@ def asteroids_search(
     conn,
     designation: str = None,
     name: str = None,
+    search: str = None,
     number: int = None,
     numbered: bool = None,
     mag_min: float = None,
@@ -749,7 +766,7 @@ def asteroids_search(
         sort_order = "asc"
 
     where, params = asteroids_build_where(
-        designation=designation, name=name, number=number, numbered=numbered,
+        designation=designation, name=name, search=search, number=number, numbered=numbered,
         mag_min=mag_min, mag_max=mag_max, tag_names=tag_names, tags_mode=tags_mode,
     )
 

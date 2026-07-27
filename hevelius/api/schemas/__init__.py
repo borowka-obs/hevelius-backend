@@ -793,6 +793,9 @@ class AsteroidsListRequestSchema(Schema):
     # Filtering parameters
     designation = fields.String(metadata={"description": "Filter by designation (partial match)"})
     name = fields.String(metadata={"description": "Filter by proper name (partial match, case-insensitive)"})
+    search = fields.String(metadata={
+        "description": "Quick search across designation, proper name, and MPC number (partial match)"
+    })
     number = fields.Integer(metadata={"description": "Filter by exact MPC number"})
     numbered = fields.Boolean(metadata={"description": "true: only numbered asteroids; false: only unnumbered/provisional"})
     mag_min = fields.Float(metadata={"description": "Minimum absolute magnitude (H)"})
