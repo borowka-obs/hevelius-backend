@@ -3466,6 +3466,12 @@ paths:
           required: false
           schema:
             type: string
+        - name: search
+          in: query
+          description: Quick search across designation, proper name, and MPC number (partial match)
+          required: false
+          schema:
+            type: string
         - name: number
           in: query
           description: Filter by exact MPC number

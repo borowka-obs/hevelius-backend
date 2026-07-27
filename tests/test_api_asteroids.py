@@ -108,6 +108,28 @@ class TestAsteroids(unittest.TestCase):
         self.assertEqual(data['asteroids'][0]['name'], 'Ceres')
         self.assertEqual(data['asteroids'][0]['number'], 1)
 
+        # Quick search: matches proper name
+        response = self.app.get('/api/asteroids?search=pallas', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['asteroids'][0]['name'], 'Pallas')
+
+        # Quick search: matches designation
+        response = self.app.get('/api/asteroids?search=K25A00A', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertIsNone(data['asteroids'][0]['number'])
+
+        # Quick search: matches MPC number (and not other rows, since '1' isn't
+        # a substring of their designations)
+        response = self.app.get('/api/asteroids?search=1', headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        data = json.loads(response.data)
+        self.assertEqual(data['total'], 1)
+        self.assertEqual(data['asteroids'][0]['designation'], '00001')
+
         # Filter by numbered=true / numbered=false
         response = self.app.get('/api/asteroids?numbered=true', headers=self.headers)
         self.assertEqual(response.status_code, 200)
