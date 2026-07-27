@@ -69,5 +69,6 @@ $ python bin/hevelius
 ```shell
 source venv/bin/activate
 python -m hevelius.api
+# or: python -m hevelius.api --host 0.0.0.0 --port 5001
 # or: flask --app hevelius.api:app run
 ```
