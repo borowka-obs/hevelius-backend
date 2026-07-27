@@ -18,6 +18,7 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   same process after the env var is unset.
 - Bug: `bin/hevelius` now propagates command exit codes via `sys.exit()`
   instead of always exiting 0.
+- CLI: Custom host and port are now configurable (`--host`, `--port`)
 
 ## 0.6.0 (2026-07-24)
 
