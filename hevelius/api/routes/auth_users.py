@@ -31,6 +31,8 @@ from hevelius.api.schemas import (
     StatusMsgSchema,
     UserAdminDetailSchema,
     UserPasswordChangeSchema,
+    UserPreferencesSchema,
+    UserPreferencesUpdateSchema,
     UserProfileUpdateSchema,
     UsersAdminListResponseSchema,
     UsersAuditLogResponseSchema,
@@ -282,6 +284,75 @@ class UsersMeResource(MethodView):
             "phone": r[5], "email": r[6], "permissions": r[7], "aavso_id": r[8],
             "login_enabled": bool(r[9] and str(r[9]).strip()),
         }
+
+
+PREFERENCE_COLUMNS = (
+    "default_exposure", "default_filter", "default_scope",
+    "task_binning", "task_guiding", "task_dither",
+    "min_alt", "limit_min_moon_dist", "limit_max_sun_alt", "limit_max_moon_phase",
+)
+
+
+@blp.route("/users/me/preferences")
+class UsersMePreferencesResource(MethodView):
+    @jwt_required()
+    @blp.response(200, UserPreferencesSchema)
+    def get(self):
+        """Current user's preferences (favourite telescope/filter, task defaults). Row is created on first use."""
+        uid = jwt_user_id_int()
+        if uid is None:
+            abort(401, message="Invalid token identity")
+        cnx = db.connect()
+        rows = db.run_query(
+            cnx,
+            f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
+            (uid,),
+        )
+        if not rows:
+            db.run_query(cnx, "INSERT INTO user_preferences (user_id) VALUES (%s)", (uid,))
+            rows = db.run_query(
+                cnx,
+                f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
+                (uid,),
+            )
+        cnx.close()
+        return dict(zip(PREFERENCE_COLUMNS, rows[0]))
+
+    @jwt_required()
+    @blp.arguments(UserPreferencesUpdateSchema, location="json")
+    @blp.response(200, UserPreferencesSchema)
+    def patch(self, body):
+        """Update the current user's preferences. default_filter/default_scope must reference existing rows."""
+        uid = jwt_user_id_int()
+        if uid is None:
+            abort(401, message="Invalid token identity")
+        cnx = db.connect()
+
+        if "default_filter" in body and body["default_filter"] is not None:
+            if not db.run_query(cnx, "SELECT filter_id FROM filters WHERE filter_id = %s", (body["default_filter"],)):
+                cnx.close()
+                abort(404, message="default_filter does not reference an existing filter")
+        if "default_scope" in body and body["default_scope"] is not None:
+            if not db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (body["default_scope"],)):
+                cnx.close()
+                abort(404, message="default_scope does not reference an existing telescope")
+
+        if not db.run_query(cnx, "SELECT user_id FROM user_preferences WHERE user_id = %s", (uid,)):
+            db.run_query(cnx, "INSERT INTO user_preferences (user_id) VALUES (%s)", (uid,))
+
+        updates = [f"{key} = %s" for key in PREFERENCE_COLUMNS if key in body]
+        args = [body[key] for key in PREFERENCE_COLUMNS if key in body]
+        if updates:
+            args.append(uid)
+            db.run_query(cnx, "UPDATE user_preferences SET " + ", ".join(updates) + " WHERE user_id = %s", tuple(args))
+
+        rows = db.run_query(
+            cnx,
+            f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
+            (uid,),
+        )
+        cnx.close()
+        return dict(zip(PREFERENCE_COLUMNS, rows[0]))
 
 
 @blp.route("/users/me/password")

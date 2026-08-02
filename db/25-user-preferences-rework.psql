@@ -1,0 +1,37 @@
+-- Schema version 25: rework of the long-unused user_preferences table.
+--
+-- The table was never wired up to any API route, so it is dropped and
+-- recreated rather than altered column-by-column.
+--
+-- Changes:
+--  * pref_id removed; user_id is now the primary key (one row per user).
+--  * user_id is NOT NULL and FK-referenced to users, cascading on delete.
+--  * defocus, solve, vphot, calibrate removed (unused task-capture flags).
+--  * exposure renamed to default_exposure.
+--  * filter (varchar) replaced by default_filter, FK to filters(filter_id).
+--  * binning, guiding, dither renamed to task_binning, task_guiding, task_dither.
+--  * moon_distance renamed to limit_min_moon_dist.
+--  * max_sun_alt, max_moon_phase renamed to limit_max_sun_alt, limit_max_moon_phase.
+--  * default_scope added, FK to telescopes(scope_id).
+
+DROP TABLE IF EXISTS user_preferences CASCADE;
+
+CREATE TABLE user_preferences (
+  user_id int NOT NULL,
+  default_exposure int DEFAULT 75,
+  default_filter int DEFAULT NULL,
+  default_scope int DEFAULT NULL,
+  task_binning int DEFAULT 2,
+  task_guiding smallint DEFAULT 1,
+  task_dither smallint DEFAULT NULL,
+  min_alt int DEFAULT 35,
+  limit_min_moon_dist int DEFAULT 0,
+  limit_max_sun_alt int NOT NULL DEFAULT -12,
+  limit_max_moon_phase int DEFAULT NULL,
+  PRIMARY KEY (user_id),
+  CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+  CONSTRAINT fk_default_filter FOREIGN KEY (default_filter) REFERENCES filters (filter_id),
+  CONSTRAINT fk_default_scope FOREIGN KEY (default_scope) REFERENCES telescopes (scope_id)
+);
+
+UPDATE schema_version SET version = 25;
