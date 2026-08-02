@@ -999,6 +999,32 @@ class UserProfileUpdateSchema(Schema):
     aavso_id = fields.String(allow_none=True, validate=validate.Length(max=5))
 
 
+class UserPreferencesSchema(Schema):
+    default_exposure = fields.Integer(allow_none=True, metadata={"description": "Default exposure time (seconds)"})
+    default_filter = fields.Integer(allow_none=True, metadata={"description": "Default filter (filters.filter_id)"})
+    default_scope = fields.Integer(allow_none=True, metadata={"description": "Default telescope (telescopes.scope_id)"})
+    task_binning = fields.Integer(allow_none=True, metadata={"description": "Default task binning"})
+    task_guiding = fields.Integer(allow_none=True, metadata={"description": "Default task guiding flag"})
+    task_dither = fields.Integer(allow_none=True, metadata={"description": "Default task dither flag"})
+    min_alt = fields.Integer(allow_none=True, metadata={"description": "Minimum altitude"})
+    limit_min_moon_dist = fields.Integer(allow_none=True, metadata={"description": "Minimum moon distance"})
+    limit_max_sun_alt = fields.Integer(allow_none=True, metadata={"description": "Maximum sun altitude"})
+    limit_max_moon_phase = fields.Integer(allow_none=True, metadata={"description": "Maximum moon phase"})
+
+
+class UserPreferencesUpdateSchema(Schema):
+    default_exposure = fields.Integer(allow_none=True)
+    default_filter = fields.Integer(allow_none=True)
+    default_scope = fields.Integer(allow_none=True)
+    task_binning = fields.Integer(allow_none=True)
+    task_guiding = fields.Integer(allow_none=True)
+    task_dither = fields.Integer(allow_none=True)
+    min_alt = fields.Integer(allow_none=True)
+    limit_min_moon_dist = fields.Integer(allow_none=True)
+    limit_max_sun_alt = fields.Integer(allow_none=True)
+    limit_max_moon_phase = fields.Integer(allow_none=True)
+
+
 class UserPasswordChangeSchema(Schema):
     current_password = fields.String(required=True, metadata={"description": "Current password"})
     new_password = fields.String(
