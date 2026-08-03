@@ -75,7 +75,10 @@ def run():
     db_parser = subparsers.add_parser('db', help="Manages database")
     db_subparsers = db_parser.add_subparsers(help="Commands related to database", dest="db_command")
     db_subparsers.add_parser('version', help="Shows the current DB schema version.")  # version_parser
-    db_subparsers.add_parser('backup', help="Generates DB backup.")  # backup_parser
+    backup_parser = db_subparsers.add_parser('backup', help="Generates DB backup.")
+    backup_parser.add_argument("--skip-tasks", dest='skip_tasks', action='store_true', help="Skip task data when exporting")
+    backup_parser.add_argument("--skip-minor-planets", dest='skip_minor_planets', action='store_true', help="Skip minor planet data when exporting")
+    backup_parser.add_argument("--skip-projects", dest='skip_projects', action='store_true', help="Skip project data when exporting")
     migrate_parser = db_subparsers.add_parser('migrate', help="Migrate to the latest DB schema")
     migrate_parser.add_argument("-t", "--dry-run", help="Don't do the actual DB upsert", action='store_true')
     db_subparsers.add_parser('stats', help="Show database statistics")  # stats_parser
