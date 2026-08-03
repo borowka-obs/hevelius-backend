@@ -81,7 +81,27 @@ def config_show():
     print(f"Backup storage path:   {config['paths']['backup-path']}")
 
 
-def backup(args):  # pylint: disable=unused-argument
+# Tables holding data for each --skip-* backup option. Small lookup tables
+# (task_states, asteroid_tags) are kept regardless, since they're tiny and
+# other tables' FKs may reference them.
+SKIP_TASKS_TABLES = ('tasks', 'task_projects')
+SKIP_PROJECTS_TABLES = ('projects', 'project_subframes', 'project_users', 'task_projects')
+SKIP_MINOR_PLANETS_TABLES = ('asteroids', 'asteroid_tag_map')
+
+
+def _format_size(num_bytes: int) -> str:
+    """Human-readable file size."""
+    size = float(num_bytes)
+    for unit in ("B", "KiB", "MiB", "GiB"):
+        if size < 1024.0 or unit == "GiB":
+            if unit == "B":
+                return f"{int(size)} {unit}"
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{num_bytes} B"
+
+
+def backup(args):
     """
     Generated DB backup
     """
@@ -97,8 +117,31 @@ def backup(args):  # pylint: disable=unused-argument
     my_env = environ.copy()
     my_env['PGPASSWORD'] = config['database']['password']
 
-    psql = subprocess.Popen(["pg_dump", "-U", config['database']['user'], "-h", config['database']['host'], "-p",
-                            str(config['database']['port']), config['database']['database'], "-f", full_path], env=my_env)
+    skip_tables = set()
+    if getattr(args, 'skip_tasks', False):
+        skip_tables.update(SKIP_TASKS_TABLES)
+    if getattr(args, 'skip_projects', False):
+        skip_tables.update(SKIP_PROJECTS_TABLES)
+    if getattr(args, 'skip_minor_planets', False):
+        skip_tables.update(SKIP_MINOR_PLANETS_TABLES)
+
+    cmd = ["pg_dump", "-U", config['database']['user'], "-h", config['database']['host'], "-p",
+           str(config['database']['port'])]
+    for table in sorted(skip_tables):
+        cmd += ["--exclude-table-data", table]
+    cmd += [config['database']['database'], "-f", full_path]
+
+    psql = subprocess.Popen(cmd, env=my_env)
     psql.communicate()
 
+    pg_dump_version = subprocess.run(
+        ["pg_dump", "--version"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+
+    if psql.returncode != 0 or not path.exists(full_path):
+        print(f"pg_dump failed (exit code {psql.returncode}); no backup was stored.")
+        return
+
     print(f"Backup stored in {full_path}")
+    print(f"Backup size: {_format_size(path.getsize(full_path))}")
+    print(f"PostgreSQL version used to export: {pg_dump_version}")
