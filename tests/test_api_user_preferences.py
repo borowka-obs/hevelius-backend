@@ -65,7 +65,18 @@ class TestUserPreferences(unittest.TestCase):
             headers=self.headers,
         )
 
-        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.status_code, 400)
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_patch_rejects_null_limit_max_sun_alt(self, config):
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/users/me/preferences',
+            data=json.dumps({'limit_max_sun_alt': None}),
+            headers=self.headers,
+        )
+
+        self.assertIn(response.status_code, (400, 422))
 
     @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_patch_accepts_valid_filter(self, config):

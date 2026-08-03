@@ -1008,7 +1008,7 @@ class UserPreferencesSchema(Schema):
     task_dither = fields.Integer(allow_none=True, metadata={"description": "Default task dither flag"})
     min_alt = fields.Integer(allow_none=True, metadata={"description": "Minimum altitude"})
     limit_min_moon_dist = fields.Integer(allow_none=True, metadata={"description": "Minimum moon distance"})
-    limit_max_sun_alt = fields.Integer(allow_none=True, metadata={"description": "Maximum sun altitude"})
+    limit_max_sun_alt = fields.Integer(metadata={"description": "Maximum sun altitude (NOT NULL in DB)"})
     limit_max_moon_phase = fields.Integer(allow_none=True, metadata={"description": "Maximum moon phase"})
 
 
@@ -1021,7 +1021,8 @@ class UserPreferencesUpdateSchema(Schema):
     task_dither = fields.Integer(allow_none=True)
     min_alt = fields.Integer(allow_none=True)
     limit_min_moon_dist = fields.Integer(allow_none=True)
-    limit_max_sun_alt = fields.Integer(allow_none=True)
+    # DB column is NOT NULL; reject explicit null rather than surfacing a 500.
+    limit_max_sun_alt = fields.Integer()
     limit_max_moon_phase = fields.Integer(allow_none=True)
 
 

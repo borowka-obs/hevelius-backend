@@ -1,5 +1,6 @@
 """Tests for `hevelius db backup` (hevelius.cli.basic.backup)."""
 
+import pathlib
 import tempfile
 import unittest
 from argparse import Namespace
@@ -32,22 +33,24 @@ class TestBackup(unittest.TestCase):
              patch('hevelius.cli.basic.subprocess.run') as mock_run:
             mock_popen.side_effect = fake_popen
             mock_run.return_value = MagicMock(stdout='pg_dump (PostgreSQL) 16.10\n')
-            basic.backup(args)
-        return mock_popen, mock_run
+            rc = basic.backup(args)
+        return mock_popen, mock_run, rc
 
     def test_backup_without_skip_flags_excludes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = Namespace(skip_tasks=False, skip_minor_planets=False, skip_projects=False)
-            mock_popen, _ = self._run_backup(args, tmp)
+            mock_popen, _, rc = self._run_backup(args, tmp)
 
+            self.assertEqual(rc, 0)
             cmd = mock_popen.call_args[0][0]
             self.assertNotIn('--exclude-table-data', cmd)
 
     def test_skip_tasks_excludes_tasks_and_junction_table(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = Namespace(skip_tasks=True, skip_minor_planets=False, skip_projects=False)
-            mock_popen, _ = self._run_backup(args, tmp)
+            mock_popen, _, rc = self._run_backup(args, tmp)
 
+            self.assertEqual(rc, 0)
             cmd = mock_popen.call_args[0][0]
             excluded = {cmd[i + 1] for i, tok in enumerate(cmd) if tok == '--exclude-table-data'}
             self.assertEqual(excluded, {'tasks', 'task_projects'})
@@ -55,8 +58,9 @@ class TestBackup(unittest.TestCase):
     def test_skip_projects_excludes_project_tables(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = Namespace(skip_tasks=False, skip_minor_planets=False, skip_projects=True)
-            mock_popen, _ = self._run_backup(args, tmp)
+            mock_popen, _, rc = self._run_backup(args, tmp)
 
+            self.assertEqual(rc, 0)
             cmd = mock_popen.call_args[0][0]
             excluded = {cmd[i + 1] for i, tok in enumerate(cmd) if tok == '--exclude-table-data'}
             self.assertEqual(excluded, {'projects', 'project_subframes', 'project_users', 'task_projects'})
@@ -64,8 +68,9 @@ class TestBackup(unittest.TestCase):
     def test_skip_minor_planets_excludes_asteroid_tables(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = Namespace(skip_tasks=False, skip_minor_planets=True, skip_projects=False)
-            mock_popen, _ = self._run_backup(args, tmp)
+            mock_popen, _, rc = self._run_backup(args, tmp)
 
+            self.assertEqual(rc, 0)
             cmd = mock_popen.call_args[0][0]
             excluded = {cmd[i + 1] for i, tok in enumerate(cmd) if tok == '--exclude-table-data'}
             self.assertEqual(excluded, {'asteroids', 'asteroid_tag_map'})
@@ -73,8 +78,9 @@ class TestBackup(unittest.TestCase):
     def test_all_skip_flags_dedupe_shared_junction_table(self):
         with tempfile.TemporaryDirectory() as tmp:
             args = Namespace(skip_tasks=True, skip_minor_planets=True, skip_projects=True)
-            mock_popen, _ = self._run_backup(args, tmp)
+            mock_popen, _, rc = self._run_backup(args, tmp)
 
+            self.assertEqual(rc, 0)
             cmd = mock_popen.call_args[0][0]
             excluded = [cmd[i + 1] for i, tok in enumerate(cmd) if tok == '--exclude-table-data']
             self.assertEqual(len(excluded), len(set(excluded)))
@@ -104,7 +110,7 @@ class TestBackup(unittest.TestCase):
                 mock_popen.side_effect = fake_popen
                 mock_run.return_value = MagicMock(stdout='pg_dump (PostgreSQL) 16.10\n')
 
-                basic.backup(args)
+                self.assertEqual(basic.backup(args), 0)
 
             printed = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
             self.assertIn("Backup stored in", printed)
@@ -120,16 +126,24 @@ class TestBackup(unittest.TestCase):
                  patch('hevelius.cli.basic.subprocess.run') as mock_run, \
                  patch('builtins.print') as mock_print:
 
-                proc = MagicMock(communicate=MagicMock(return_value=(b'', b'connection failed')))
-                proc.returncode = 1
-                mock_popen.return_value = proc
+                def fake_popen(cmd, env=None):  # pylint: disable=unused-argument
+                    full_path = cmd[-1]
+                    with open(full_path, 'wb') as f:
+                        f.write(b'partial')
+                    proc = MagicMock(communicate=MagicMock(return_value=(b'', b'connection failed')))
+                    proc.returncode = 1
+                    return proc
+
+                mock_popen.side_effect = fake_popen
                 mock_run.return_value = MagicMock(stdout='pg_dump (PostgreSQL) 16.10\n')
 
-                basic.backup(args)  # must not raise
+                rc = basic.backup(args)
 
+            self.assertEqual(rc, 1)
             printed = "\n".join(str(c.args[0]) for c in mock_print.call_args_list)
             self.assertIn("pg_dump failed", printed)
             self.assertNotIn("Backup size", printed)
+            self.assertEqual(list(pathlib.Path(tmp).iterdir()), [])
 
 
 if __name__ == '__main__':

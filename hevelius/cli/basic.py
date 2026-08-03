@@ -139,9 +139,15 @@ def backup(args):
     ).stdout.strip()
 
     if psql.returncode != 0 or not path.exists(full_path):
+        if path.exists(full_path):
+            try:
+                pathlib.Path(full_path).unlink()
+            except OSError as err:
+                print(f"Warning: could not remove incomplete backup {full_path}: {err}")
         print(f"pg_dump failed (exit code {psql.returncode}); no backup was stored.")
-        return
+        return 1
 
     print(f"Backup stored in {full_path}")
     print(f"Backup size: {_format_size(path.getsize(full_path))}")
     print(f"PostgreSQL version used to export: {pg_dump_version}")
+    return 0

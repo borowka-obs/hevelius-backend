@@ -1502,6 +1502,80 @@ components:
           type: string
           minLength: 8
           description: New password
+    UserPreferences:
+      type: object
+      description: Authenticated user's observation/task preference defaults
+      properties:
+        default_exposure:
+          type: integer
+          nullable: true
+          description: Default exposure time (seconds)
+        default_filter:
+          type: integer
+          nullable: true
+          description: Default filter (filters.filter_id)
+        default_scope:
+          type: integer
+          nullable: true
+          description: Default telescope (telescopes.scope_id)
+        task_binning:
+          type: integer
+          nullable: true
+        task_guiding:
+          type: integer
+          nullable: true
+        task_dither:
+          type: integer
+          nullable: true
+        min_alt:
+          type: integer
+          nullable: true
+        limit_min_moon_dist:
+          type: integer
+          nullable: true
+        limit_max_sun_alt:
+          type: integer
+          description: Maximum sun altitude (NOT NULL; defaults to -12)
+        limit_max_moon_phase:
+          type: integer
+          nullable: true
+    UserPreferencesUpdate:
+      type: object
+      description: |
+        Partial update of the authenticated user's preferences. Only fields
+        present in the body are changed. default_filter and default_scope may
+        be set to null to clear them; limit_max_sun_alt must not be null.
+      properties:
+        default_exposure:
+          type: integer
+          nullable: true
+        default_filter:
+          type: integer
+          nullable: true
+        default_scope:
+          type: integer
+          nullable: true
+        task_binning:
+          type: integer
+          nullable: true
+        task_guiding:
+          type: integer
+          nullable: true
+        task_dither:
+          type: integer
+          nullable: true
+        min_alt:
+          type: integer
+          nullable: true
+        limit_min_moon_dist:
+          type: integer
+          nullable: true
+        limit_max_sun_alt:
+          type: integer
+          description: Maximum sun altitude (must not be null)
+        limit_max_moon_phase:
+          type: integer
+          nullable: true
     StatusMsg:
       type: object
       properties:
@@ -1655,6 +1729,50 @@ paths:
           description: Missing or invalid JWT
         '404':
           description: User row missing
+      security:
+        - bearerAuth: []
+  /api/users/me/preferences:
+    get:
+      summary: Current user preferences
+      description: |
+        Returns the authenticated user's favourite telescope/filter and task
+        defaults. Creates a row with DB defaults on first access.
+      responses:
+        '200':
+          description: Current preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '401':
+          description: Missing or invalid JWT
+      security:
+        - bearerAuth: []
+    patch:
+      summary: Update own preferences
+      description: |
+        Updates the authenticated user's preferences. Only fields present in
+        the request body are changed. default_filter and default_scope must
+        reference existing filters/telescopes when non-null.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserPreferencesUpdate'
+      responses:
+        '200':
+          description: Updated preferences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPreferences'
+        '400':
+          description: Invalid default_filter or default_scope, or validation error
+        '401':
+          description: Missing or invalid JWT
+        '422':
+          description: Request body failed schema validation
       security:
         - bearerAuth: []
   /api/users/me/password:
