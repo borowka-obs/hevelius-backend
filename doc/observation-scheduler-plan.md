@@ -4,6 +4,11 @@ Status: **draft for review**. This document is meant to be iterated on before an
 code is written. It covers four components requested for the telescope
 observation scheduler:
 
+> **Revision (2026-08-03)**: §6 revised after feedback that external
+> telemetry (weather, roof state, sensor temperatures, ASCOM state) belongs
+> in this picture too. That data class has a genuinely different shape than
+> `observation_events`, and it changes the database recommendation — see §6.3.
+
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
 3. Agent/runner support (contract only — implementation is a separate session)
@@ -75,14 +80,14 @@ plan, with file references.
   expensive) — SQL magnitude pre-filter, transit-altitude check (one
   subtraction), night hour-angle overlap (trig, no frame transform), apparent
   magnitude, then a precise `astropy` `GCRS → AltAz` transform only for
-  survivors. This is the pattern §5 below reuses (by extraction into a
+  survivors. This is the pattern §4.2 below reuses (by extraction into a
   shared module, not by copy-paste).
 
 - **Statistics** (`hevelius/stats.py`): only a sky-density histogram
   (1°×1° bins of completed, plate-solved tasks) and simple `COUNT(*) …
   GROUP BY state/user`. **There is no time-series or per-night data of any
   kind today**, and — importantly — no event log to build one from (see
-  §7).
+  §5.2).
 
 - **User preferences** (`db/25-user-preferences-rework.psql`,
   `hevelius/api/routes/auth_users.py`): `GET`/`PATCH /api/users/me/preferences`
@@ -123,7 +128,7 @@ observing session collapse onto one date, which is exactly the property we
 want for grouping tasks/statistics/UI by "night."
 
 **This requires a per-telescope time zone**, which does not exist in the
-schema today (see §3). NINA can get away without one because it runs on a
+schema today (see §2). NINA can get away without one because it runs on a
 single PC with one system time zone; Hevelius is explicitly multi-site
 ("up to 10 telescopes, multiple locations"), so the same trick needs an
 explicit IANA zone (e.g. `Europe/Warsaw`, `Africa/Windhoek`) per telescope
@@ -182,11 +187,13 @@ notice immediately.
 | `projects` | `+ min_alt float`, `+ moon_distance float`, `+ max_moon_phase int`, `+ max_sun_alt int`, `+ min_interval int` (all nullable) | Mirrors the same columns on `tasks` so both can go through one visibility engine (§5.2). Today projects have **no** observing constraints at all. |
 | `projects`, `tasks` | `+ priority int NOT NULL DEFAULT 0` | *Recommended, not required.* Night Plan and Observation Planning both need *some* ordering signal beyond "visible y/n"; see §8 "no ordering/priority field" for why this is flagged separately rather than assumed. |
 | `tasks` | `skip_before`, `skip_after`, `created`, `activated`, `performed` : `timestamp` → `timestamptz` | These are naive today (§0). Fine as long as everything writing them is disciplined about UTC, but that's an invariant enforced by convention only, not the type system — a real footgun across multi-timezone sites. Values are assumed already UTC; migration is a type change, not a value change. |
-| new: `observation_events` | see §7.1 | Execution/report event log — becomes the source of truth for project subframe counts *and* all statistics. This table does not exist in any form today; it's the biggest net-new piece of this plan. |
+| new: `observation_events` | see §5.2 | Execution/report event log — becomes the source of truth for project subframe counts *and* all statistics. This table does not exist in any form today; it's the biggest net-new piece of this plan. |
+| new: `telemetry_weather`, `telemetry_sensor_temps`, `telemetry_ascom_state`, `telemetry_roof_events` | see §6.4 | External telemetry not tracked anywhere today. First three become TimescaleDB hypertables; roof events stay a plain event-log table (low frequency, same shape as `observation_events`). |
 
 Illustrative migration numbers (next free is 26): `26` telescopes timezone +
 project constraint/priority columns, `27` tasks timestamptz conversion, `28`
-`observation_events` + derived subframe counts. Final numbering decided at
+`observation_events` + derived subframe counts, `29` enable TimescaleDB
+extension + telemetry tables/hypertables. Final numbering decided at
 implementation time.
 
 ---
@@ -279,7 +286,7 @@ The runner-side leftover (`TaskManager`/`prepare_sequence_file`, the `run`
 loop) is **not touched in this session** (out of scope, per the request)
 but is flagged here for the record: it's dead/mismatched code per the
 runner's own `AGENTS.md`, and will need a rewrite against the contract in
-§4.4/§6 in a future runner-focused session.
+§4.4/§5 in a future runner-focused session.
 
 ### 4.2 Shared observability engine
 
@@ -518,26 +525,97 @@ read-only SQL directly — anything beyond the couple of in-app widgets can
 just be a SQL query written in a Grafana panel against `observation_events`
 (or a rollup view later), with zero new backend code.
 
-### 6.2 The database question: stick with PostgreSQL
+### 6.2 The database question, part 1: `observation_events` itself
 
-You asked specifically whether Postgres is well-suited here or whether
-something like InfluxDB or Prometheus would fit better. Given the actual
-numbers involved (≤10 telescopes, event volume in the thousands-to-tens-of-
-thousands-per-year range, not "metrics scraped every 15 seconds from a
-fleet of servers"), **this is not big-data / high-cardinality time-series
-territory**, and I'd recommend against introducing a second database:
+For the business/event data described in §6.1 alone, the original
+reasoning still holds: ≤10 telescopes, thousands-to-tens-of-thousands of
+rows a year, dimensional data that wants to join against `tasks`,
+`projects`, `users`, `filters`. That's a plain Postgres table, no argument.
+The picture changes once a second, genuinely different data class enters —
+see below.
 
-| Option | Fit here | Why / why not |
+### 6.3 The database question, part 2: external telemetry changes the answer
+
+You're right that weather, roof open/closed, sensor temperatures, and
+ASCOM telescope state are a different data class than `observation_events`,
+and I was implicitly scoping the earlier recommendation to the latter only.
+Characterizing the difference concretely:
+
+| | `observation_events` | Telemetry (weather / roof / sensors / ASCOM) |
 |---|---|---|
-| **PostgreSQL (recommended)** | ✅ | Already self-hosted, already the source of truth for tasks/projects/users — `observation_events` joins naturally to all of them (which telescope, which user, which filter, which project) without a cross-database join. Grafana has a first-class native Postgres data source. Volume is trivially small for Postgres. Zero new services to run, back up, monitor, or learn. |
-| **Prometheus** | ❌ | Built for pull-based scraping of live numeric gauges/counters from running systems, with retention tuned for operational monitoring (weeks–months by default). Doesn't fit rich, dimensional business/event records (which project, which user, exact historical audit trail) and isn't meant as a permanent system of record for exact history. |
-| **InfluxDB** | ⚠️ possible, not recommended now | Real option — open-source, self-hostable, Grafana support is good, popular. But it's a second database to operate and back up, a second query language to learn (Flux/InfluxQL depending on version), and it's built for high-frequency, high-cardinality raw metrics (many sensors, sub-second sampling) — none of which describes "a few hundred exposure events a night." You'd be running infrastructure sized for a problem you don't have. |
-| **TimescaleDB** | 🔁 natural upgrade path, not needed yet | A Postgres *extension* — same SQL, same server, same backups, just hypertables/continuous-aggregates/compression bolted on. If `observation_events` ever grows enough that plain Postgres aggregation becomes a real bottleneck (unlikely at this scale for years), this is the low-friction next step — no data migration to a different system, no new query language, Grafana config barely changes. |
+| Frequency | one row per exposure (minutes apart) | continuous polling (seconds-to-minutes) |
+| Channels | few, fixed dimensions | many numeric channels per telescope, growing over time |
+| Primary use | exact audit trail, joined to tasks/projects/users | downsampled graphs, threshold alerting, coarse long-term history |
+| Retention shape | keep every row forever (it's the audit trail) | keep fine detail briefly, coarse rollups long-term |
 
-**Recommendation**: build `observation_events` as an ordinary Postgres
-table now, point Grafana at Postgres directly, and only reach for
-TimescaleDB (not Influx/Prometheus) if and when volume actually justifies
-it.
+That last row is the important one: telemetry *wants* automatic
+downsampling and retention management (raw 10-second samples for 90 days,
+5-minute rollups forever) — machinery you'd otherwise hand-roll as cron
+jobs in plain Postgres. That's a legitimate, different requirement, and it
+changes which of the earlier options make sense — re-evaluated against
+*this* data class specifically:
+
+| Option | Fit for telemetry | Why / why not |
+|---|---|---|
+| **TimescaleDB (recommended)** | ✅ | Postgres extension: hypertables auto-partition by time, continuous aggregates auto-maintain rollups, retention policies auto-expire raw data — the exact machinery this data needs, declared in SQL, no external service. Stays in the same database as `observation_events`, so **correlating a failed/aborted exposure with cloud cover or roof state at that moment is a plain SQL join**, not a cross-database federation — directly useful for diagnosing "was this actually a weather abort?" (§8 flags live weather *gating* as still unsolved; this at least closes the post-hoc analysis half of that gap). One backup job, one credential story, one system to run. |
+| **Plain PostgreSQL (no Timescale)** | ⚠️ works, but you'd rebuild Timescale by hand | Postgres can absolutely store this volume, but continuous high-frequency polling from up to 10 sites, over months/years, with no automatic partitioning/rollup/retention, means either unbounded table growth or a hand-written downsampling+deletion job — exactly what Timescale gives you for free as a config statement. Since Timescale is "the same Postgres, plus an extension," there's no real reason to decline it once this data class exists. |
+| **InfluxDB** | ⚠️ legitimate, second-choice | A real, popular, self-hostable, Grafana-native option, and this data class is actually within its intended envelope (unlike the earlier `observation_events` case). The reason to prefer Timescale over it here is architectural fit, not capability: it'd be a second database (separate backup/ops/credentials) and, more concretely, a second **ingestion path** — see below, telemetry is naturally pushed by the runner over the same authenticated HTTPS API it already uses, and Influx doesn't change that story, it just adds a second target for it to write to. Worth revisiting if telemetry cardinality/volume ever outgrows what one Postgres+Timescale instance handles comfortably (unlikely at 10 telescopes, but not impossible at much larger fleet sizes). |
+| **Prometheus** | ⚠️ good fit for a *different* job | Prometheus's pull/scrape model is a real mismatch for this topology: it wants to reach into each site and scrape a `/metrics` endpoint, and "multiple locations" plausibly means home-observatory setups behind NAT with no inbound access — you'd need a Pushgateway workaround to make pull-based collection work at all. Where Prometheus *is* the right tool: monitoring the **machines** themselves (is the backend server up, is a runner PC's disk full, is the API responding) — that's a separate, complementary concern from domain telemetry (roof/weather/mount state) and shouldn't be conflated with it. If infra monitoring is wanted later, it can run alongside Timescale-backed domain telemetry as two independent, non-competing systems. |
+
+**Revised recommendation**: enable the **TimescaleDB extension on the same
+Postgres instance**, and use it for telemetry hypertables (§6.4) while
+`observation_events` and everything else stays exactly as designed in §6.2
+— one database, two workloads it's each well-suited for, rather than
+fragmenting into Postgres + InfluxDB + Prometheus for three overlapping
+concerns. Point Grafana at that one Postgres/Timescale instance for
+everything (Grafana's Postgres data source understands Timescale
+hypertables/continuous-aggregates transparently — no separate data source
+needed).
+
+### 6.4 Telemetry schema and ingestion (sketch)
+
+Not every telemetry source is actually high-frequency — worth not
+cargo-culting "hypertable" onto all of it:
+
+- **Roof state** is naturally sparse (a handful of open/close transitions a
+  night) — an event log, same shape as `observation_events`, not a
+  hypertable candidate:
+  ```
+  telemetry_roof_events (time timestamptz, scope_id int, state ('open'|'closed'|'moving'|'error'), reason text NULL)
+  ```
+- **Weather**, **sensor temperatures**, and **ASCOM state** genuinely are
+  continuous polls and become hypertables:
+  ```
+  telemetry_weather      (time, scope_id, source, temperature_c, humidity_pct, wind_speed_kph, cloud_cover_pct, sky_temp_c, rain boolean)
+  telemetry_sensor_temps (time, scope_id, sensor, temperature_c)          -- sensor: 'camera_ccd' | 'ambient' | 'mount' | 'focuser' | ...
+  telemetry_ascom_state  (time, scope_id, mount_ra_deg, mount_dec_deg, mount_tracking, mount_slewing, focuser_position, filter_wheel_position, connected)
+  ```
+  Each `SELECT create_hypertable('telemetry_weather', 'time'), ...` plus a
+  continuous aggregate (e.g. 5-minute rollups) and a retention policy
+  (drop raw rows after ~90 days, keep rollups indefinitely) — a handful of
+  SQL statements in the migration, not application code.
+
+  Modeling choice worth flagging: this is a handful of purpose-built,
+  typed tables (matching how the rest of Hevelius is modeled — explicit
+  columns, not JSONB blobs) rather than one generic long/narrow
+  `(time, scope_id, metric, value)` table. That trades a small amount of
+  schema flexibility (a genuinely new sensor type needs a migration) for
+  real column types and much more natural SQL — the right call while the
+  telemetry sources are a known, short list (weather / roof / sensor temps
+  / ASCOM). Revisit if the sensor set turns out to be large and
+  fast-changing.
+
+- **Ingestion**: reuse the runner's existing authenticated HTTPS
+  relationship with the backend rather than inventing a new
+  push/pull topology (Prometheus scrape targets or an InfluxDB write
+  token) — the runner already polls ASCOM/ambient sensors on the
+  observatory PC for its own purposes, so it batches samples and `POST`s
+  them periodically (e.g. once a minute, not per-sample) to a new
+  `POST /api/telemetry` endpoint. This is push-based by construction, so
+  it works from a home-observatory site behind NAT with no inbound
+  access, unlike Prometheus's default pull model. **Runner-side polling
+  itself is out of scope for this session**, same as the rest of the
+  runner work — this section defines the backend contract it will target.
 
 ---
 
@@ -551,6 +629,7 @@ it.
 | 3 | backend + web | Observation Planning: small backend additions (`priority`, computed project completion fields), web "Observation Planning" screen (§3) | Phase 0 (schema) |
 | 4 | backend | `observation_events` table + `POST /api/observation-events` + derived subframe counts (§5); publish a short "Runner Integration Guide" as the spec for a future runner session. **No runner code touched.** | Phase 0 |
 | 5 | backend | `GET /api/stats/nightly` (and similar) over `observation_events`; example Grafana dashboard doc | Phase 4 |
+| 6 | backend (+ runner, future) | Enable TimescaleDB extension; telemetry hypertables + `telemetry_roof_events` + `POST /api/telemetry` (§6.3–6.4); example continuous aggregate + retention policy. Runner-side polling deferred, same as Phase 4. | Phase 0 |
 
 Phases 0/1/4 are backend-only and can proceed in parallel once §2 is
 agreed; 2 and 3 depend on their backend halves; 5 depends on 4 actually
@@ -587,14 +666,18 @@ session ships).
   building can make a "visible" target actually unobservable. Worth a
   per-telescope horizon-mask feature eventually; explicitly not in this
   plan.
-- **No weather/cloud integration.** This is probably the single biggest
+- **No *live* weather/cloud gating.** This is probably the single biggest
   gap relative to the stated long-term goal ("automate observations, no
   manual actions each evening"). Night Plan answers "what *could* be
   observed tonight" as a static, pre-computed list — it says nothing about
-  live sky conditions at the moment of execution. Full automation needs a
-  separate live go/no-go gate (cloud sensor, all-sky camera, a weather API)
-  that the runner consults *during* the night, independent of this plan.
-  Flagging this now so it isn't assumed to already be solved.
+  live sky conditions at the moment of execution. §6.3–6.4 now plans for
+  *storing* weather/roof/sensor telemetry, which closes the **post-hoc**
+  half of this gap (e.g. "was this abort actually caused by clouds?" is a
+  SQL join once telemetry lands) — but storing telemetry is not the same
+  as a live go/no-go gate the runner consults *during* the night before/
+  while executing. That decision logic is still separate, still
+  unaddressed, and still runner-side future work. Flagging this explicitly
+  so telemetry storage isn't mistaken for automation gating.
 - **No ordering/scheduling, only filtering.** Night Plan (v1, per §4.2's
   scoping note) tells you *what's possible*, not *what order to shoot it
   in*. Real sequencing — meridian flips, filter-change cost, optimizing for
@@ -628,11 +711,16 @@ session ships).
   behavior for existing tasks that set it.
 - **Scale check, stated explicitly so nobody over-builds**: 10 telescopes,
   thousands of tasks, tens of projects, a few hundred exposure-events/night
-  at the high end. This does not justify message queues, Redis caches, a
-  second database for statistics, or a distributed scheduler. Every
-  recommendation above is sized for "small self-hosted system," not
-  "cloud-scale" — if a future reviewer proposes infrastructure beyond
-  what's here, ask what problem it solves at *this* scale first.
+  at the high end (continuous telemetry per §6.3–6.4 is higher-frequency
+  but still modest — tens of channels × 10 sites polled every 10–60s). This
+  does not justify message queues, Redis caches, a genuinely separate
+  database system (InfluxDB/Prometheus), or a distributed scheduler — note
+  that TimescaleDB is deliberately *not* in that list, since it's an
+  extension to the one Postgres instance already being run, not a second
+  system to operate. Every recommendation above is sized for "small
+  self-hosted system," not "cloud-scale" — if a future reviewer proposes
+  infrastructure beyond what's here, ask what problem it solves at *this*
+  scale first.
 
 ---
 
@@ -677,5 +765,35 @@ POST /api/observation-events
   "imagename": "obs3/2026/08/m33_300s_0007.fits",
   "fwhm": 2.1, "hfr": 1.9, "eccentricity": 0.12,
   "idempotency_key": "b3f1c2a0-…"
+}
+```
+
+## Appendix: example `POST /api/telemetry` payload
+
+Batched, not one request per sample — the runner accumulates a minute (or
+so) of polled readings and sends them together.
+
+```jsonc
+POST /api/telemetry
+{
+  "scope_id": 3,
+  "weather": [
+    { "time": "2026-08-03T23:00:00Z", "source": "boltwood", "temperature_c": 9.1,
+      "humidity_pct": 62, "wind_speed_kph": 8.4, "cloud_cover_pct": 5, "sky_temp_c": -18.2, "rain": false },
+    { "time": "2026-08-03T23:01:00Z", "source": "boltwood", "temperature_c": 9.0,
+      "humidity_pct": 63, "wind_speed_kph": 9.1, "cloud_cover_pct": 5, "sky_temp_c": -18.0, "rain": false }
+  ],
+  "sensor_temps": [
+    { "time": "2026-08-03T23:00:00Z", "sensor": "camera_ccd", "temperature_c": -10.0 },
+    { "time": "2026-08-03T23:00:00Z", "sensor": "ambient", "temperature_c": 9.1 }
+  ],
+  "ascom_state": [
+    { "time": "2026-08-03T23:00:30Z", "mount_ra_deg": 45.2, "mount_dec_deg": 25.9,
+      "mount_tracking": true, "mount_slewing": false, "focuser_position": 12480,
+      "filter_wheel_position": 3, "connected": true }
+  ],
+  "roof_events": [
+    { "time": "2026-08-03T19:40:00Z", "state": "open", "reason": "schedule-start" }
+  ]
 }
 ```
