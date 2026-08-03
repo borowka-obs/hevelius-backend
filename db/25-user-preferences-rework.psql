@@ -1,7 +1,9 @@
--- Schema version 25: rework of the long-unused user_preferences table.
+-- Schema version 25: rework of the user_preferences table.
 --
--- The table was never wired up to any API route, so it is dropped and
--- recreated rather than altered column-by-column.
+-- The table existed since schema 07 but was never wired to any API route.
+-- Existing rows are preserved where possible (filter names mapped via
+-- filters.short_name). Rows with NULL user_id are dropped; if a user has
+-- multiple preference rows, the lowest pref_id wins.
 --
 -- Changes:
 --  * pref_id removed; user_id is now the primary key (one row per user).
@@ -13,10 +15,9 @@
 --  * moon_distance renamed to limit_min_moon_dist.
 --  * max_sun_alt, max_moon_phase renamed to limit_max_sun_alt, limit_max_moon_phase.
 --  * default_scope added, FK to telescopes(scope_id).
+--  * default_filter / default_scope use ON DELETE SET NULL.
 
-DROP TABLE IF EXISTS user_preferences CASCADE;
-
-CREATE TABLE user_preferences (
+CREATE TABLE user_preferences_new (
   user_id int NOT NULL,
   default_exposure int DEFAULT 75,
   default_filter int DEFAULT NULL,
@@ -30,8 +31,34 @@ CREATE TABLE user_preferences (
   limit_max_moon_phase int DEFAULT NULL,
   PRIMARY KEY (user_id),
   CONSTRAINT fk_user_id FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
-  CONSTRAINT fk_default_filter FOREIGN KEY (default_filter) REFERENCES filters (filter_id),
-  CONSTRAINT fk_default_scope FOREIGN KEY (default_scope) REFERENCES telescopes (scope_id)
+  CONSTRAINT fk_default_filter FOREIGN KEY (default_filter) REFERENCES filters (filter_id) ON DELETE SET NULL,
+  CONSTRAINT fk_default_scope FOREIGN KEY (default_scope) REFERENCES telescopes (scope_id) ON DELETE SET NULL
 );
+
+INSERT INTO user_preferences_new (
+  user_id, default_exposure, default_filter, default_scope,
+  task_binning, task_guiding, task_dither,
+  min_alt, limit_min_moon_dist, limit_max_sun_alt, limit_max_moon_phase
+)
+SELECT DISTINCT ON (up.user_id)
+  up.user_id,
+  up.exposure,
+  f.filter_id,
+  NULL,
+  up.binning,
+  up.guiding,
+  up.dither,
+  up.min_alt,
+  up.moon_distance,
+  COALESCE(up.max_sun_alt, -12),
+  up.max_moon_phase
+FROM user_preferences up
+LEFT JOIN filters f ON f.short_name = up.filter
+WHERE up.user_id IS NOT NULL
+  AND EXISTS (SELECT 1 FROM users u WHERE u.user_id = up.user_id)
+ORDER BY up.user_id, up.pref_id;
+
+DROP TABLE user_preferences CASCADE;
+ALTER TABLE user_preferences_new RENAME TO user_preferences;
 
 UPDATE schema_version SET version = 25;

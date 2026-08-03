@@ -210,12 +210,12 @@ class TestDoctorDb(unittest.TestCase):
     @use_repository(load_test_data=None)
     def test_doctor_end_to_end_returns_failure_on_bad_settings(self, config):
         os.environ["HEVELIUS_DB_NAME"] = config["database"]
-        # May be set in the ambient test environment (e.g. CI exports
-        # JWT_SECRET_KEY for the API tests); clear them so jwt.secret-key
-        # falls back to the (unset) built-in default and check_jwt() FAILs
-        # deterministically regardless of who else runs in this process.
+        # Force a deterministic FAIL regardless of ambient env or hevelius.yaml:
+        # JWT_SECRET_KEY overrides file config (empty would not — load_config only
+        # applies truthy env values), so set the documented example placeholder.
         leaky_env = ["JWT_SECRET_KEY", "HEVELIUS_WEB_BASE_URL", "HEVELIUS_SMTP_HOST"]
         saved = {k: os.environ.pop(k, None) for k in leaky_env}
+        os.environ["JWT_SECRET_KEY"] = doctor._JWT_EXAMPLE_SECRET
         try:
             args = Namespace(mail_check=None, no_color=True)
             buf = io.StringIO()
@@ -226,8 +226,10 @@ class TestDoctorDb(unittest.TestCase):
             self.assertIn("Database", out)
             self.assertIn("DB schema is up to date", out)
             self.assertIn("JWT secret", out)
+            self.assertIn("example placeholder", out)
         finally:
             os.environ.pop("HEVELIUS_DB_NAME", None)
+            os.environ.pop("JWT_SECRET_KEY", None)
             for k, v in saved.items():
                 if v is not None:
                     os.environ[k] = v

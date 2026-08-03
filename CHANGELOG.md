@@ -5,6 +5,15 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- API: `GET`/`PATCH /api/users/me/preferences` for favourite telescope/filter
+  and task defaults. Preference row is created lazily on first access.
+- DB: schema bumped to 25: `user_preferences` reworked (one row per user,
+  renamed defaults/limits columns, `default_filter`/`default_scope` FKs with
+  `ON DELETE SET NULL`). Existing preference rows are migrated; legacy varchar
+  filter names map via `filters.short_name`.
+- CLI: `hevelius db backup` accepts `--skip-tasks`, `--skip-minor-planets`,
+  and `--skip-projects` (schema kept, data excluded), prints backup size and
+  `pg_dump` version, removes incomplete dumps, and exits non-zero on failure.
 - Bug: Fixed hevelius db migrate command - it does not throw anymore.
 - CLI: `hevelius doctor` checks whether the tool starts, where the config was
   loaded from, DB connectivity and schema version (against `db/*.psql`),

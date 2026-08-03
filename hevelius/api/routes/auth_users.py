@@ -293,6 +293,24 @@ PREFERENCE_COLUMNS = (
 )
 
 
+def _ensure_user_preferences_row(cnx, uid):
+    """Insert a defaults row if missing. Safe under concurrent first access."""
+    db.run_query(
+        cnx,
+        "INSERT INTO user_preferences (user_id) VALUES (%s) ON CONFLICT (user_id) DO NOTHING",
+        (uid,),
+    )
+
+
+def _load_user_preferences(cnx, uid):
+    rows = db.run_query(
+        cnx,
+        f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
+        (uid,),
+    )
+    return dict(zip(PREFERENCE_COLUMNS, rows[0])) if rows else None
+
+
 @blp.route("/users/me/preferences")
 class UsersMePreferencesResource(MethodView):
     @jwt_required()
@@ -303,20 +321,10 @@ class UsersMePreferencesResource(MethodView):
         if uid is None:
             abort(401, message="Invalid token identity")
         cnx = db.connect()
-        rows = db.run_query(
-            cnx,
-            f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
-            (uid,),
-        )
-        if not rows:
-            db.run_query(cnx, "INSERT INTO user_preferences (user_id) VALUES (%s)", (uid,))
-            rows = db.run_query(
-                cnx,
-                f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
-                (uid,),
-            )
+        _ensure_user_preferences_row(cnx, uid)
+        prefs = _load_user_preferences(cnx, uid)
         cnx.close()
-        return dict(zip(PREFERENCE_COLUMNS, rows[0]))
+        return prefs
 
     @jwt_required()
     @blp.arguments(UserPreferencesUpdateSchema, location="json")
@@ -331,14 +339,13 @@ class UsersMePreferencesResource(MethodView):
         if "default_filter" in body and body["default_filter"] is not None:
             if not db.run_query(cnx, "SELECT filter_id FROM filters WHERE filter_id = %s", (body["default_filter"],)):
                 cnx.close()
-                abort(404, message="default_filter does not reference an existing filter")
+                abort(400, message="Invalid default_filter: filter not found.")
         if "default_scope" in body and body["default_scope"] is not None:
             if not db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (body["default_scope"],)):
                 cnx.close()
-                abort(404, message="default_scope does not reference an existing telescope")
+                abort(400, message="Invalid default_scope: telescope not found.")
 
-        if not db.run_query(cnx, "SELECT user_id FROM user_preferences WHERE user_id = %s", (uid,)):
-            db.run_query(cnx, "INSERT INTO user_preferences (user_id) VALUES (%s)", (uid,))
+        _ensure_user_preferences_row(cnx, uid)
 
         updates = [f"{key} = %s" for key in PREFERENCE_COLUMNS if key in body]
         args = [body[key] for key in PREFERENCE_COLUMNS if key in body]
@@ -346,13 +353,9 @@ class UsersMePreferencesResource(MethodView):
             args.append(uid)
             db.run_query(cnx, "UPDATE user_preferences SET " + ", ".join(updates) + " WHERE user_id = %s", tuple(args))
 
-        rows = db.run_query(
-            cnx,
-            f"SELECT {', '.join(PREFERENCE_COLUMNS)} FROM user_preferences WHERE user_id = %s",
-            (uid,),
-        )
+        prefs = _load_user_preferences(cnx, uid)
         cnx.close()
-        return dict(zip(PREFERENCE_COLUMNS, rows[0]))
+        return prefs
 
 
 @blp.route("/users/me/password")
