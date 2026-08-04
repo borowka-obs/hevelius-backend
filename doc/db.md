@@ -30,7 +30,7 @@ Part of the observation scheduler plan (`doc/observation-scheduler-plan.md`, OS-
   value must be backfilled by hand afterwards (5–10 rows, not reliably derivable from
   `lat`/`lon` alone).
 - **projects** – Added the same observing-constraint columns `tasks` already has, all
-  nullable: **min_alt**, **moon_distance**, **max_moon_phase**, **max_sun_alt** (float),
+  nullable: **min_alt**, **moon_distance** (float); **max_moon_phase**, **max_sun_alt**,
   **min_interval** (int). Projects previously had no observing constraints at all.
 - **projects**, **tasks** – Added **priority** (int, NOT NULL, default 0): ordering
   signal for Night Plan and Observation Planning.

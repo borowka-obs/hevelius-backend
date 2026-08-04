@@ -47,6 +47,7 @@ _PROJECT_SORT_COLUMNS = {
     "total_integration_time": "p.total_integration_time",
     "start_date": "p.start_date",
     "end_date": "p.end_date",
+    "priority": "p.priority",
 }
 
 
