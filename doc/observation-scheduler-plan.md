@@ -26,6 +26,10 @@ observation scheduler:
 > [PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116),
 > issue #111 closed. OS-3 (depends on both) is now the next unblocked
 > backend task; OS-6 (depends only on OS-2) is unblocked too.
+>
+> **Revisions (2026-08-04, even later)**: PR #115 deployed to production
+> and existing telescope rows backfilled with real IANA timezones — the
+> one loose end noted on OS-2 is closed out (§2, §7).
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -190,7 +194,7 @@ it's not a second proper noun in code, config, or API docs.
 
 | Table | Change | Why |
 |---|---|---|
-| `telescopes` | `+ timezone varchar(64) NOT NULL DEFAULT 'UTC'` (IANA name) | Night-date labeling (§1.1); required once sites span time zones. Existing rows need a real value backfilled by hand at migration time (5–10 telescopes, not automatable from `lat`/`lon` reliably enough to trust). |
+| `telescopes` | `+ timezone varchar(64) NOT NULL DEFAULT 'UTC'` (IANA name) | Night-date labeling (§1.1); required once sites span time zones. **Done**: deployed (PR #115) and existing rows backfilled by hand with real per-site values in production. |
 | `projects` | `+ min_alt float`, `+ moon_distance float`, `+ max_moon_phase int`, `+ max_sun_alt int`, `+ min_interval int` (all nullable) | Mirrors the same columns on `tasks` so both can go through one visibility engine (§5.2). Today projects have **no** observing constraints at all. |
 | `projects`, `tasks` | `+ priority int NOT NULL DEFAULT 0` | *Recommended, not required.* Night Plan and Observation Planning both need *some* ordering signal beyond "visible y/n"; see §8 "no ordering/priority field" for why this is flagged separately rather than assumed. |
 | `tasks` | `skip_before`, `skip_after`, `created`, `activated`, `performed` : `timestamp` → `timestamptz` | These are naive today (§0). Fine as long as everything writing them is disciplined about UTC, but that's an invariant enforced by convention only, not the type system — a real footgun across multi-timezone sites. Values are assumed already UTC; migration is a type change, not a value change. |
@@ -868,10 +872,10 @@ observing-constraint columns (`min_alt`, `moon_distance`, `max_moon_phase`,
 `max_sun_alt`, `min_interval`) + `priority`; `tasks.priority`; and the
 `tasks` naive-`timestamp` → `timestamptz` conversion (§2), all wired
 through create/update/list/get and documented in OpenAPI, with tests.
-**Outstanding from this task**: the manual timezone backfill for existing
-telescope rows (5–10 rows currently default to `UTC` post-migration, not
-automatable from lat/lon reliably) — worth confirming done before OS-1/OS-4
-lean on real per-site values. `observation_events` (OS-8) and telemetry
+The one loose end — the manual timezone backfill for existing telescope
+rows, since it's not automatable from lat/lon reliably — is **done**:
+deployed to production with real per-site IANA values set. Nothing left
+outstanding from this task. `observation_events` (OS-8) and telemetry
 (OS-10) were deliberately **not** in this task — they're new tables with
 real design questions attached, not plain column additions.
 
