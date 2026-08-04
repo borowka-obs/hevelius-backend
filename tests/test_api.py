@@ -97,6 +97,30 @@ class TestTaskAdd(unittest.TestCase):
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    @use_repository
+    def test_task_add_priority_defaults_to_zero(self, config):
+        """Task added without priority defaults to 0."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        test_task = {"user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27}
+        response = self.app.post('/api/task-add', data=json.dumps(test_task), headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+        response = self.app.get(f'/api/task-get?task_id={task_id}', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(data['task']['priority'], 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_task_add_with_priority(self, config):
+        """Task added with an explicit priority persists it."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        test_task = {"user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27, "priority": 7}
+        response = self.app.post('/api/task-add', data=json.dumps(test_task), headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+        response = self.app.get(f'/api/task-get?task_id={task_id}', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(data['task']['priority'], 7)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
     def test_task_add_missing_required(self):
         """Test task addition with missing required fields"""
         test_task = {
@@ -416,6 +440,26 @@ class TestTaskUpdate(unittest.TestCase):
         self.assertEqual(data['task']['decl'], 41.27)
         self.assertEqual(data['task']['scope_id'], 2)  # Verify scope_id was updated
 
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_task_update_sets_priority(self, config):
+        """Update task priority via task-update."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        test_task = {"user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27}
+        response = self.app.post('/api/task-add', data=json.dumps(test_task), headers=self.headers)
+        task_id = json.loads(response.data)['task_id']
+
+        response = self.app.post(
+            '/api/task-update',
+            data=json.dumps({"task_id": task_id, "priority": 9}),
+            headers=self.headers
+        )
+        self.assertTrue(json.loads(response.data)['status'])
+
+        response = self.app.get(f'/api/task-get?task_id={task_id}', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(data['task']['priority'], 9)
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
@@ -838,6 +882,25 @@ class TestTasks(unittest.TestCase):
                 'Authorization': f'Bearer {self.test_token}',
                 'Content-Type': 'application/json'
             }
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_tasks_list_includes_priority(self, config):
+        """GET /api/tasks returns the priority field for each task."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.post(
+            '/api/task-add',
+            data=json.dumps({"user_id": 1, "scope_id": 1, "object": "M31", "ra": 0.712, "decl": 41.27, "priority": 4}),
+            headers=self.headers
+        )
+        self.assertTrue(json.loads(response.data)['status'])
+
+        response = self.app.get('/api/tasks', headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(data['tasks'])
+        task = next(t for t in data['tasks'] if t['object'] == 'M31')
+        self.assertEqual(task['priority'], 4)
+        os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_tasks_pagination(self, config):
@@ -1792,6 +1855,44 @@ class TestTelescopeOperations(unittest.TestCase):
         self.assertIsNone(data['scope']['default_rotation'])
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    # ── timezone field tests (OS-2) ─────────────────────────────────────────
+
+    @use_repository
+    def test_telescope_post_add_default_timezone_is_utc(self, config):
+        """Add telescope without timezone; defaults to UTC."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "No Timezone Scope"}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['scope']['timezone'], 'UTC')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_post_add_with_timezone(self, config):
+        """Add telescope with an explicit IANA timezone."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Nerpio Scope", "timezone": "Europe/Madrid"}
+        response = self.app.post('/api/scopes', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['scope']['timezone'], 'Europe/Madrid')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_telescope_patch_sets_timezone(self, config):
+        """PATCH telescope to set timezone."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/scopes/1',
+            data=json.dumps({"timezone": "America/Santiago"}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['scope']['timezone'], 'America/Santiago')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestProjectOperations(unittest.TestCase):
     """Tests for project and subframe CRUD: add (catalog lookup), edit, subframe add/edit/remove."""
@@ -1878,6 +1979,71 @@ class TestProjectOperations(unittest.TestCase):
         self.assertTrue(data['status'])
         self.assertEqual(data['project']['name'], 'Updated Z Peg')
         self.assertEqual(data['project']['description'], 'Updated desc')
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    # ── observing constraints + priority fields (OS-2) ──────────────────────
+
+    @use_repository
+    def test_project_create_with_constraints_and_priority(self, config):
+        """Create project with observing constraints and priority set."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {
+            "name": "Constrained Project", "scope_id": 1, "ra": 0.5, "decl": 25.0,
+            "min_alt": 30.0, "moon_distance": 45.0, "max_moon_phase": 0.5,
+            "max_sun_alt": -12.0, "min_interval": 3600, "priority": 5,
+        }
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(data['project']['min_alt'], 30.0)
+        self.assertEqual(data['project']['moon_distance'], 45.0)
+        self.assertEqual(data['project']['max_moon_phase'], 0.5)
+        self.assertEqual(data['project']['max_sun_alt'], -12.0)
+        self.assertEqual(data['project']['min_interval'], 3600)
+        self.assertEqual(data['project']['priority'], 5)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_create_without_constraints_defaults(self, config):
+        """Create project without constraints; constraints are null, priority defaults to 0."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        body = {"name": "Unconstrained Project", "scope_id": 1, "ra": 0.5, "decl": 25.0}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 201)
+        self.assertIsNone(data['project']['min_alt'])
+        self.assertIsNone(data['project']['moon_distance'])
+        self.assertIsNone(data['project']['max_moon_phase'])
+        self.assertIsNone(data['project']['max_sun_alt'])
+        self.assertIsNone(data['project']['min_interval'])
+        self.assertEqual(data['project']['priority'], 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_patch_sets_and_clears_constraints(self, config):
+        """PATCH project to set observing constraints and priority, then clear the nullable ones."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"min_alt": 25.0, "max_sun_alt": -10.0, "priority": 3}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(data['project']['min_alt'], 25.0)
+        self.assertEqual(data['project']['max_sun_alt'], -10.0)
+        self.assertEqual(data['project']['priority'], 3)
+
+        response = self.app.patch(
+            '/api/projects/1',
+            data=json.dumps({"min_alt": None}),
+            headers=self.headers
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNone(data['project']['min_alt'])
+        # priority (NOT NULL) is unaffected by the previous request
+        self.assertEqual(data['project']['priority'], 3)
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository

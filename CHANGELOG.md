@@ -5,6 +5,16 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- DB: schema bumped to 26 (OS-2, observation scheduler plan): `telescopes.timezone`
+  (IANA name, default `UTC`; existing rows need the real value backfilled by hand);
+  `projects` gains the same observing-constraint columns `tasks` has (`min_alt`,
+  `moon_distance`, `max_moon_phase`, `max_sun_alt`, `min_interval`, all nullable);
+  `projects`/`tasks` gain `priority` (int, default 0); `tasks.skip_before`,
+  `skip_after`, `created`, `activated`, `performed` are now `timestamptz` (values
+  assumed already UTC).
+- API: telescope create/update/response expose `timezone`. Project create/update/
+  response expose the new observing-constraint columns and `priority`. Task
+  create/update/response expose `priority`.
 - API: `GET`/`PATCH /api/users/me/preferences` for favourite telescope/filter
   and task defaults. Preference row is created lazily on first access.
 - DB: schema bumped to 25: `user_preferences` reworked (one row per user,

@@ -29,13 +29,15 @@ logger = logging.getLogger(__name__)
 _PROJECT_SELECT_COLS = (
     "project_id, name, description, regexps, scope_id, ra, decl, active, "
     "last_updated, total_integration_time, start_date, end_date, publications, rotation, "
-    "focal, resx, resy, pixel_x, pixel_y"
+    "focal, resx, resy, pixel_x, pixel_y, "
+    "min_alt, moon_distance, max_moon_phase, max_sun_alt, min_interval, priority"
 )
 
 _PROJECT_SELECT_COLS_P = (
     "p.project_id, p.name, p.description, p.regexps, p.scope_id, p.ra, p.decl, p.active, "
     "p.last_updated, p.total_integration_time, p.start_date, p.end_date, p.publications, p.rotation, "
-    "p.focal, p.resx, p.resy, p.pixel_x, p.pixel_y"
+    "p.focal, p.resx, p.resy, p.pixel_x, p.pixel_y, "
+    "p.min_alt, p.moon_distance, p.max_moon_phase, p.max_sun_alt, p.min_interval, p.priority"
 )
 
 _PROJECT_SORT_COLUMNS = {
@@ -90,6 +92,8 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
         "publications": _normalize_publications(r[12]),
         "rotation": r[13],
         "focal": r[14], "resx": r[15], "resy": r[16], "pixel_x": r[17], "pixel_y": r[18],
+        "min_alt": r[19], "moon_distance": r[20], "max_moon_phase": r[21], "max_sun_alt": r[22],
+        "min_interval": r[23], "priority": r[24],
         "subframes": subframes or [], "user_ids": user_ids or []
     }
 
@@ -200,6 +204,12 @@ class ProjectsResource(MethodView):
         resy = body.get("resy")
         pixel_x = body.get("pixel_x")
         pixel_y = body.get("pixel_y")
+        min_alt = body.get("min_alt")
+        moon_distance = body.get("moon_distance")
+        max_moon_phase = body.get("max_moon_phase")
+        max_sun_alt = body.get("max_sun_alt")
+        min_interval = body.get("min_interval")
+        priority = body.get("priority", 0)
         cnx = db.connect()
         if ra is None or decl is None:
             cat = db.run_query(cnx, "SELECT object_id, name, ra, decl FROM objects WHERE lower(name)=%s", (name.strip().lower(),))
@@ -238,10 +248,12 @@ class ProjectsResource(MethodView):
         db.run_query(
             cnx,
             "INSERT INTO projects (name, description, regexps, scope_id, ra, decl, active, start_date, end_date, "
-            "publications, rotation, focal, resx, resy, pixel_x, pixel_y) "
-            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+            "publications, rotation, focal, resx, resy, pixel_x, pixel_y, "
+            "min_alt, moon_distance, max_moon_phase, max_sun_alt, min_interval, priority) "
+            "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
             (name, description, regexps, scope_id, ra, decl, active, start_date, end_date,
-             publications, rotation, focal, resx, resy, pixel_x, pixel_y),
+             publications, rotation, focal, resx, resy, pixel_x, pixel_y,
+             min_alt, moon_distance, max_moon_phase, max_sun_alt, min_interval, priority),
         )
         row = db.run_query(
             cnx,
@@ -331,10 +343,14 @@ class ProjectDetailResource(MethodView):
         if "rotation" in body:
             updates.append("rotation = %s")
             args.append(body["rotation"])   # None is valid — clears the value
-        for key in ("focal", "resx", "resy", "pixel_x", "pixel_y"):
+        for key in ("focal", "resx", "resy", "pixel_x", "pixel_y",
+                    "min_alt", "moon_distance", "max_moon_phase", "max_sun_alt", "min_interval"):
             if key in body:
                 updates.append(f"{key} = %s")
-                args.append(body[key])
+                args.append(body[key])   # None is valid for nullable fields — clears the value
+        if "priority" in body and body["priority"] is not None:
+            updates.append("priority = %s")
+            args.append(body["priority"])
         if updates:
             args.append(project_id)
             db.run_query(cnx, "UPDATE projects SET " + ", ".join(updates) + " WHERE project_id = %s", tuple(args))

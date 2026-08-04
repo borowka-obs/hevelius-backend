@@ -28,7 +28,7 @@ class DbTest(unittest.TestCase):
         version = db.version_get(conn)
         conn.close()
 
-        self.assertEqual(version, 25)
+        self.assertEqual(version, 26)
 
     @use_repository
     def test_sensor(self, config):
