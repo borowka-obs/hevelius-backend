@@ -4,14 +4,16 @@ Status: **draft for review**. This document is meant to be iterated on before an
 code is written. It covers four components requested for the telescope
 observation scheduler:
 
-> **Revision (2026-08-03)**: §6 revised after feedback that external
+> **Revisions (2026-08-03)**: §6 revised after feedback that external
 > telemetry (weather, roof state, sensor temperatures, ASCOM state) belongs
-> in this picture too. That data class has a genuinely different shape than
-> `observation_events`, and it changes the database recommendation — see §6.3.
+> in this picture too — that data class has a genuinely different shape
+> than `observation_events` and changes the database recommendation, see
+> §6.3. §7 turned into a numbered `OS-#` task breakdown, with telemetry
+> (OS-10) deferred as a separate topic.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
-3. Agent/runner support (contract only — implementation is a separate session)
+3. Runner support (contract only — implementation is a separate session)
 4. Statistics (nightly observing-time reporting, Grafana-ready)
 
 It also answers the four general questions raised alongside the request
@@ -156,26 +158,15 @@ shared visibility code must convert at the boundary (`ra_deg = ra_hours *
 mis-places every target by a factor of 15, not an out-of-range error you'd
 notice immediately.
 
-### 1.3 Naming: "Planning" / "Night Plan" / "runner" vs "agent"
+### 1.3 Naming
 
-- **Observation Planning** and **Night Plan** are both fine, intuitive
-  names — keep them. `/api/night-plan` already exists as a route and is
-  referenced by both other repos; renaming it has real migration cost for
-  no real benefit, and "night plan" is already the vocabulary in the DB
-  migration comments (`db/22-asteroids.psql: "visibility planning"`) and
-  the runner's own client code.
-- **Runner vs agent**: the repo, CLI entry point, config keys, and every
-  doc in `hevelius-runner` consistently say **runner**
-  (`hevelius-runner.py`, `hevelius-runner/AGENTS.md` even calls itself "the
-  observatory-side client" rather than introducing a second name). "Agent"
-  is a fine *informal* word to use in prose (the way people say "CI agent"),
-  but it should not become a second proper noun living alongside "runner"
-  in code, config, or API docs — that's how you end up with half the
-  codebase importing `RunnerConfig` and the other half calling it
-  `agent_config` two years from now. **Recommendation: keep "runner" as the
-  one formal name**; this document uses "runner" for the software and
-  "agent support" only as the section title, matching how the request
-  phrased it.
+Settled, not up for further debate: **"Observation Planning" and "Night
+Plan"** stay as-is (already load-bearing in route names and client code
+across all three repos), and **"runner"** is the one formal name for the
+observatory-side software — matches the repo, CLI, and its own docs
+already. "Agent" stays fine as an informal word in prose (§5's title keeps
+it only because that's how the original request phrased the section), but
+it's not a second proper noun in code, config, or API docs.
 
 ---
 
@@ -412,7 +403,7 @@ going through the UI.
 
 ---
 
-## 5. Component 3 — Agent / Runner support (contract only)
+## 5. Component 3 — Runner support (contract only)
 
 Per the request, runner-side implementation is out of scope for this
 session. What *is* in scope: designing a stable contract now, and building
@@ -619,24 +610,125 @@ cargo-culting "hypertable" onto all of it:
 
 ---
 
-## 7. Phased roadmap
+## 7. Task breakdown
 
-| Phase | Repo(s) | Contents | Depends on |
-|---|---|---|---|
-| 0 | backend | Schema changes (§2); extract `hevelius/night.py` from `asteroid.py` (pure refactor); new `hevelius/observability.py` engine (§4.2) | — |
-| 1 | backend | Night Plan rewrite: `night_plan.py` route, new schemas, remove old `_get_night_plan`, explain mode, OpenAPI + rewritten tests, `hevelius night-plan show` CLI | Phase 0 |
-| 2 | web | Night Plan UI rewrite against the new contract (telescope selector defaulting from user prefs, date picker, visibility badges, explain toggle) | Phase 1 |
-| 3 | backend + web | Observation Planning: small backend additions (`priority`, computed project completion fields), web "Observation Planning" screen (§3) | Phase 0 (schema) |
-| 4 | backend | `observation_events` table + `POST /api/observation-events` + derived subframe counts (§5); publish a short "Runner Integration Guide" as the spec for a future runner session. **No runner code touched.** | Phase 0 |
-| 5 | backend | `GET /api/stats/nightly` (and similar) over `observation_events`; example Grafana dashboard doc | Phase 4 |
-| 6 | backend (+ runner, future) | Enable TimescaleDB extension; telemetry hypertables + `telemetry_roof_events` + `POST /api/telemetry` (§6.3–6.4); example continuous aggregate + retention policy. Runner-side polling deferred, same as Phase 4. | Phase 0 |
+Numbered `OS-#` ("Observation Scheduler") so each task has one stable
+reference distinct from GitHub issue/PR numbers, which are per-repo and
+would collide across `hevelius-backend`/`hevelius-web`/`hevelius-runner`
+(this plan itself lives under PR #110 in `hevelius-backend`). If/when these
+become actual GitHub issues, `OS-#` can go in the issue title as a
+cross-repo anchor.
 
-Phases 0/1/4 are backend-only and can proceed in parallel once §2 is
-agreed; 2 and 3 depend on their backend halves; 5 depends on 4 actually
-having data flowing into it (which, until the runner is rebuilt, means
-either seeding it manually/via a backfill script from existing
-`tasks.performed` rows, or accepting it stays empty until the runner
-session ships).
+**On "is night identity a good separate task?"** — yes, worth pulling out.
+The `night_date(scope, t)` rule (§1.1) is pure logic (not a schema change),
+it's small and precisely testable in isolation (the worked examples in
+§1.1 basically *are* the test cases), and — most importantly — three
+different consumers need to call the exact same function: Night Plan
+(OS-4), `observation_events.night_date` (OS-8), and the nightly Statistics
+grouping (OS-9). Bundling it into whichever of those three ships first
+risks the other two re-deriving it slightly differently later. Written and
+tested once, up front, as its own task, that risk goes away. It's listed
+separately below (OS-1) rather than folded into the schema task (OS-2),
+since OS-2 is schema-only and this is application code.
+
+| ID | Title | Repo | Depends on | Size | Status |
+|---|---|---|---|---|---|
+| **OS-1** | Night identity (`night_date` computation) | backend | — | S | Planned |
+| **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | Planned |
+| **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned |
+| **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned |
+| **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned |
+| **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned |
+| **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned |
+| **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned |
+| **OS-9** | Statistics API | backend | OS-8 | S–M | Planned |
+| **OS-10** | Telemetry (weather / roof / sensors / ASCOM) | backend (+ runner, later) | OS-2 | L | **Deferred** — separate topic, per your note |
+| **OS-11** | Runner rewrite: night plan + execution reporting | runner | OS-4, OS-8 | L | **Deferred** — separate session, unchanged from the original request |
+
+**OS-1 — Night identity (`night_date` computation).** The §1.1 rule as a
+small, independently unit-tested function (e.g. in `hevelius/night.py`,
+see OS-3). Logically independent of the DB — takes a tz string as a
+parameter — but only useful in anger once OS-2's `telescopes.timezone`
+column exists to feed it.
+
+**OS-2 — Data model: telescopes, projects, tasks.** Bundled per your
+request — one migration (or tight sequence) covering `telescopes.timezone`;
+`projects` observing-constraint columns (`min_alt`, `moon_distance`,
+`max_moon_phase`, `max_sun_alt`, `min_interval`) + `priority`; `tasks.priority`;
+and the `tasks` naive-`timestamp` → `timestamptz` conversion (§2). Includes
+OpenAPI updates for the new/changed fields and the manual timezone backfill
+for existing telescope rows (5–10 rows, not automatable from lat/lon
+reliably). `observation_events` (OS-8) and telemetry (OS-10) are deliberately
+**not** in this task — they're new tables with real design questions
+attached, not plain column additions.
+
+**OS-3 — Shared observability engine.** Extract `hevelius/night.py` out of
+`hevelius/asteroid.py` (pure refactor, no behavior change for the asteroid
+feature) plus the new `hevelius/observability.py` staged-filter pipeline
+(§4.2), generic over `(ra_deg, dec_deg, constraints)`. Includes the RA
+hours→degrees conversion at the boundary (§1.2) and a unit test guarding
+it specifically — the easiest kind of bug to introduce here and the
+hardest to notice by inspection.
+
+**OS-4 — Night Plan API rewrite.** New `hevelius/api/routes/night_plan.py`;
+delete the old `_get_night_plan` stub out of `tasks.py` (§4.1); new
+request/response schemas including `explain=true` (§4.3–4.4); OpenAPI
+update; rewritten `test_night_plan_*` tests; `hevelius night-plan show`
+CLI companion folded into this task rather than split out, since it's a
+thin wrapper over the same module.
+
+**OS-5 — Night Plan web UI.** Rewrite `NightPlanComponent`/
+`NightPlanService` against the OS-4 contract: telescope selector defaulted
+from `users/me/preferences.default_scope`, date picker, visibility badges,
+explain-mode toggle.
+
+**OS-6 — Observation Planning: backend additions.** Computed
+`is_complete`/`subframes_remaining` on project list/detail; wire `priority`
+(from OS-2) into `task-add`/`task-update`/`tasks` list sort and
+project create/update. Small — no new tables, no new endpoints.
+
+**OS-7 — Observation Planning: web UI.** The unified tasks+projects
+planning screen (§3.1's client-side-merge recommendation), filters, and
+whatever bulk actions turn out to be wanted. Two decisions from §8 land
+here and are worth closing out before/during implementation rather than
+guessing: the unified-vs-two-sections final call (§3.1), and task-delete
+semantics (no delete endpoint exists today — hard delete vs. `state=-1`).
+
+**OS-8 — Observation events (execution log).** `observation_events` table
+(§5.2); `POST /api/observation-events` (§5.3) including idempotency-key
+handling (§5.4); switch `project_subframes.count` to trigger-derived from
+the event log, keeping `PATCH` around as a manual-override path rather than
+the primary write path; publish the "Runner Integration Guide" as the spec
+OS-11 will implement against. The largest single task here — it's real
+schema plus a state-transition change to how subframe counts work.
+Decisions flagged in §5.5 (failure/retry semantics, unattended auth) are
+worth resolving before or during this task, not deferred silently.
+
+**OS-9 — Statistics API.** `GET /api/stats/nightly` (and similar) as plain
+SQL aggregates over `observation_events` (§6.1); example Grafana dashboard
+doc pointed directly at Postgres. Depends on OS-8 existing, though it can
+be developed and demoed against seed/backfilled data before OS-11 (the
+runner) actually produces live events.
+
+**OS-10 — Telemetry (weather / roof / sensors / ASCOM). Deferred**, as
+requested — a separate, large topic on its own (external data sources,
+TimescaleDB, a new runner-side polling/ingestion story). Kept numbered so
+§6.3–6.4's design has a stable reference when it's picked back up, but
+intentionally excluded from the active sequence below.
+
+**OS-11 — Runner rewrite: night plan + execution reporting. Deferred** —
+unchanged from the original request's scoping. Replaces the dead
+`TaskManager`/`run` loop (§0, §4.1) against the OS-4/OS-8 contracts, once
+those exist. Listed here only so it isn't lost track of.
+
+### Suggested order
+
+OS-1 and OS-2 have no dependencies and can start immediately, in either
+order or in parallel. Once both land: OS-3 → OS-4 → OS-5 is one track
+(Night Plan); OS-6 → OS-7 is an independent second track (Observation
+Planning) that only needs OS-2, not OS-3/4. OS-8 needs only OS-1 and OS-2,
+so it can run alongside either track rather than waiting on Night Plan;
+OS-9 follows it. OS-10 and OS-11 stay off the active sequence per above.
 
 ---
 
@@ -740,12 +832,8 @@ session ships).
    addition beyond NINA's own approach is a per-telescope IANA time zone,
    which NINA doesn't need (single PC, single system clock) but this
    multi-site system does.
-3. **Naming**: keep "Observation Planning" and "Night Plan" as-is — already
-   intuitive, already load-bearing in existing route names and client code.
-   Keep **"runner"** as the one formal name for the observatory-side
-   software (matches the repo, CLI, and its own docs already); "agent" is
-   fine as an informal word in prose but shouldn't become a second name in
-   code or config (§1.3).
+3. **Naming**: settled — "Observation Planning," "Night Plan," and
+   **"runner"** stay as the formal names (§1.3).
 4. **Skeptical review**: §8, in full.
 
 ---
