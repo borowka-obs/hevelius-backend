@@ -10,10 +10,15 @@ observation scheduler:
 > than `observation_events` and changes the database recommendation, see
 > §6.3. §7 turned into a numbered `OS-#` task breakdown, with telemetry
 > (OS-10) deferred as a separate topic.
+>
+> **Revisions (2026-08-04)**: runner implementation is now in scope
+> (previously contract-only) — §5.6–§5.11 add the actual runner-side
+> design, including generating NINA Advanced Sequencer files from the
+> Night Plan (OS-11–OS-15 in §7). GitHub issues opened for OS-1 and OS-2.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
-3. Runner support (contract only — implementation is a separate session)
+3. Runner support, including NINA sequence generation
 4. Statistics (nightly observing-time reporting, Grafana-ready)
 
 It also answers the four general questions raised alongside the request
@@ -403,14 +408,12 @@ going through the UI.
 
 ---
 
-## 5. Component 3 — Runner support (contract only)
+## 5. Component 3 — Runner support
 
-Per the request, runner-side implementation is out of scope for this
-session. What *is* in scope: designing a stable contract now, and building
-the backend half of it, so a future runner-focused session has a real spec
-instead of having to reverse-engineer intent — and because this piece is
-also the statistics foundation (§7), it's worth landing independent of the
-runner.
+**Now in scope** (revised from "contract only" — see §5.6 onward for the
+actual runner-side design). §5.1–§5.5 below are the backend contract
+(`observation_events`); §5.6–§5.11 are the runner-side implementation,
+including the sequence-generation problem flagged as the hard part.
 
 ### 5.1 The gap: no execution event log
 
@@ -485,6 +488,191 @@ a burst of retries and your statistics quietly overcount.
   silent for six hours. A lightweight heartbeat
   (`POST /api/scopes/{id}/heartbeat` or similar) is worth a line item in
   whatever session actually builds runner automation.
+
+### 5.6 Runner architecture — what's already there, what's actually broken
+
+`hevelius-runner` already has the right shape for this, once its two stub
+pieces are replaced — it doesn't need a rebuild:
+
+- **`NINAController`** (`src/nina_controller.py`) launches NINA as
+  `nina.exe -s <sequence_path>` and monitors the process tree. That matches
+  a "hand NINA one sequence file, let its own Advanced Sequencer execute
+  the whole night" model — which is also the model recommended below
+  (§5.9), for the same reason NINA already owns meridian flips, autofocus,
+  guiding, and (if configured) safety-monitor/weather stops: those are
+  mature, hardware-tested behaviors inside NINA that Hevelius has no
+  business reimplementing.
+- **`FileMonitor`** (`src/file_monitor.py`) already watches configured
+  volumes for new FITS/XISF files via `watchdog`, calls back per file, and
+  can catch up on pre-existing files on startup (`process_existing_files`).
+  This is exactly the mechanism needed for decoupled, pull-based execution
+  reporting (§5.10) — reused, not rebuilt, just pointed at new logic.
+- **What's actually broken**: `TaskManager.prepare_sequence_file` (§0)
+  builds a JSON shape (`Targets: [{Filters: [...], Exposures: [...]}]`)
+  that matches neither the real `Task`/`Project` schema nor NINA's actual
+  Advanced Sequencer file format — it's replaced outright, not patched
+  (§5.9). And there is currently no bridge at all from "a FITS file just
+  appeared" to `POST /api/observation-events` (§5.10).
+- **What's unverified**: the `-s` CLI flag and the assumption that a
+  loaded sequence starts executing unattended (vs. loading into the UI for
+  a human to press play) are both asserted by existing code, not confirmed
+  against a real NINA install. Confirming this is cheap and blocking —
+  see §5.7.
+
+### 5.7 First step: an empirical NINA integration spike (before writing the generator)
+
+NINA's Advanced Sequencer `.json` format is an internal, versioned
+serialization of a live object tree (`$type`-tagged for .NET
+deserialization), not a stable published API, and it can be influenced by
+which plugins are installed. I have reasonable *conceptual* confidence in
+its shape (a root container holding Start/Targets/End sections; each
+target is its own sub-container with its coordinates and a set of
+switch-filter/loop/expose instructions) but not confidence in exact class
+names or field names from memory — and asserting fabricated specifics here
+would be worse than admitting the gap. The fix is cheap: a short, timeboxed
+spike against a real NINA install (one representative telescope profile is
+enough to start) that answers, empirically:
+
+1. Build one target with a couple of filters/exposures/loops in NINA's own
+   Advanced Sequencer UI, export it, and read the resulting JSON — this
+   becomes the literal template §5.9 clones from, so its exact schema
+   doesn't need to be reverse-derived from documentation at all.
+2. Does `nina.exe -s <path>` actually auto-start execution, or only load
+   the sequence for a human to press play? (There is reportedly a
+   profile-level "auto start sequence" option — confirm it, and confirm
+   the CLI flag name/behavior against the actual installed NINA version,
+   not older docs.)
+3. Does the target's `Name`/`TargetName` field flow through into the
+   captured FITS `OBJECT` header and into the default filename pattern
+   (`$$TARGETNAME$$`)? This is the carrier §5.9's identifier scheme relies
+   on.
+4. What altitude/time-gating condition types are available on a target
+   container (needed for §5.9's per-target visibility window), and do they
+   behave as "skip if not currently valid" or "block until valid"?
+
+This is **OS-11** below — small, and everything else in this section
+should treat its findings as authoritative over anything asserted here.
+
+### 5.8 Night plan consumption
+
+Unremarkable by comparison: the runner polls `GET /api/night-plan` (§4.4)
+for its configured `scope_id`, on a schedule (e.g. once at dusk to build
+the night's sequence, per §5.9's "static per-night snapshot" v1 scoping —
+see the tradeoff called out there) rather than continuously. Response is
+cached locally so a transient network blip doesn't stall sequence
+generation. This is **OS-12**.
+
+### 5.9 NINA Advanced Sequencer generation — the hard part
+
+The recommended approach is **template cloning, not schema generation
+from scratch**: don't try to hand-build a valid Advanced Sequencer tree
+from a reverse-derived schema (fragile against NINA version drift, and per
+§5.7, not something to assert exact specifics about from memory anyway).
+Instead:
+
+1. **A human observatory operator builds and exports one real template per
+   telescope profile**, in NINA's own UI, containing exactly one example
+   target with the switch-filter/loop/expose instructions they want (their
+   real autofocus triggers, meridian-flip settings, guiding start, dither
+   behavior, safety-monitor wiring — all of it already correctly
+   configured for that specific hardware, because a human who runs that
+   telescope built it and can see it execute correctly before it's ever
+   templated). This sidesteps Hevelius needing to know or encode any
+   hardware-specific NINA behavior at all.
+2. **The runner treats that exported JSON as an opaque tree it walks
+   generically**, locating only a small number of known nodes by `$type`
+   suffix and a naming convention (the operator names the one example
+   target something recognizable, e.g. `__HEVELIUS_TEMPLATE__`):
+   - the single template target container → **cloned once per Night Plan
+     item** for the night (tasks and projects alike);
+   - within each clone, the **target's name/coordinates/rotation** →
+     overwritten with the real values;
+   - the **target's name specifically encodes a stable identifier**
+     (`HEV-T512` for task 512, `HEV-P42-S7` for project 42 / subframe 7)
+     rather than the free-text object name — per §5.7 item 3, this is what
+     flows into the FITS `OBJECT` header and default filename, and it's
+     what makes §5.10's correlation step a direct parse instead of fuzzy
+     name matching (today's `task-find-by-filename` approach, kept as a
+     fallback for older data, not the primary path going forward);
+   - the **per-filter switch/loop/expose block inside the template target**
+     → cloned once per relevant filter: once for a task (its one filter,
+     count 1), or once per pending subframe for a project (each
+     subframe's filter, exposure time, and `goal_count − count` remaining
+     iterations) — a project with three incomplete subframes produces
+     three of these blocks inside its one cloned target container;
+   - a **per-target altitude/time condition** (§5.7 item 4) set from the
+     Night Plan response's own visibility metadata (§4.4 — `check_time_utc`
+     and the underlying rise/set window), so NINA only actually attempts a
+     target during the window Hevelius already computed as valid, rather
+     than duplicating that visibility logic inside the sequence itself.
+   - target containers ordered by `priority` (OS-2/OS-6) descending, so if
+     the night doesn't have room for everything, higher-priority items are
+     attempted first.
+3. Generic tree substitution, sketched (not literal — the real node-finding
+   predicate depends on §5.7's findings):
+   ```
+   template = load_json(template_path)
+   target_template = find_node(template, name == "__HEVELIUS_TEMPLATE__")
+   for item in night_plan.items (ordered by priority desc):
+       clone = deepcopy(target_template)
+       set_target_fields(clone, name=identifier_for(item), ra=..., dec=..., rotation=...)
+       set_visibility_condition(clone, item.visibility)
+       exposure_template = find_node(clone, type_suffix == "SmartExposure")  # or equivalent
+       replace_with(clone, [exposure_template.clone_for(filter, exposure_s, count)
+                             for filter, exposure_s, count in exposure_blocks_for(item)])
+       insert_into(targets_container, clone)
+   write_json(output_sequence_path, template)
+   ```
+   This keeps the generator's surface area small and testable — it doesn't
+   need to understand or reconstruct NINA's full grammar, only locate and
+   patch a handful of known leaf fields inside a tree it never has to fully
+   model. This is **OS-13**, and it depends on §5.7's findings (OS-11) landing
+   first — writing this against guessed field names would very likely need
+   a rewrite once the real template is in hand.
+
+**Scoping decision, stated explicitly**: v1 generates one static sequence
+per telescope per night (built once, e.g. at dusk, from that moment's
+Night Plan) rather than live-editing a running NINA sequence when the plan
+changes mid-evening (a new task added at 11pm doesn't retroactively appear
+in an already-generated, already-running sequence). This is a real
+limitation against "no manual actions," but re-editing a *running* NINA
+sequence via its Advanced API is a materially harder and less-verified
+problem than generating a fresh file before NINA starts — worth revisiting
+as a v2 enhancement once §5.7's spike clarifies what the Advanced API
+plugin actually supports for live sequence mutation, rather than guessing
+now.
+
+### 5.10 Execution correlation & reporting
+
+`FileMonitor`'s existing callback (§5.6) fires per new FITS/XISF file.
+The new logic behind that callback: parse the `HEV-T512` / `HEV-P42-S7`
+identifier out of the FITS header (or filename, as a fallback) written by
+the sequence generated in §5.9, then `POST /api/observation-events` (§5.3)
+with that task/project/subframe id, the filter/exposure actually used (from
+the FITS header, not just what was requested — catches partial/aborted
+exposures), an idempotency key (§5.4, derived from the file's content hash
+or path so a restarted runner re-scanning the same file doesn't
+double-report), and `status` inferred from whether the frame looks
+complete (file size stabilized, expected FITS keywords present) vs. a
+truncated/aborted capture. `process_existing_files` (already in
+`FileMonitor`) gives this a free "catch up on anything captured while the
+runner itself was offline" path — no separate backfill mechanism needed.
+This is **OS-14**, and it's the piece that actually starts populating
+`observation_events` (OS-8) and therefore Statistics (OS-9) with real data.
+
+### 5.11 Process lifecycle & scheduling
+
+Ties §5.8–§5.10 together into the thing that actually runs unattended each
+night: at a configured time before sunset (or driven by the Night Plan's
+own `night_start_utc`, §4.4), fetch the plan (OS-12), generate the sequence
+(OS-13), launch NINA via the existing `NINAController` (confirmed, not
+assumed, per §5.7), keep `FileMonitor` running throughout (OS-14), and —
+new behavior the current `NINAController` doesn't have — detect NINA
+exiting **before** the sequence's expected end (crash, hardware fault, a
+weather closure NINA's own safety monitor already handled correctly) and
+report a partial-night status rather than assuming full completion or,
+worse, blindly relaunching NINA into a crash loop. This is **OS-15**, and
+it's where the §5.5 heartbeat idea plugs in if it's built.
 
 ---
 
@@ -643,7 +831,11 @@ since OS-2 is schema-only and this is application code.
 | **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned |
 | **OS-9** | Statistics API | backend | OS-8 | S–M | Planned |
 | **OS-10** | Telemetry (weather / roof / sensors / ASCOM) | backend (+ runner, later) | OS-2 | L | **Deferred** — separate topic, per your note |
-| **OS-11** | Runner rewrite: night plan + execution reporting | runner | OS-4, OS-8 | L | **Deferred** — separate session, unchanged from the original request |
+| **OS-11** | NINA integration spike (empirical verification) | runner | — | S | Planned |
+| **OS-12** | Runner — night plan consumption | runner | OS-4 | S | Planned |
+| **OS-13** | Runner — NINA Advanced Sequencer generation | runner | OS-11, OS-12 | L | Planned |
+| **OS-14** | Runner — execution correlation & reporting | runner | OS-13, OS-8 | M | Planned |
+| **OS-15** | Runner — process lifecycle & scheduling | runner | OS-11, OS-12, OS-13 | M | Planned |
 
 **OS-1 — Night identity (`night_date` computation).** The §1.1 rule as a
 small, independently unit-tested function (e.g. in `hevelius/night.py`,
@@ -716,10 +908,34 @@ TimescaleDB, a new runner-side polling/ingestion story). Kept numbered so
 §6.3–6.4's design has a stable reference when it's picked back up, but
 intentionally excluded from the active sequence below.
 
-**OS-11 — Runner rewrite: night plan + execution reporting. Deferred** —
-unchanged from the original request's scoping. Replaces the dead
-`TaskManager`/`run` loop (§0, §4.1) against the OS-4/OS-8 contracts, once
-those exist. Listed here only so it isn't lost track of.
+**OS-11 — NINA integration spike.** Empirical verification against a real
+NINA install (§5.7): export one real Advanced Sequencer template, confirm
+`-s`/auto-start behavior, confirm target-name → FITS header/filename
+propagation, confirm available altitude/time condition types. Deliverable
+is findings + the actual template file, not a big code change — but OS-13
+and OS-15 are written against its output, not against this document's
+best-effort description of NINA's internals.
+
+**OS-12 — Runner: night plan consumption.** Poll `GET /api/night-plan`
+(§5.8) on a schedule, cache locally.
+
+**OS-13 — Runner: NINA Advanced Sequencer generation.** The template-clone
+substitution engine (§5.9) — the piece flagged as the hard part. Replaces
+`TaskManager.prepare_sequence_file` outright. Depends on OS-11's actual
+template/findings, not on a guessed schema.
+
+**OS-14 — Runner: execution correlation & reporting.** Wire `FileMonitor`'s
+existing callback (§5.10) to parse the `HEV-T#`/`HEV-P#-S#` identifier
+from each new FITS file and `POST /api/observation-events` (OS-8) with an
+idempotency key. This is what actually starts populating `observation_events`
+and therefore Statistics (OS-9) with real data — everything upstream of
+this is planning, everything downstream is just SQL until this lands.
+
+**OS-15 — Runner: process lifecycle & scheduling.** Ties OS-12–OS-14
+together into the nightly unattended run (§5.11): scheduled trigger before
+sunset, generate + launch, keep `FileMonitor` running, detect early NINA
+exit and report partial-night status instead of assuming completion or
+blind-relaunching.
 
 ### Suggested order
 
@@ -728,7 +944,12 @@ order or in parallel. Once both land: OS-3 → OS-4 → OS-5 is one track
 (Night Plan); OS-6 → OS-7 is an independent second track (Observation
 Planning) that only needs OS-2, not OS-3/4. OS-8 needs only OS-1 and OS-2,
 so it can run alongside either track rather than waiting on Night Plan;
-OS-9 follows it. OS-10 and OS-11 stay off the active sequence per above.
+OS-9 follows it. On the runner side, OS-11 has no dependencies and should
+start early — ideally in parallel with everything above, since OS-13
+depends on its findings and is the longest task in the whole plan. OS-12
+needs OS-4 (Night Plan); OS-13 needs OS-11 and OS-12; OS-14 needs OS-13
+and OS-8; OS-15 closes the loop over OS-11–OS-13. OS-10 (telemetry) stays
+off the active sequence, deferred as its own topic.
 
 ---
 
@@ -770,15 +991,27 @@ OS-9 follows it. OS-10 and OS-11 stay off the active sequence per above.
   while executing. That decision logic is still separate, still
   unaddressed, and still runner-side future work. Flagging this explicitly
   so telemetry storage isn't mistaken for automation gating.
-- **No ordering/scheduling, only filtering.** Night Plan (v1, per §4.2's
-  scoping note) tells you *what's possible*, not *what order to shoot it
-  in*. Real sequencing — meridian flips, filter-change cost, optimizing for
-  transit time across many targets in one night — is a genuinely harder
-  scheduling problem. It's reasonable to lean on NINA's own
-  sequencer/scheduler for this in the near term and treat a backend "smart
-  sequencer" as an explicit, separate future phase — but don't let "Night
-  Plan" quietly become the thing people expect to solve sequencing; it
-  doesn't, on purpose, in v1.
+- **Ordering is priority + per-target visibility windows, not real
+  scheduling.** Night Plan (§4.2) tells you *what's possible*; §5.9's
+  generator orders target containers by `priority` and gates each with its
+  own altitude/time condition, and NINA's own engine executes them — but
+  none of that optimizes *across* targets (meridian-flip cost,
+  filter-change cost, squeezing the most out of a night by re-ordering
+  around transit times). That's a genuinely harder scheduling problem,
+  deliberately not attempted here; a backend "smart sequencer" is a
+  plausible future phase, not part of this plan.
+- **The generated sequence is a static per-night snapshot (§5.9).** A task
+  or project added mid-evening doesn't retroactively appear in an
+  already-running NINA sequence; it shows up in the following night's
+  generation. Live-editing a running sequence via NINA's Advanced API is a
+  real possibility but a materially less-verified one — explicitly deferred
+  to v2 pending §5.7's spike findings, not assumed solved.
+- **NINA's Advanced Sequencer JSON format is asserted at a conceptual
+  level only.** §5.9's design deliberately avoids needing an exact schema
+  (clone-and-patch a real exported template rather than generate one from
+  a hand-derived spec), but that's precisely *because* the exact
+  `$type`/field names in this document are not to be trusted — OS-11's
+  spike is a hard prerequisite for OS-13, not a nice-to-have.
 - **No access control beyond a flat permission bitmask.** Any authenticated
   user can currently submit tasks/projects to any `scope_id` and read any
   telescope's night plan. Fine for one trusted team; "multiple observatory
