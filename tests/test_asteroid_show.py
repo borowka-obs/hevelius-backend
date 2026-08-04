@@ -7,7 +7,7 @@ from argparse import Namespace
 from contextlib import redirect_stdout
 
 from tests.dbtest import use_repository
-from hevelius import db, asteroid
+from hevelius import db, asteroid, night
 
 
 class TestAsteroidNameLookup(unittest.TestCase):
@@ -136,7 +136,7 @@ class TestNightWindow(unittest.TestCase):
         from astropy import units as u
 
         loc = EarthLocation(lat=52.2 * u.deg, lon=21.0 * u.deg, height=100 * u.m)
-        start, end = asteroid._get_night_times(loc, Time("2026-07-22 00:00:00"))
+        start, end = night.get_night_times(loc, Time("2026-07-22 00:00:00"))
         self.assertLess(start, end)
         # Must cross midnight and start in the evening (not the old 06:00–18:00 fallback)
         self.assertNotEqual(start.iso[:10], end.iso[:10])
