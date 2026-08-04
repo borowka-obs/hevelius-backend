@@ -19,6 +19,11 @@ observation scheduler:
 > already exist as issues filed by the project owner before this plan
 > (`backend#46`, `web#164`, `runner#1`/`#2`) and were updated in place
 > rather than duplicated — see §7's Issue column for the full mapping.
+>
+> **Revisions (2026-08-04, later)**: **OS-2 implemented** — merged in
+> [PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115),
+> issue #112 closed. OS-1 and OS-3 (both depend on OS-2) can now proceed
+> against real schema instead of a plan.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -830,7 +835,7 @@ since OS-2 is schema-only and this is application code.
 | ID | Title | Repo | Depends on | Size | Status | Issue |
 |---|---|---|---|---|---|---|
 | **OS-1** | Night identity (`night_date` computation) | backend | — | S | Planned | backend#111 |
-| **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | Planned | backend#112 |
+| **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | **Implemented** ([PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115), merged) | backend#112 (closed) |
 | **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned | backend#113 |
 | **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned | backend#46 (pre-existing, updated) |
 | **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned | web#164 (pre-existing, updated) |
@@ -851,16 +856,20 @@ see OS-3). Logically independent of the DB — takes a tz string as a
 parameter — but only useful in anger once OS-2's `telescopes.timezone`
 column exists to feed it.
 
-**OS-2 — Data model: telescopes, projects, tasks.** Bundled per your
-request — one migration (or tight sequence) covering `telescopes.timezone`;
-`projects` observing-constraint columns (`min_alt`, `moon_distance`,
-`max_moon_phase`, `max_sun_alt`, `min_interval`) + `priority`; `tasks.priority`;
-and the `tasks` naive-`timestamp` → `timestamptz` conversion (§2). Includes
-OpenAPI updates for the new/changed fields and the manual timezone backfill
-for existing telescope rows (5–10 rows, not automatable from lat/lon
-reliably). `observation_events` (OS-8) and telemetry (OS-10) are deliberately
-**not** in this task — they're new tables with real design questions
-attached, not plain column additions.
+**OS-2 — Data model: telescopes, projects, tasks. Implemented** in
+[PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115)
+(merged to `master`, schema bumped to 26 —
+`db/26-os2-scheduler-data-model.psql`): `telescopes.timezone`; `projects`
+observing-constraint columns (`min_alt`, `moon_distance`, `max_moon_phase`,
+`max_sun_alt`, `min_interval`) + `priority`; `tasks.priority`; and the
+`tasks` naive-`timestamp` → `timestamptz` conversion (§2), all wired
+through create/update/list/get and documented in OpenAPI, with tests.
+**Outstanding from this task**: the manual timezone backfill for existing
+telescope rows (5–10 rows currently default to `UTC` post-migration, not
+automatable from lat/lon reliably) — worth confirming done before OS-1/OS-4
+lean on real per-site values. `observation_events` (OS-8) and telemetry
+(OS-10) were deliberately **not** in this task — they're new tables with
+real design questions attached, not plain column additions.
 
 **OS-3 — Shared observability engine.** Extract `hevelius/night.py` out of
 `hevelius/asteroid.py` (pure refactor, no behavior change for the asteroid
