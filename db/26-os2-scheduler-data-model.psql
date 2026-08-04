@@ -1,0 +1,38 @@
+-- Schema version 26 (OS-2): telescope timezone, project observing constraints
+-- and priority, tasks.priority, tasks timestamp -> timestamptz.
+--
+-- Part of the observation scheduler plan (doc/observation-scheduler-plan.md, OS-2).
+
+-- telescopes.timezone defaults to 'UTC' so the NOT NULL constraint is
+-- satisfiable without guessing at deploy time: the real IANA zone per site
+-- (5-10 rows) can't be reliably derived from lat/lon alone and must be
+-- backfilled by hand after migrating, e.g.:
+--   UPDATE telescopes SET timezone = 'Europe/Madrid' WHERE scope_id = 1;
+ALTER TABLE telescopes ADD COLUMN timezone varchar(64) NOT NULL DEFAULT 'UTC';
+
+-- projects: observing constraints mirroring the columns tasks already has,
+-- so both can go through the same visibility engine (OS-3). Projects
+-- currently have no observing constraints at all.
+ALTER TABLE projects ADD COLUMN min_alt float DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN moon_distance float DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN max_moon_phase float DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN max_sun_alt float DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN min_interval int DEFAULT NULL;
+
+-- priority: ordering signal for Night Plan (OS-4) and Observation Planning
+-- (OS-6/OS-7), also used by the runner's NINA sequence generator (OS-13)
+-- to order target containers.
+ALTER TABLE projects ADD COLUMN priority int NOT NULL DEFAULT 0;
+ALTER TABLE tasks ADD COLUMN priority int NOT NULL DEFAULT 0;
+
+-- tasks: naive timestamps -> timestamptz. These were fine only by
+-- convention (everything writing them happens to use UTC) which is a real
+-- footgun once telescopes span multiple time zones. Values are assumed
+-- already UTC, so this is a type change only, not a value change.
+ALTER TABLE tasks ALTER COLUMN skip_before TYPE timestamptz USING skip_before AT TIME ZONE 'UTC';
+ALTER TABLE tasks ALTER COLUMN skip_after TYPE timestamptz USING skip_after AT TIME ZONE 'UTC';
+ALTER TABLE tasks ALTER COLUMN created TYPE timestamptz USING created AT TIME ZONE 'UTC';
+ALTER TABLE tasks ALTER COLUMN activated TYPE timestamptz USING activated AT TIME ZONE 'UTC';
+ALTER TABLE tasks ALTER COLUMN performed TYPE timestamptz USING performed AT TIME ZONE 'UTC';
+
+UPDATE schema_version SET version = 26;

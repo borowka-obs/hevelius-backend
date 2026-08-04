@@ -20,6 +20,24 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 26 (OS-2: telescope timezone, project constraints, priority)
+
+Part of the observation scheduler plan (`doc/observation-scheduler-plan.md`, OS-2).
+
+- **telescopes** – Added **timezone** (varchar 64, NOT NULL, default `'UTC'`): IANA
+  timezone name (e.g. `Europe/Warsaw`) used to compute the observing night boundary
+  (local time − 12h). Existing rows default to `UTC` on migration; the real per-site
+  value must be backfilled by hand afterwards (5–10 rows, not reliably derivable from
+  `lat`/`lon` alone).
+- **projects** – Added the same observing-constraint columns `tasks` already has, all
+  nullable: **min_alt**, **moon_distance**, **max_moon_phase**, **max_sun_alt** (float),
+  **min_interval** (int). Projects previously had no observing constraints at all.
+- **projects**, **tasks** – Added **priority** (int, NOT NULL, default 0): ordering
+  signal for Night Plan and Observation Planning.
+- **tasks** – **skip_before**, **skip_after**, **created**, **activated**, **performed**
+  changed from naive `timestamp` to `timestamptz`. Existing values are assumed already
+  UTC (the prior convention), so this is a type change only, not a value change.
+
 ### Schema version 24 (asteroid tags + proper names)
 
 - **asteroids** – Added optional **name** (varchar 64): proper name parsed from the

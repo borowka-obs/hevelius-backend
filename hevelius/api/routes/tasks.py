@@ -182,7 +182,8 @@ class TasksResource(MethodView):
             tasks.min_alt, tasks.moon_distance, tasks.skip_before, tasks.skip_after,
             tasks.min_interval, tasks.comment, tasks.state, tasks.imagename,
             tasks.created, tasks.activated, tasks.performed, tasks.max_moon_phase,
-            tasks.max_sun_alt, tasks.auto_center, tasks.calibrated, tasks.solved, tasks.sent
+            tasks.max_sun_alt, tasks.auto_center, tasks.calibrated, tasks.solved, tasks.sent,
+            tasks.priority
             FROM tasks
             JOIN users ON tasks.user_id = users.user_id
             LEFT JOIN telescopes ON tasks.scope_id = telescopes.scope_id
@@ -340,6 +341,7 @@ class TasksResource(MethodView):
                 'calibrated': bool(task[32]),
                 'solved': bool(task[33]),
                 'sent': bool(task[34]),
+                'priority': task[35],
                 'project_ids': sorted(project_ids_by_task.get(task[0], []))
             }
             formatted_tasks.append(task_dict)
@@ -432,7 +434,7 @@ class TaskGetResource(MethodView):
             min_interval, comment, state, imagename,
             created, activated, performed, max_moon_phase,
             max_sun_alt, auto_center, calibrated, solved,
-            sent, scope_id FROM tasks, users WHERE tasks.user_id = users.user_id AND task_id = %s"""
+            sent, scope_id, priority FROM tasks, users WHERE tasks.user_id = users.user_id AND task_id = %s"""
 
         cnx = db.connect()
         task = db.run_query(cnx, query, (task_id,))
@@ -485,6 +487,7 @@ class TaskGetResource(MethodView):
             'solved': bool(task[30]),
             'sent': bool(task[31]),
             'scope_id': task[32],
+            'priority': task[33],
             'project_ids': project_ids
         }
 
@@ -604,7 +607,7 @@ class NightPlanResource(MethodView):
             min_interval, comment, state, imagename,
             created, activated, performed, max_moon_phase,
             max_sun_alt, auto_center, calibrated, solved,
-            sent FROM tasks, users
+            sent, priority FROM tasks, users
             WHERE tasks.user_id = users.user_id
             AND scope_id = %s
             AND state IN (1, 2, 3)"""
@@ -666,7 +669,8 @@ class NightPlanResource(MethodView):
                 'auto_center': bool(task[29]),
                 'calibrated': bool(task[30]),
                 'solved': bool(task[31]),
-                'sent': bool(task[32])
+                'sent': bool(task[32]),
+                'priority': task[33]
             }
             formatted_tasks.append(task_dict)
 

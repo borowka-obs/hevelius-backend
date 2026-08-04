@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 def _scopes_base_query():
     return """
         SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
-               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation,
+               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation, t.timezone,
                s.sensor_id, s.name, s.resx, s.resy, s.pixel_x, s.pixel_y,
                s.bits, s.width, s.height, s.vendor, s.url, s.active AS sensor_active
         FROM telescopes t
@@ -98,7 +98,8 @@ class ScopesResource(MethodView):
                 return {"status": False, "scope_id": None, "scope": None, "msg": f"Telescope scope_id={scope_id} already exists"}
         cols = ["scope_id", "name"]
         vals = [scope_id, name]
-        for key in ("descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active", "default_rotation"):
+        for key in ("descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active",
+                    "default_rotation", "timezone"):
             if data.get(key) is not None:
                 cols.append(key)
                 vals.append(data[key])
@@ -118,7 +119,8 @@ class ScopesResource(MethodView):
             "scope_id": scope_id, "name": name, "descr": data.get("descr"), "min_dec": data.get("min_dec"),
             "max_dec": data.get("max_dec"), "focal": data.get("focal"), "aperture": data.get("aperture"),
             "lon": data.get("lon"), "lat": data.get("lat"), "alt": data.get("alt"), "sensor": None,
-            "filters": [], "active": data.get("active", True), "default_rotation": data.get("default_rotation")
+            "filters": [], "active": data.get("active", True), "default_rotation": data.get("default_rotation"),
+            "timezone": data.get("timezone", "UTC")
         }
         return {"status": True, "scope_id": scope_id, "scope": scope, "msg": "Created"}
 
@@ -151,7 +153,8 @@ class ScopeDetailResource(MethodView):
             return {"status": False, "scope": None, "msg": f"Telescope scope_id={scope_id} not found"}
         updates = []
         params = []
-        for key in ("name", "descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active"):
+        for key in ("name", "descr", "min_dec", "max_dec", "focal", "aperture", "lon", "lat", "alt", "active",
+                    "timezone"):
             if data.get(key) is not None:
                 updates.append(f"{key} = %s")
                 params.append(data[key])
@@ -226,14 +229,15 @@ def _telescope_row_to_dict(row, filters_list=None):
         'alt': row[9],
         'active': row[11],
         'default_rotation': row[12],
+        'timezone': row[13],
         'filters': filters_list or []
     }
     if row[10] is not None:  # sensor_id
         telescope['sensor'] = {
-            'sensor_id': row[13], 'name': row[14], 'resx': row[15], 'resy': row[16],
-            'pixel_x': row[17], 'pixel_y': row[18], 'bits': row[19],
-            'width': row[20], 'height': row[21],
-            'vendor': row[22], 'url': row[23], 'active': row[24]
+            'sensor_id': row[14], 'name': row[15], 'resx': row[16], 'resy': row[17],
+            'pixel_x': row[18], 'pixel_y': row[19], 'bits': row[20],
+            'width': row[21], 'height': row[22],
+            'vendor': row[23], 'url': row[24], 'active': row[25]
         }
     else:
         telescope['sensor'] = None

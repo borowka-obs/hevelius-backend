@@ -151,7 +151,7 @@ class TestLogChecks(unittest.TestCase):
 
     def test_latest_migration_version(self):
         # Uses the real db/ directory checked into the repo.
-        self.assertEqual(doctor.latest_migration_version("db"), 25)
+        self.assertEqual(doctor.latest_migration_version("db"), 26)
 
     def test_latest_migration_version_missing_dir(self):
         self.assertIsNone(doctor.latest_migration_version("/no/such/dir"))

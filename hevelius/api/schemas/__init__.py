@@ -128,6 +128,10 @@ class TaskAddRequestSchema(Schema):
         load_default=lambda: [],
         metadata={"description": "Project IDs this task belongs to (default: none)"}
     )
+    priority = fields.Integer(
+        load_default=0,
+        metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"}
+    )
 
     @validates_schema
     def validate_cross_fields(self, data, **_kwargs):
@@ -230,6 +234,7 @@ class Task(Schema):
     solved = fields.Boolean(metadata={"description": "Plate solving status"})
     sent = fields.Boolean(metadata={"description": "Sent status"})
     project_ids = fields.List(fields.Integer(), metadata={"description": "Project IDs this task belongs to"})
+    priority = fields.Integer(metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"})
 
 
 class TasksList(Schema):
@@ -362,6 +367,9 @@ class TaskUpdateRequestSchema(Schema):
         fields.Integer(),
         metadata={"description": "Project IDs this task belongs to (replaces current list when provided)"}
     )
+    priority = fields.Integer(
+        metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"}
+    )
 
     @validates_schema
     def validate_cross_fields(self, data, **_kwargs):
@@ -466,6 +474,9 @@ class TelescopeSchema(Schema):
         allow_none=True,
         metadata={"description": "Default camera rotation (degrees East of North) applied to new projects on this telescope when not specified"}
     )
+    timezone = fields.String(
+        metadata={"description": "IANA timezone name (e.g. Europe/Warsaw) used to compute the observing night boundary"}
+    )
 
 
 class TelescopesListSchema(Schema):
@@ -489,6 +500,10 @@ class ScopeCreateSchema(Schema):
         load_default=None, allow_none=True,
         metadata={"description": "Default camera rotation (degrees East of North) for new projects on this telescope"}
     )
+    timezone = fields.String(
+        load_default="UTC", validate=validate.Length(max=64),
+        metadata={"description": "IANA timezone name (e.g. Europe/Warsaw) used to compute the observing night boundary"}
+    )
 
 
 class ScopeUpdateSchema(Schema):
@@ -504,6 +519,7 @@ class ScopeUpdateSchema(Schema):
     sensor_id = fields.Integer(load_default=None)
     active = fields.Boolean()
     default_rotation = fields.Float(allow_none=True)
+    timezone = fields.String(validate=validate.Length(max=64))
 
 
 class ProjectSubframeSchema(Schema):
@@ -538,6 +554,12 @@ class ProjectSchema(Schema):
     resy = fields.Integer(allow_none=True, metadata={"description": "Sensor height (pixels)"})
     pixel_x = fields.Float(allow_none=True, metadata={"description": "Pixel pitch X (µm)"})
     pixel_y = fields.Float(allow_none=True, metadata={"description": "Pixel pitch Y (µm)"})
+    min_alt = fields.Float(allow_none=True, metadata={"description": "Minimum altitude"})
+    moon_distance = fields.Float(allow_none=True, metadata={"description": "Minimum moon distance"})
+    max_moon_phase = fields.Float(allow_none=True, metadata={"description": "Maximum moon phase"})
+    max_sun_alt = fields.Float(allow_none=True, metadata={"description": "Maximum sun altitude"})
+    min_interval = fields.Integer(allow_none=True, metadata={"description": "Minimum interval between observations"})
+    priority = fields.Integer(metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"})
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
 
@@ -559,6 +581,15 @@ class ProjectCreateSchema(Schema):
     resy = fields.Integer(load_default=None, allow_none=True)
     pixel_x = fields.Float(load_default=None, allow_none=True)
     pixel_y = fields.Float(load_default=None, allow_none=True)
+    min_alt = fields.Float(load_default=None, allow_none=True, metadata={"description": "Minimum altitude"})
+    moon_distance = fields.Float(load_default=None, allow_none=True, metadata={"description": "Minimum moon distance"})
+    max_moon_phase = fields.Float(load_default=None, allow_none=True, metadata={"description": "Maximum moon phase"})
+    max_sun_alt = fields.Float(load_default=None, allow_none=True, metadata={"description": "Maximum sun altitude"})
+    min_interval = fields.Integer(load_default=None, allow_none=True, metadata={"description": "Minimum interval between observations"})
+    priority = fields.Integer(
+        load_default=0,
+        metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"}
+    )
 
 
 class ProjectUpdateSchema(Schema):
@@ -578,6 +609,12 @@ class ProjectUpdateSchema(Schema):
     resy = fields.Integer(allow_none=True)
     pixel_x = fields.Float(allow_none=True)
     pixel_y = fields.Float(allow_none=True)
+    min_alt = fields.Float(allow_none=True, metadata={"description": "Minimum altitude. Send null to clear."})
+    moon_distance = fields.Float(allow_none=True, metadata={"description": "Minimum moon distance. Send null to clear."})
+    max_moon_phase = fields.Float(allow_none=True, metadata={"description": "Maximum moon phase. Send null to clear."})
+    max_sun_alt = fields.Float(allow_none=True, metadata={"description": "Maximum sun altitude. Send null to clear."})
+    min_interval = fields.Integer(allow_none=True, metadata={"description": "Minimum interval between observations. Send null to clear."})
+    priority = fields.Integer(metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"})
 
 
 class ProjectSubframeCreateSchema(Schema):
