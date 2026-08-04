@@ -10,6 +10,12 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   interpreter's `zoneinfo` recognizes). `telescope show`/`list` display it.
   New `hevelius telescope timezones [--filter TEXT]` lists/searches valid IANA
   names so users don't have to guess the exact spelling.
+- Added `hevelius.night.night_date()` (OS-1, observation scheduler plan): computes
+  the observing night for a UTC instant using the NINA "date - 12h" rule (convert
+  to the site's local civil time via its IANA timezone, subtract 12 hours, take
+  the date), so a night session spanning local midnight collapses onto a single
+  calendar date. Pure function, no DB dependency; shared by Night Plan (OS-4),
+  `observation_events.night_date` (OS-8), and nightly Statistics grouping (OS-9).
 - DB: schema bumped to 26 (OS-2, observation scheduler plan): `telescopes.timezone`
   (IANA name, default `UTC`; existing rows need the real value backfilled by hand);
   `projects` gains the same observing-constraint columns `tasks` has (`min_alt`,
