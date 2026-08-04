@@ -22,8 +22,10 @@ observation scheduler:
 >
 > **Revisions (2026-08-04, later)**: **OS-2 implemented** — merged in
 > [PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115),
-> issue #112 closed. OS-1 and OS-3 (both depend on OS-2) can now proceed
-> against real schema instead of a plan.
+> issue #112 closed. **OS-1 implemented** — merged in
+> [PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116),
+> issue #111 closed. OS-3 (depends on both) is now the next unblocked
+> backend task; OS-6 (depends only on OS-2) is unblocked too.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -834,7 +836,7 @@ since OS-2 is schema-only and this is application code.
 
 | ID | Title | Repo | Depends on | Size | Status | Issue |
 |---|---|---|---|---|---|---|
-| **OS-1** | Night identity (`night_date` computation) | backend | — | S | Planned | backend#111 |
+| **OS-1** | Night identity (`night_date` computation) | backend | — | S | **Implemented** ([PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116), merged) | backend#111 (closed) |
 | **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | **Implemented** ([PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115), merged) | backend#112 (closed) |
 | **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned | backend#113 |
 | **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned | backend#46 (pre-existing, updated) |
@@ -850,11 +852,13 @@ since OS-2 is schema-only and this is application code.
 | **OS-14** | Runner — execution correlation & reporting | runner | OS-13, OS-8 | M | Planned | — |
 | **OS-15** | Runner — process lifecycle & scheduling | runner | OS-11, OS-12, OS-13 | M | Planned | — |
 
-**OS-1 — Night identity (`night_date` computation).** The §1.1 rule as a
-small, independently unit-tested function (e.g. in `hevelius/night.py`,
-see OS-3). Logically independent of the DB — takes a tz string as a
-parameter — but only useful in anger once OS-2's `telescopes.timezone`
-column exists to feed it.
+**OS-1 — Night identity (`night_date` computation). Implemented** in
+[PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116)
+(merged): `hevelius/night.py` → `night_date(t, tz_name)`, the §1.1 rule as
+a pure, `zoneinfo`-based function with no DB dependency, plus a test suite
+covering the worked examples and local-noon boundary cases. This is the
+same module OS-3 (shared observability engine) extends with the rest of
+the night/sun/moon helpers, not a separate file to reconcile later.
 
 **OS-2 — Data model: telescopes, projects, tasks. Implemented** in
 [PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115)
