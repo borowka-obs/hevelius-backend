@@ -5,6 +5,11 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- CLI: `hevelius telescope add`/`edit` accept `--timezone` (IANA name, e.g.
+  `Europe/Warsaw`; rejected up front, before any DB write, if not a name the
+  interpreter's `zoneinfo` recognizes). `telescope show`/`list` display it.
+  New `hevelius telescope timezones [--filter TEXT]` lists/searches valid IANA
+  names so users don't have to guess the exact spelling.
 - DB: schema bumped to 26 (OS-2, observation scheduler plan): `telescopes.timezone`
   (IANA name, default `UTC`; existing rows need the real value backfilled by hand);
   `projects` gains the same observing-constraint columns `tasks` has (`min_alt`,

@@ -43,6 +43,37 @@ hevelius telescope list
 hevelius user list
 ```
 
+## Telescope timezone
+
+`telescope add` and `telescope edit` accept `--timezone`, an **IANA time
+zone name** (e.g. `Europe/Warsaw`, `America/Santiago`, `Africa/Windhoek`) —
+the same names used by the `tz`/Olson database and validated against the
+Python interpreter's own zone data (`zoneinfo`). It's the per-telescope
+site zone used to compute the observing night boundary (the "local time -
+12h" rule; see `hevelius.night`). It defaults to `UTC` if never set.
+
+Rather than guessing the exact spelling, search the CLI's own list:
+
+```shell
+hevelius telescope timezones --filter warsaw
+# Europe/Warsaw
+#
+# 1 timezone(s) matching 'warsaw'.
+
+hevelius telescope timezones --filter africa
+hevelius telescope timezones   # full list (several hundred entries)
+```
+
+The full canonical list is also documented at
+https://en.wikipedia.org/wiki/List_of_tz_database_time_zones. An invalid
+name is rejected with an error at `add`/`edit` time, before the database
+is touched:
+
+```shell
+hevelius telescope edit 3 --timezone Europe/Warsaw
+hevelius telescope show 3
+```
+
 ## Doctor
 
 `hevelius doctor` runs a series of sanity checks on the local installation

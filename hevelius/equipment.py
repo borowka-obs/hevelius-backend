@@ -3,6 +3,7 @@ CLI commands for filters, sensors (cameras), and projects.
 """
 
 import difflib
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError, available_timezones
 
 from hevelius import db
 
@@ -526,6 +527,32 @@ def remove_task_from_project(project_id, task_id):
 SCOPE_SORT_FIELDS = {"scope_id", "name", "focal", "active"}
 
 
+def _is_valid_timezone(tz_name):
+    """Returns True if tz_name is a valid IANA timezone name (per the system's tzdata)."""
+    try:
+        ZoneInfo(tz_name)
+        return True
+    except (ZoneInfoNotFoundError, KeyError, ValueError):
+        return False
+
+
+def list_timezones(name_filter=None):
+    """Print IANA timezone names accepted by `telescope add`/`telescope edit --timezone`,
+    optionally narrowed to those containing name_filter (case-insensitive substring,
+    e.g. 'warsaw' or 'europe')."""
+    names = sorted(available_timezones())
+    if name_filter:
+        needle = name_filter.lower()
+        names = [n for n in names if needle in n.lower()]
+    if not names:
+        print(f"No timezones matching {name_filter!r}.")
+        return
+    for n in names:
+        print(n)
+    suffix = f" matching {name_filter!r}" if name_filter else ""
+    print(f"\n{len(names)} timezone(s){suffix}.")
+
+
 def list_telescopes(sort_by="scope_id", sort_order="asc"):
     """List all telescopes with optional sorting (scope_id, name, focal, active)."""
     if sort_by not in SCOPE_SORT_FIELDS:
@@ -536,7 +563,7 @@ def list_telescopes(sort_by="scope_id", sort_order="asc"):
     cnx = db.connect()
     rows = db.run_query(cnx, f"""
         SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
-               t.lon, t.lat, t.alt, t.sensor_id, t.active,
+               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.timezone,
                s.name AS sensor_name
         FROM telescopes t
         LEFT JOIN sensors s ON t.sensor_id = s.sensor_id
@@ -546,18 +573,27 @@ def list_telescopes(sort_by="scope_id", sort_order="asc"):
     if not rows:
         print("No telescopes found.")
         return
-    print(f"{'ID':<6} {'Name':<24} {'Focal':<8} {'Sensor':<22} Active")
-    print("-" * 75)
+    print(f"{'ID':<6} {'Name':<24} {'Focal':<8} {'Sensor':<22} {'Timezone':<20} Active")
+    print("-" * 95)
     for r in rows:
         name = (r[1] or "")[:22]
         focal = r[5] if r[5] is not None else ""
-        sensor = (r[12] or "")[:20] if len(r) > 12 else ""
-        print(f"{r[0]:<6} {name:<24} {focal!s:<8} {sensor:<22} {r[11]}")
+        timezone = (r[12] or "")[:18]
+        sensor = (r[13] or "")[:20] if len(r) > 13 else ""
+        print(f"{r[0]:<6} {name:<24} {focal!s:<8} {sensor:<22} {timezone:<20} {r[11]}")
 
 
 def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
-                  lon=None, lat=None, alt=None, sensor_id=None, active=True, default_rotation=None):
-    """Add a new telescope. scope_id is optional (auto-assigned if omitted). Returns scope_id on success, None on failure."""
+                  lon=None, lat=None, alt=None, sensor_id=None, active=True, default_rotation=None,
+                  timezone=None):
+    """Add a new telescope. scope_id is optional (auto-assigned if omitted). timezone is an
+    IANA name (e.g. 'Europe/Warsaw'), defaults to 'UTC' in the DB if omitted.
+    Returns scope_id on success, None on failure."""
+    if timezone is not None and not _is_valid_timezone(timezone):
+        print(f"Error: {timezone!r} is not a valid IANA timezone name. "
+              "Run 'hevelius telescope timezones --filter <text>' to search for one, or see "
+              "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")
+        return None
     if sensor_id == 0:
         sensor_id = None
     cnx = db.connect()
@@ -575,7 +611,7 @@ def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, f
     for key, val in [
         ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec), ("focal", focal),
         ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active),
-        ("default_rotation", default_rotation)
+        ("default_rotation", default_rotation), ("timezone", timezone)
     ]:
         if val is not None:
             cols.append(key)
@@ -597,9 +633,15 @@ def add_telescope(name, scope_id=None, descr=None, min_dec=None, max_dec=None, f
 
 def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, focal=None, aperture=None,
                    lon=None, lat=None, alt=None, sensor_id=None, active=None,
-                   default_rotation=None, clear_default_rotation=False):
-    """Edit an existing telescope. sensor_id=0 removes the sensor.
-    clear_default_rotation=True sets default_rotation to NULL. Returns True on success."""
+                   default_rotation=None, clear_default_rotation=False, timezone=None):
+    """Edit an existing telescope. sensor_id=0 removes the sensor. timezone is an IANA name
+    (e.g. 'Europe/Warsaw'). clear_default_rotation=True sets default_rotation to NULL.
+    Returns True on success."""
+    if timezone is not None and not _is_valid_timezone(timezone):
+        print(f"Error: {timezone!r} is not a valid IANA timezone name. "
+              "Run 'hevelius telescope timezones --filter <text>' to search for one, or see "
+              "https://en.wikipedia.org/wiki/List_of_tz_database_time_zones")
+        return False
     cnx = db.connect()
     row = db.run_query(cnx, "SELECT scope_id FROM telescopes WHERE scope_id = %s", (scope_id,))
     if not row:
@@ -610,7 +652,8 @@ def edit_telescope(scope_id, name=None, descr=None, min_dec=None, max_dec=None, 
     params = []
     for key, val in [
         ("name", name), ("descr", descr), ("min_dec", min_dec), ("max_dec", max_dec),
-        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active)
+        ("focal", focal), ("aperture", aperture), ("lon", lon), ("lat", lat), ("alt", alt), ("active", active),
+        ("timezone", timezone)
     ]:
         if val is not None:
             updates.append(f"{key} = %s")
@@ -640,7 +683,7 @@ def show_telescope(scope_id):
     cnx = db.connect()
     row = db.run_query(cnx, """
         SELECT t.scope_id, t.name, t.descr, t.min_dec, t.max_dec, t.focal, t.aperture,
-               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation
+               t.lon, t.lat, t.alt, t.sensor_id, t.active, t.default_rotation, t.timezone
         FROM telescopes t WHERE t.scope_id = %s
     """, (scope_id,))
     if not row:
@@ -656,6 +699,7 @@ def show_telescope(scope_id):
     print(f"Focal:     {r[5]}")
     print(f"Aperture:  {r[6]}")
     print(f"Lon/Lat/Alt: {r[7]} / {r[8]} / {r[9]}")
+    print(f"Timezone:  {r[13]}")
     print(f"Active:    {r[11]}")
     print(f"Default rotation: {r[12]}")
     if r[10] is not None:
