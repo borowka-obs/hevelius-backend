@@ -5,7 +5,7 @@ import unittest
 from astropy.coordinates import EarthLocation
 from astropy import units as u
 
-from hevelius import asteroid
+from hevelius import asteroid, night
 
 
 def _mpcorb_line(designation: str, H: str = " 3.34", G: str = " 0.15",
@@ -169,11 +169,11 @@ class TestVisibilityCurve(unittest.TestCase):
 
 class TestIersConfigLazy(unittest.TestCase):
     def test_import_does_not_require_prior_iers_config(self):
-        # Visibility entry points call _configure_iers_for_planning(); the
-        # helper is idempotent and safe to call again.
-        asteroid._configure_iers_for_planning()
-        asteroid._configure_iers_for_planning()
-        self.assertIsNone(asteroid.iers.conf.auto_max_age)
+        # Visibility entry points call night._configure_iers_for_planning();
+        # the helper is idempotent and safe to call again.
+        night._configure_iers_for_planning()
+        night._configure_iers_for_planning()
+        self.assertIsNone(night.iers.conf.auto_max_age)
 
 
 if __name__ == "__main__":

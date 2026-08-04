@@ -18,15 +18,13 @@ from astropy.coordinates import (
     EarthLocation,
     GCRS,
     get_body,
-    get_sun,
     solar_system_ephemeris,
 )
 from astropy.time import Time
 from astropy import units as u
-from astropy.utils import iers
 import numpy as np
 
-from hevelius import db
+from hevelius import db, night
 from hevelius.config import load_config
 
 # MPCORB.DAT fixed-width columns (0-based); format from MPC Export Format.
@@ -59,25 +57,6 @@ MPCORB_MAX_AGE_DAYS = 7
 # Base-62 alphabet used in MPC packed permanent designations (>= 620000).
 _BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
 _BASE62_INDEX = {c: i for i, c in enumerate(_BASE62)}
-
-
-def _configure_iers_for_planning() -> None:
-    """
-    Allow IERS age extrapolation for offline/future observation planning.
-
-    Recent/future dates need up-to-date Earth orientation (IERS) data, normally
-    auto-downloaded. Without network access (or if the download fails), astropy
-    raises rather than falling back to extrapolated values. The extrapolation
-    error is sub-arcsecond and irrelevant for altitude/visibility purposes, so
-    disable the hard age limit when running visibility computations.
-
-    Applied lazily from visibility entry points only (idempotent via the
-    auto_max_age sentinel), so importing this module for MPCORB parsing does
-    not change global IERS behaviour for unrelated astropy callers.
-    """
-    if iers.conf.auto_max_age is None:
-        return
-    iers.conf.auto_max_age = None
 
 
 def _progress(msg: str) -> None:
@@ -594,117 +573,6 @@ def _apparent_magnitude(H: float, G: float, r_au: float, delta_au: float, phase_
     return H + 5 * np.log10(r_au * delta_au) - 2.5 * np.log10(phi)
 
 
-def _altitude_series(body_fn, location: EarthLocation, t0: Time, t1: Time, n: int = 481):
-    """
-    Sample altitude (degrees) of a solar-system body from t0 to t1 inclusive.
-
-    body_fn(times) -> SkyCoord (e.g. get_sun, or lambda t: get_body('moon', t)).
-    """
-    duration_h = (t1 - t0).to(u.hour).value
-    times = t0 + np.linspace(0.0, duration_h, n) * u.hour
-    frame = AltAz(obstime=times, location=location)
-    alt = body_fn(times).transform_to(frame).alt.to(u.deg).value
-    return times, np.asarray(alt, dtype=float)
-
-
-def _find_zero_crossings(times: Time, alts: np.ndarray, level: float = 0.0):
-    """
-    Linearly interpolate times where altitude crosses `level`.
-
-    Returns list of (Time, direction) with direction 'up' or 'down'.
-    """
-    crossings = []
-    for i in range(len(alts) - 1):
-        a0, a1 = alts[i] - level, alts[i + 1] - level
-        if a0 == 0:
-            # Exact hit: infer direction from the next sample when possible.
-            if a1 > 0:
-                crossings.append((times[i], "up"))
-            elif a1 < 0:
-                crossings.append((times[i], "down"))
-            continue
-        if a0 * a1 > 0:
-            continue
-        if a0 * a1 == 0 and a1 == 0:
-            continue
-        frac = abs(a0) / (abs(a0) + abs(a1) + 1e-20)
-        t_cross = times[i] + frac * (times[i + 1] - times[i])
-        crossings.append((t_cross, "up" if a1 > a0 else "down"))
-    return crossings
-
-
-def _get_night_times(location: EarthLocation, obs_time: Time) -> Tuple[Time, Time]:
-    """
-    Return (sunset, sunrise) in UTC for the night beginning on obs_time's date.
-
-    The night runs from geometric sunset (sun altitude crossing 0° downward)
-    on the evening of that calendar date through geometric sunrise the next
-    morning. This matches observer "night" even when astronomical twilight
-    never occurs (e.g. mid-latitude summer).
-
-    If the Sun never sets (polar day), falls back to a 12-hour window centred
-    on local solar midnight as a last resort. If the Sun never rises (polar
-    night), returns noon→next-noon.
-    """
-    # Search from noon UTC on the evening date through noon the next day.
-    date_str = obs_time.iso[:10]
-    noon = Time(f"{date_str} 12:00:00")
-    times, alts = _altitude_series(get_sun, location, noon, noon + 24 * u.hour, n=577)
-    crossings = _find_zero_crossings(times, alts, level=0.0)
-
-    sunset = next((t for t, d in crossings if d == "down"), None)
-    sunrise = None
-    if sunset is not None:
-        sunrise = next((t for t, d in crossings if d == "up" and t > sunset), None)
-
-    if sunset is not None and sunrise is not None and sunrise > sunset:
-        return sunset, sunrise
-
-    # Polar night: sun always below horizon across the window.
-    if np.all(alts < 0):
-        return noon, noon + 24 * u.hour
-
-    # Polar day / no clear night: last-resort evening-centred window (NOT daytime).
-    midnight = noon + 12 * u.hour
-    return midnight - 6 * u.hour, midnight + 6 * u.hour
-
-
-def _moon_rise_set(location: EarthLocation, night_start: Time, night_end: Time):
-    """
-    Find moonrise/moonset near the given night.
-
-    Searches a padded window around the night so events just outside sunset/
-    sunrise are still reported. Returns (moonrise, moonset) as Time or None.
-    """
-    pad = 6 * u.hour
-    times, alts = _altitude_series(
-        lambda t: get_body("moon", t),
-        location,
-        night_start - pad,
-        night_end + pad,
-        n=721,
-    )
-    crossings = _find_zero_crossings(times, alts, level=0.0)
-    rises = [t for t, d in crossings if d == "up"]
-    sets = [t for t, d in crossings if d == "down"]
-
-    moonrise = next((r for r in rises if r <= night_end + pad), None)
-    moonset = None
-    if moonrise is not None:
-        moonset = next((s for s in sets if s > moonrise), None)
-    elif sets:
-        # Moon already up at window start: report the upcoming set.
-        moonset = sets[0]
-
-    return moonrise, moonset
-
-
-def _moon_altitudes(location: EarthLocation, times: Time) -> np.ndarray:
-    """Moon altitude in degrees at each sample time."""
-    frame = AltAz(obstime=times, location=location)
-    return get_body("moon", times).transform_to(frame).alt.to(u.deg).value
-
-
 def _xyz_to_radec(x: float, y: float, z: float) -> Tuple[float, float]:
     """Convert equatorial Cartesian to RA/Dec in degrees."""
     r = np.sqrt(x * x + y * y + z * z)
@@ -713,47 +581,6 @@ def _xyz_to_radec(x: float, y: float, z: float) -> Tuple[float, float]:
     dec = np.degrees(np.arcsin(np.clip(z / r, -1.0, 1.0)))
     ra = np.degrees(np.arctan2(y, x)) % 360.0
     return ra, dec
-
-
-def _transit_altitude(dec_deg: float, lat_deg: float) -> float:
-    """Maximum altitude an object ever reaches (at upper transit)."""
-    return 90.0 - abs(lat_deg - dec_deg)
-
-
-def _night_visible(ra_deg: float, dec_deg: float, lat_deg: float,
-                   lst_mid_deg: float, night_half_hours: float,
-                   alt_min_deg: float) -> bool:
-    """
-    Quick test: is the object above alt_min at any moment during the night?
-
-    Uses hour-angle arithmetic to determine whether the window in which the
-    object is above alt_min overlaps with the night window (centred on midnight).
-    """
-    lat = np.radians(lat_deg)
-    dec = np.radians(dec_deg)
-    alt_min = np.radians(alt_min_deg)
-
-    sin_alt_transit = np.sin(dec) * np.sin(lat) + np.cos(dec) * np.cos(lat)
-    if sin_alt_transit < np.sin(alt_min):
-        return False
-
-    cos_ha_thresh = (np.sin(alt_min) - np.sin(dec) * np.sin(lat)) / (
-        np.cos(dec) * np.cos(lat) + 1e-12
-    )
-
-    lst_half_deg = night_half_hours * 15.0
-
-    if cos_ha_thresh <= -1.0:
-        return True  # circumpolar above alt_min
-
-    if cos_ha_thresh >= 1.0:
-        return False  # never reaches alt_min
-
-    ha_thresh_deg = np.degrees(np.arccos(cos_ha_thresh))
-
-    # Angular separation between object RA and LST at midnight
-    center_sep = abs(((ra_deg - lst_mid_deg) + 180.0) % 360.0 - 180.0)
-    return center_sep < (ha_thresh_deg + lst_half_deg)
 
 
 def compute_visibility(
@@ -791,12 +618,12 @@ def compute_visibility(
     Returns:
         List of visible asteroids with designation, magnitude, max_altitude, etc.
     """
-    _configure_iers_for_planning()
+    night._configure_iers_for_planning()
 
     obs_time = Time(obs_date + " 00:00:00")
 
     _progress("Computing night window...")
-    night_start, night_end = _get_night_times(location, obs_time)
+    night_start, night_end = night.get_night_times(location, obs_time)
     night_duration_h = (night_end - night_start).to(u.hour).value
     night_half_h = night_duration_h / 2.0
     t_midnight = night_start + night_half_h * u.hour
@@ -923,12 +750,12 @@ def compute_visibility(
 
             # Quick check a: transit altitude
             ra_deg, dec_deg = _xyz_to_radec(ast_geo[0], ast_geo[1], ast_geo[2])
-            if _transit_altitude(dec_deg, lat_deg) < alt_min:
+            if night.transit_altitude_deg(dec_deg, lat_deg) < alt_min:
                 skipped_altitude += 1
                 continue
 
             # Quick check b: night hour-angle overlap
-            if not _night_visible(ra_deg, dec_deg, lat_deg, lst_midnight_deg, night_half_h, alt_min):
+            if not night.ha_window_visible(ra_deg, dec_deg, lat_deg, lst_midnight_deg, night_half_h, alt_min):
                 skipped_night += 1
                 continue
 
@@ -1045,9 +872,9 @@ def compute_asteroid_visibility_curve(
     (number, designation, _name, epoch_s, M_epoch, peri, node, inc, e, n, a, H, G) = asteroid_row
     G = G if G is not None else 0.15
 
-    _configure_iers_for_planning()
+    night._configure_iers_for_planning()
     obs_time = Time(obs_date + " 00:00:00")
-    night_start, night_end = _get_night_times(location, obs_time)
+    night_start, night_end = night.get_night_times(location, obs_time)
     duration_h = (night_end - night_start).to(u.hour).value
     n_samples = max(2, int(duration_h * 60 / step_minutes) + 1)
     times = night_start + np.linspace(0, duration_h, n_samples) * u.hour
@@ -1056,8 +883,8 @@ def compute_asteroid_visibility_curve(
 
     with solar_system_ephemeris.set("builtin"):
         earth_positions = get_body("earth", times)
-        moon_alt = _moon_altitudes(location, times)
-        moonrise, moonset = _moon_rise_set(location, night_start, night_end)
+        moon_alt = night._moon_altitudes(location, times)
+        moonrise, moonset = night.moon_rise_set(location, night_start, night_end)
     ex = earth_positions.cartesian.x.to(u.AU).value
     ey = earth_positions.cartesian.y.to(u.AU).value
     ez = earth_positions.cartesian.z.to(u.AU).value

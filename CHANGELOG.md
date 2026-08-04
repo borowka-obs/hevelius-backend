@@ -5,6 +5,20 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- Added `hevelius.observability` (OS-3, observation scheduler plan): a
+  generic, staged target-visibility engine operating on plain
+  `(ra_deg, dec_deg, constraints)` rather than task/project rows, so it's
+  reusable by both. Mirrors `hevelius asteroid visible`'s cheap-filters-first
+  structure - transit-altitude check, night hour-angle overlap, a
+  representative-moment sun/moon check, then a precise `astropy`
+  GCRS/ICRS → AltAz confirm for survivors - and will be the engine behind
+  the Night Plan rewrite (OS-4, #46). Also extracted the underlying
+  astronomy primitives (`get_night_times`, `moon_rise_set`,
+  `transit_altitude_deg`, `ha_window_visible`, plus new `sun_altitude_deg`,
+  `moon_separation_deg`, `moon_illumination_pct`) out of
+  `hevelius/asteroid.py` into `hevelius/night.py` so they're shared rather
+  than asteroid-specific; no behavior change for the existing asteroid
+  visibility feature.
 - CLI: `hevelius telescope add`/`edit` accept `--timezone` (IANA name, e.g.
   `Europe/Warsaw`; rejected up front, before any DB write, if not a name the
   interpreter's `zoneinfo` recognizes). `telescope show`/`list` display it.
