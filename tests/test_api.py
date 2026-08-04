@@ -862,6 +862,31 @@ class TestNightPlan(unittest.TestCase):
 
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_night_plan_orders_by_priority_desc(self, config):
+        """Night plan returns higher-priority tasks first."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        for priority, obj in ((1, 'LowPri'), (9, 'HighPri'), (5, 'MidPri')):
+            response = self.app.post(
+                '/api/task-add',
+                data=json.dumps({
+                    "user_id": 1, "scope_id": 1, "object": obj,
+                    "ra": 0.1, "decl": 10.0, "priority": priority, "state": 1,
+                }),
+                headers=self.headers,
+            )
+            self.assertTrue(json.loads(response.data)['status'])
+
+        response = self.app.get(
+            '/api/night-plan?scope_id=1&user_id=1',
+            headers=self.headers,
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        names = [t['object'] for t in data['tasks'] if t['object'] in ('LowPri', 'HighPri', 'MidPri')]
+        self.assertEqual(names, ['HighPri', 'MidPri', 'LowPri'])
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestTasks(unittest.TestCase):
     def setUp(self):
@@ -900,6 +925,39 @@ class TestTasks(unittest.TestCase):
         self.assertTrue(data['tasks'])
         task = next(t for t in data['tasks'] if t['object'] == 'M31')
         self.assertEqual(task['priority'], 4)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_tasks_sort_by_priority(self, config):
+        """GET /api/tasks?sort_by=priority orders by priority."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        for priority, obj in ((1, 'P1'), (7, 'P7'), (3, 'P3')):
+            response = self.app.post(
+                '/api/task-add',
+                data=json.dumps({
+                    "user_id": 1, "scope_id": 1, "object": obj,
+                    "ra": 0.1, "decl": 10.0, "priority": priority,
+                }),
+                headers=self.headers,
+            )
+            self.assertTrue(json.loads(response.data)['status'])
+
+        response = self.app.get(
+            '/api/tasks?sort_by=priority&sort_order=desc&per_page=100',
+            headers=self.headers,
+        )
+        data = json.loads(response.data)
+        self.assertEqual(response.status_code, 200)
+        ours = [t for t in data['tasks'] if t['object'] in ('P1', 'P7', 'P3')]
+        self.assertEqual([t['object'] for t in ours], ['P7', 'P3', 'P1'])
+
+        response = self.app.get(
+            '/api/tasks?sort_by=priority&sort_order=asc&per_page=100',
+            headers=self.headers,
+        )
+        data = json.loads(response.data)
+        ours = [t for t in data['tasks'] if t['object'] in ('P1', 'P7', 'P3')]
+        self.assertEqual([t['object'] for t in ours], ['P1', 'P3', 'P7'])
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository(load_test_data="tests/test-data-basic.psql")
@@ -1893,6 +1951,25 @@ class TestTelescopeOperations(unittest.TestCase):
         self.assertEqual(data['scope']['timezone'], 'America/Santiago')
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    @use_repository
+    def test_telescope_rejects_invalid_timezone(self, config):
+        """Create/update with a non-IANA timezone name fails validation."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        response = self.app.post(
+            '/api/scopes',
+            data=json.dumps({"name": "Bad TZ", "timezone": "Not/AZone"}),
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+
+        response = self.app.patch(
+            '/api/scopes/1',
+            data=json.dumps({"timezone": "Also/Fake"}),
+            headers=self.headers,
+        )
+        self.assertEqual(response.status_code, 422)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
 
 class TestProjectOperations(unittest.TestCase):
     """Tests for project and subframe CRUD: add (catalog lookup), edit, subframe add/edit/remove."""
@@ -1989,16 +2066,16 @@ class TestProjectOperations(unittest.TestCase):
         os.environ['HEVELIUS_DB_NAME'] = config['database']
         body = {
             "name": "Constrained Project", "scope_id": 1, "ra": 0.5, "decl": 25.0,
-            "min_alt": 30.0, "moon_distance": 45.0, "max_moon_phase": 0.5,
-            "max_sun_alt": -12.0, "min_interval": 3600, "priority": 5,
+            "min_alt": 30.0, "moon_distance": 45.0, "max_moon_phase": 50,
+            "max_sun_alt": -12, "min_interval": 3600, "priority": 5,
         }
         response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 201)
         self.assertEqual(data['project']['min_alt'], 30.0)
         self.assertEqual(data['project']['moon_distance'], 45.0)
-        self.assertEqual(data['project']['max_moon_phase'], 0.5)
-        self.assertEqual(data['project']['max_sun_alt'], -12.0)
+        self.assertEqual(data['project']['max_moon_phase'], 50)
+        self.assertEqual(data['project']['max_sun_alt'], -12)
         self.assertEqual(data['project']['min_interval'], 3600)
         self.assertEqual(data['project']['priority'], 5)
         os.environ.pop('HEVELIUS_DB_NAME')
@@ -2025,13 +2102,13 @@ class TestProjectOperations(unittest.TestCase):
         os.environ['HEVELIUS_DB_NAME'] = config['database']
         response = self.app.patch(
             '/api/projects/1',
-            data=json.dumps({"min_alt": 25.0, "max_sun_alt": -10.0, "priority": 3}),
+            data=json.dumps({"min_alt": 25.0, "max_sun_alt": -10, "priority": 3}),
             headers=self.headers
         )
         data = json.loads(response.data)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(data['project']['min_alt'], 25.0)
-        self.assertEqual(data['project']['max_sun_alt'], -10.0)
+        self.assertEqual(data['project']['max_sun_alt'], -10)
         self.assertEqual(data['project']['priority'], 3)
 
         response = self.app.patch(
@@ -2044,6 +2121,38 @@ class TestProjectOperations(unittest.TestCase):
         self.assertIsNone(data['project']['min_alt'])
         # priority (NOT NULL) is unaffected by the previous request
         self.assertEqual(data['project']['priority'], 3)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_sort_by_priority(self, config):
+        """List API sort_by=priority orders projects by priority."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        suf = datetime.now().strftime('%H%M%S%f')
+        for priority, label in ((1, 'Lo'), (8, 'Hi'), (4, 'Mid')):
+            body = {
+                "name": f"{label}Pri{suf}", "scope_id": 1, "ra": 0.2, "decl": 2.0,
+                "priority": priority,
+            }
+            response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+            self.assertEqual(response.status_code, 201)
+
+        asc = json.loads(
+            self.app.get(
+                '/api/projects?sort_by=priority&sort_order=asc&per_page=100',
+                headers=self.headers,
+            ).data
+        )['projects']
+        ours = [p for p in asc if p['name'].endswith(suf)]
+        self.assertEqual([p['name'][:p['name'].find('Pri')] for p in ours], ['Lo', 'Mid', 'Hi'])
+
+        desc = json.loads(
+            self.app.get(
+                '/api/projects?sort_by=priority&sort_order=desc&per_page=100',
+                headers=self.headers,
+            ).data
+        )['projects']
+        ours = [p for p in desc if p['name'].endswith(suf)]
+        self.assertEqual([p['name'][:p['name'].find('Pri')] for p in ours], ['Hi', 'Mid', 'Lo'])
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository

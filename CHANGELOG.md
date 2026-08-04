@@ -12,9 +12,11 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   `projects`/`tasks` gain `priority` (int, default 0); `tasks.skip_before`,
   `skip_after`, `created`, `activated`, `performed` are now `timestamptz` (values
   assumed already UTC).
-- API: telescope create/update/response expose `timezone`. Project create/update/
-  response expose the new observing-constraint columns and `priority`. Task
-  create/update/response expose `priority`.
+- API: telescope create/update/response expose `timezone` (validated as an IANA
+  name). Project create/update/response expose the new observing-constraint
+  columns and `priority`. Task create/update/response expose `priority`.
+  Tasks and projects lists accept `sort_by=priority`; night plan returns tasks
+  ordered by `priority` DESC (then `task_id` DESC).
 - API: `GET`/`PATCH /api/users/me/preferences` for favourite telescope/filter
   and task defaults. Preference row is created lazily on first access.
 - DB: schema bumped to 25: `user_preferences` reworked (one row per user,

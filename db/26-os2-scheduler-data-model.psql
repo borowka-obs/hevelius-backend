@@ -13,10 +13,12 @@ ALTER TABLE telescopes ADD COLUMN timezone varchar(64) NOT NULL DEFAULT 'UTC';
 -- projects: observing constraints mirroring the columns tasks already has,
 -- so both can go through the same visibility engine (OS-3). Projects
 -- currently have no observing constraints at all.
+-- Types match tasks: min_alt/moon_distance float; max_moon_phase/max_sun_alt int;
+-- min_interval int.
 ALTER TABLE projects ADD COLUMN min_alt float DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN moon_distance float DEFAULT NULL;
-ALTER TABLE projects ADD COLUMN max_moon_phase float DEFAULT NULL;
-ALTER TABLE projects ADD COLUMN max_sun_alt float DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN max_moon_phase int DEFAULT NULL;
+ALTER TABLE projects ADD COLUMN max_sun_alt int DEFAULT NULL;
 ALTER TABLE projects ADD COLUMN min_interval int DEFAULT NULL;
 
 -- priority: ordering signal for Night Plan (OS-4) and Observation Planning

@@ -270,6 +270,7 @@ class TasksResource(MethodView):
             'created': 'tasks.created',
             'performed': 'tasks.performed',
             'user_id': 'tasks.user_id',
+            'priority': 'tasks.priority',
         }
         sort_field_sql = sort_field_map.get(sort_field, 'tasks.task_id')
         sort_order = args.get('sort_order', 'desc').upper()
@@ -627,7 +628,7 @@ class NightPlanResource(MethodView):
             query += " AND tasks.user_id = %s"
             values.append(user_id)
 
-        query += " ORDER BY task_id DESC"
+        query += " ORDER BY priority DESC, task_id DESC"
 
         cnx = db.connect()
         tasks_list = db.run_query(cnx, query, values)

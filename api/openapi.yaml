@@ -706,13 +706,11 @@ components:
           nullable: true
           description: Minimum moon distance
         max_moon_phase:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum moon phase
         max_sun_alt:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum sun altitude
         min_interval:
@@ -815,13 +813,11 @@ components:
           nullable: true
           description: Minimum moon distance
         max_moon_phase:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum moon phase
         max_sun_alt:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum sun altitude
         min_interval:
@@ -906,13 +902,11 @@ components:
           nullable: true
           description: Minimum moon distance. Send null to clear.
         max_moon_phase:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum moon phase. Send null to clear.
         max_sun_alt:
-          type: number
-          format: float
+          type: integer
           nullable: true
           description: Maximum sun altitude. Send null to clear.
         min_interval:
@@ -1019,6 +1013,7 @@ components:
           description: >
             IANA timezone name (e.g. Europe/Warsaw) for this telescope's site, used to
             compute the observing night boundary (local time − 12h). Defaults to UTC.
+            Must be a valid IANA name.
     TelescopesList:
       type: object
       properties:
@@ -1078,7 +1073,8 @@ components:
           default: UTC
           description: >
             IANA timezone name (e.g. Europe/Warsaw) for this telescope's site, used to
-            compute the observing night boundary (local time − 12h).
+            compute the observing night boundary (local time − 12h). Must be a valid
+            IANA name.
     ScopeUpdate:
       type: object
       properties:
@@ -1125,7 +1121,8 @@ components:
           type: string
           description: >
             IANA timezone name (e.g. Europe/Warsaw) for this telescope's site, used to
-            compute the observing night boundary (local time − 12h).
+            compute the observing night boundary (local time − 12h). Must be a valid
+            IANA name.
     ScopeResponse:
       type: object
       properties:
@@ -2253,7 +2250,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id]
+            enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id, priority]
             default: task_id
         - name: sort_order
           in: query
@@ -2379,7 +2376,7 @@ paths:
                   maximum: 1000
                 sort_by:
                   type: string
-                  enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id]
+                  enum: [task_id, state, object, exposure, skip_before, skip_after, ra, decl, created, performed, user_id, priority]
                   default: task_id
                 sort_order:
                   type: string
@@ -2659,7 +2656,10 @@ paths:
   /api/night-plan:
     get:
       summary: Get night plan (tasks available for execution)
-      description: Returns tasks that can be executed tonight for a given telescope, optionally filtered by user and date
+      description: >
+        Returns tasks that can be executed tonight for a given telescope,
+        optionally filtered by user and date. Results are ordered by priority
+        descending (higher first), then task_id descending.
       parameters:
         - name: scope_id
           in: query
@@ -2691,7 +2691,10 @@ paths:
         - bearerAuth: []
     post:
       summary: Get night plan (tasks available for execution)
-      description: Returns tasks that can be executed tonight for a given telescope (body parameters)
+      description: >
+        Returns tasks that can be executed tonight for a given telescope (body
+        parameters). Results are ordered by priority descending (higher first),
+        then task_id descending.
       requestBody:
         required: true
         content:
@@ -3144,6 +3147,7 @@ paths:
               - total_integration_time
               - start_date
               - end_date
+              - priority
           description: Sort field for the project list
         - name: sort_order
           in: query
