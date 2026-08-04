@@ -14,7 +14,11 @@ observation scheduler:
 > **Revisions (2026-08-04)**: runner implementation is now in scope
 > (previously contract-only) — §5.6–§5.11 add the actual runner-side
 > design, including generating NINA Advanced Sequencer files from the
-> Night Plan (OS-11–OS-15 in §7). GitHub issues opened for OS-1 and OS-2.
+> Night Plan (OS-11–OS-15 in §7). GitHub issues opened for OS-1, OS-2,
+> OS-3, OS-6, OS-7, and OS-11; OS-4, OS-5, OS-12, and OS-13 turned out to
+> already exist as issues filed by the project owner before this plan
+> (`backend#46`, `web#164`, `runner#1`/`#2`) and were updated in place
+> rather than duplicated — see §7's Issue column for the full mapping.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -803,9 +807,13 @@ cargo-culting "hypertable" onto all of it:
 Numbered `OS-#` ("Observation Scheduler") so each task has one stable
 reference distinct from GitHub issue/PR numbers, which are per-repo and
 would collide across `hevelius-backend`/`hevelius-web`/`hevelius-runner`
-(this plan itself lives under PR #110 in `hevelius-backend`). If/when these
-become actual GitHub issues, `OS-#` can go in the issue title as a
-cross-repo anchor.
+(this plan itself lives under PR #110 in `hevelius-backend`). Most of these
+are now real GitHub issues (`OS-#` in the title as a cross-repo anchor) —
+see the Issue column. Several turned out to already exist, filed by the
+project owner before this plan (`backend#46`, `web#164`,
+`runner#1`/`#2`) — those were updated in place (retitled, design appended)
+rather than forked into duplicates, preserving their original scope notes
+and any completed checklist items.
 
 **On "is night identity a good separate task?"** — yes, worth pulling out.
 The `night_date(scope, t)` rule (§1.1) is pure logic (not a schema change),
@@ -819,23 +827,23 @@ tested once, up front, as its own task, that risk goes away. It's listed
 separately below (OS-1) rather than folded into the schema task (OS-2),
 since OS-2 is schema-only and this is application code.
 
-| ID | Title | Repo | Depends on | Size | Status |
-|---|---|---|---|---|---|
-| **OS-1** | Night identity (`night_date` computation) | backend | — | S | Planned |
-| **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | Planned |
-| **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned |
-| **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned |
-| **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned |
-| **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned |
-| **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned |
-| **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned |
-| **OS-9** | Statistics API | backend | OS-8 | S–M | Planned |
-| **OS-10** | Telemetry (weather / roof / sensors / ASCOM) | backend (+ runner, later) | OS-2 | L | **Deferred** — separate topic, per your note |
-| **OS-11** | NINA integration spike (empirical verification) | runner | — | S | Planned |
-| **OS-12** | Runner — night plan consumption | runner | OS-4 | S | Planned |
-| **OS-13** | Runner — NINA Advanced Sequencer generation | runner | OS-11, OS-12 | L | Planned |
-| **OS-14** | Runner — execution correlation & reporting | runner | OS-13, OS-8 | M | Planned |
-| **OS-15** | Runner — process lifecycle & scheduling | runner | OS-11, OS-12, OS-13 | M | Planned |
+| ID | Title | Repo | Depends on | Size | Status | Issue |
+|---|---|---|---|---|---|---|
+| **OS-1** | Night identity (`night_date` computation) | backend | — | S | Planned | backend#111 |
+| **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | Planned | backend#112 |
+| **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned | backend#113 |
+| **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned | backend#46 (pre-existing, updated) |
+| **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned | web#164 (pre-existing, updated) |
+| **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned | backend#114 |
+| **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned | web#170 |
+| **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned | — |
+| **OS-9** | Statistics API | backend | OS-8 | S–M | Planned | — |
+| **OS-10** | Telemetry (weather / roof / sensors / ASCOM) | backend (+ runner, later) | OS-2 | L | **Deferred** — separate topic, per your note | — |
+| **OS-11** | NINA integration spike (empirical verification) | runner | — | S | Planned | runner#25 |
+| **OS-12** | Runner — night plan consumption | runner | OS-4 | S | Planned | runner#1 (pre-existing, updated) |
+| **OS-13** | Runner — NINA Advanced Sequencer generation | runner | OS-11, OS-12 | L | Planned | runner#2 (pre-existing, updated) |
+| **OS-14** | Runner — execution correlation & reporting | runner | OS-13, OS-8 | M | Planned | — |
+| **OS-15** | Runner — process lifecycle & scheduling | runner | OS-11, OS-12, OS-13 | M | Planned | — |
 
 **OS-1 — Night identity (`night_date` computation).** The §1.1 rule as a
 small, independently unit-tested function (e.g. in `hevelius/night.py`,
