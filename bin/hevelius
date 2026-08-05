@@ -17,6 +17,7 @@ from hevelius.cli.db_migrate import migrate
 from hevelius.cli.repo import repo
 from hevelius.cli.task_search import task_search, format_get
 from hevelius.cli.tasks import list_tasks
+from hevelius.cli.night_plan import night_plan_show
 from hevelius.cli.catalogs import list_catalogs, find_catalog_objects
 from hevelius.cli.users import list_users, add_user, disable_user, enable_user, edit_user_profile
 from hevelius.equipment import (
@@ -428,6 +429,23 @@ def run():
     user_profile_edit.add_argument('--phone', default=None, help="Phone number")
     user_profile_edit.add_argument('--email', default=None, help="Email address (empty string to clear)")
     user_profile_edit.add_argument('--aavso-id', default=None, dest='aavso_id', help="AAVSO observer ID")
+
+    night_plan_parser = subparsers.add_parser('night-plan', help="Night observing plan (what a telescope can shoot tonight)")
+    night_plan_sub = night_plan_parser.add_subparsers(help="night-plan commands", dest="night_plan_command")
+    night_plan_show_parser = night_plan_sub.add_parser(
+        'show',
+        help="Show the observable tasks and projects for one telescope and one night",
+    )
+    night_plan_show_parser.add_argument('-s', '--scope', '--scope-id', dest='scope_id', type=int, required=True,
+                                        help="Telescope scope_id to plan for")
+    night_plan_show_parser.add_argument('-d', '--date', default=None,
+                                        help="Observing night (YYYY-MM-DD, default: the night in progress at the telescope)")
+    night_plan_show_parser.add_argument('--user-id', dest='user_id', type=int, default=None,
+                                        help="Only plan this user's tasks and projects")
+    night_plan_show_parser.add_argument('--explain', action='store_true',
+                                        help="Also list what was excluded, and why")
+    night_plan_show_parser.add_argument('--no-color', action='store_true',
+                                        help="Disable ANSI colors in the output")
 
     asteroid_parser = subparsers.add_parser('asteroid', help="Asteroid observation planning (MPC orbits, visibility)")
     asteroid_subparsers = asteroid_parser.add_subparsers(help="asteroid commands", dest="asteroid_command")
@@ -871,6 +889,10 @@ def run():
             )
             return 0 if ok else 1
         return user_parser.print_help() or 1
+    if args.command == "night-plan":
+        if args.night_plan_command == "show":
+            return night_plan_show(args)
+        return night_plan_parser.print_help() or 1
     if args.command == "asteroid":
         if args.asteroid_command == "download":
             return asteroids_download(args)

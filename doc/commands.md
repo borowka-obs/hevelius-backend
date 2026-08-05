@@ -170,6 +170,36 @@ options:
                         sensors table)
 ```
 
+## Night plan — what a telescope can observe tonight
+
+`hevelius night-plan show` prints the observing plan for one telescope and one
+night: the tasks and projects that are actually above the horizon and within
+their own sun/moon constraints, ordered by priority. It is the CLI twin of
+`GET /api/night-plan` and runs exactly the same computation.
+
+The night is identified the way NINA does it (local civil time minus 12 hours),
+in the telescope's own time zone, so `--date 2026-01-15` means "the night of
+15 January" — including the small hours of the 16th. Without `--date`, the
+night currently in progress at that telescope is used.
+
+`--explain` additionally lists everything that was left out and why, which is
+the fastest way to answer "why isn't my target in the plan?":
+
+```shell
+hevelius night-plan show --scope 3
+hevelius night-plan show --scope 3 --date 2026-01-15
+hevelius night-plan show --scope 3 --date 2026-01-15 --user-id 12 --explain
+```
+
+Exclusion reasons are `wrong_state`, `outside_date_window`,
+`outside_mount_dec_range`, `filter_not_on_scope`, `already_complete`,
+`missing_coordinates`, `below_min_altitude`, `sun_too_high`, `moon_too_close`
+and `moon_phase_too_bright`.
+
+The telescope needs `lat`/`lon` and a correct `timezone` set (see
+[Telescope timezone](#telescope-timezone) above) — planning fails with an
+explanatory error otherwise.
+
 ## Catalog — list installed catalogs and search objects
 
 ```shell

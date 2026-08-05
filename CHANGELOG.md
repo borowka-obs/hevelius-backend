@@ -5,6 +5,33 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- Rewrote `GET`/`POST /api/night-plan` (OS-4, #46) as a real visibility
+  endpoint. It used to filter tasks by telescope, state and date only - it
+  never looked at `ra`/`decl`, so nothing about it was actually about
+  observability. It now runs every candidate through the OS-3 engine
+  (mount declination limits, minimum altitude, maximum sun altitude, minimum
+  moon distance, maximum moon phase) and covers **projects** as well as
+  tasks, returning per-item altitude/azimuth and sun/moon geometry plus the
+  night's own sunset, sunrise, moonrise, moonset and moon illumination. The
+  night is identified with OS-1's `night_date()` rule in the telescope's own
+  time zone, so `date` means "the night of", not "the calendar day".
+  New `explain=true` mode returns everything that was left out and why
+  (`wrong_state`, `outside_date_window`, `outside_mount_dec_range`,
+  `filter_not_on_scope`, `already_complete`, `missing_coordinates`,
+  `below_min_altitude`, `sun_too_high`, `moon_too_close`,
+  `moon_phase_too_bright`) - previously there was no way to tell why a target
+  didn't show up. Projects carry only the subframes still to shoot whose
+  filter this telescope actually has. The response shape changed: it is no
+  longer a bare `{tasks: [...]}` list. Moved out of
+  `hevelius/api/routes/tasks.py` into `hevelius/api/routes/night_plan.py`,
+  with the planning logic itself in `hevelius/night_plan.py`.
+- Added `hevelius night-plan show --scope ID [--date YYYY-MM-DD] [--user-id ID]
+  [--explain]`, the CLI twin of the endpoint above - the quickest way to answer
+  "why isn't my target in tonight's plan" without going through the web UI.
+- Added `hevelius.night.night_window()`: the sunset/sunrise search anchored at
+  the site's *local* noon rather than 12:00 UTC. `get_night_times()` keeps its
+  existing behavior; the new function is correct at any longitude, which
+  matters once telescopes are far from the Greenwich meridian.
 - Added `hevelius.observability` (OS-3, observation scheduler plan): a
   generic, staged target-visibility engine operating on plain
   `(ra_deg, dec_deg, constraints)` rather than task/project rows, so it's

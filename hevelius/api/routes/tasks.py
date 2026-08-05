@@ -1,4 +1,4 @@
-"""Task, night-plan, and version API routes."""
+"""Task and version API routes."""
 
 import logging
 
@@ -15,7 +15,6 @@ from hevelius.api.auth_utils import (
 )
 from hevelius.api.blueprint import blp
 from hevelius.api.schemas import (
-    NightPlanRequestSchema,
     TaskAddRequestSchema,
     TaskAddResponseSchema,
     TaskFindByFilenameQuerySchema,
@@ -574,105 +573,3 @@ class TaskUpdateResource(MethodView):
         except Exception as e:
             print(f"ERROR: Exception while handling /task-update call: {e}")
             return {'status': False, 'msg': f'Error updating task: {str(e)}'}
-
-
-@blp.route("/night-plan")
-class NightPlanResource(MethodView):
-    @jwt_required()
-    @blp.arguments(NightPlanRequestSchema, location="query")
-    @blp.response(200, TasksList)
-    def get(self, args):
-        """Get list of tasks available for execution tonight
-        Returns a list of astronomical observation tasks that can be executed during the current night
-        """
-        return self._get_night_plan(args)
-
-    @jwt_required()
-    @blp.arguments(NightPlanRequestSchema)
-    @blp.response(200, TasksList)
-    def post(self, args):
-        """Get list of tasks available for execution tonight
-        Returns a list of astronomical observation tasks that can be executed during the current night
-        """
-        return self._get_night_plan(args)
-
-    def _get_night_plan(self, args):
-        scope_id = args['scope_id']
-        user_id = args.get('user_id')  # Optional parameter
-        date = args.get('date')  # Optional parameter
-
-        query = """SELECT task_id, tasks.user_id, scope_id, aavso_id, object, ra, decl,
-            exposure, descr, filter, binning, guiding, dither,
-            calibrate, solve, other_cmd,
-            min_alt, moon_distance, skip_before, skip_after,
-            min_interval, comment, state, imagename,
-            created, activated, performed, max_moon_phase,
-            max_sun_alt, auto_center, calibrated, solved,
-            sent, priority FROM tasks, users
-            WHERE tasks.user_id = users.user_id
-            AND scope_id = %s
-            AND state IN (1, 2, 3)"""
-
-        values = [scope_id]
-
-        if date is not None:
-            query += " AND (skip_before IS NULL OR skip_before < %s) AND (skip_after IS NULL OR skip_after > %s)"
-            values.append(date)
-            values.append(date)
-        else:
-            query += """
-            AND (skip_before IS NULL OR skip_before < NOW())
-            AND (skip_after IS NULL OR skip_after > NOW())"""
-
-        if user_id is not None:
-            query += " AND tasks.user_id = %s"
-            values.append(user_id)
-
-        query += " ORDER BY priority DESC, task_id DESC"
-
-        cnx = db.connect()
-        tasks_list = db.run_query(cnx, query, values)
-        cnx.close()
-
-        # Convert the raw database results to a list of task dictionaries
-        formatted_tasks = []
-        for task in tasks_list:
-            task_dict = {
-                'task_id': task[0],
-                'user_id': task[1],
-                'scope_id': task[2],
-                'aavso_id': task[3],
-                'object': task[4],
-                'ra': task[5],
-                'decl': task[6],
-                'exposure': task[7],
-                'descr': task[8],
-                'filter': task[9],
-                'binning': task[10],
-                'guiding': bool(task[11]),
-                'dither': bool(task[12]),
-                'calibrate': bool(task[13]),
-                'solve': bool(task[14]),
-                'other_cmd': task[15],
-                'min_alt': task[16],
-                'moon_distance': task[17],
-                'skip_before': task[18],
-                'skip_after': task[19],
-                'min_interval': task[20],
-                'comment': task[21],
-                'state': task[22],
-                'imagename': task[23],
-                'created': task[24],
-                'activated': task[25],
-                'performed': task[26],
-                'max_moon_phase': task[27],
-                'max_sun_alt': task[28],
-                'auto_center': bool(task[29]),
-                'calibrated': bool(task[30]),
-                'solved': bool(task[31]),
-                'sent': bool(task[32]),
-                'priority': task[33]
-            }
-            formatted_tasks.append(task_dict)
-
-        return {"tasks": formatted_tasks}

@@ -1458,14 +1458,124 @@ components:
         catalog:
           type: string
           description: Catalog short name
+    NightPlanVisibility:
+      type: object
+      description: Where and under what sun/moon conditions the target was found observable
+      properties:
+        check_time_utc:
+          type: string
+          description: >
+            Moment within the night the target was checked at (ISO-8601 UTC):
+            its transit when that falls inside the night, otherwise the nearest
+            edge of the night.
+        altitude_deg:
+          type: number
+          description: Target altitude at check_time_utc (degrees)
+        azimuth_deg:
+          type: number
+          description: Target azimuth at check_time_utc (degrees)
+        moon_separation_deg:
+          type: number
+          description: Angular distance to the Moon at check_time_utc (degrees)
+        sun_altitude_deg:
+          type: number
+          description: Sun altitude at check_time_utc (degrees)
+    NightPlanItem:
+      type: object
+      description: One observable task or project, with its computed visibility
+      properties:
+        kind:
+          type: string
+          enum: [task, project]
+        task:
+          allOf:
+            - $ref: '#/components/schemas/Task'
+          nullable: true
+          description: Present when kind is task
+        project:
+          allOf:
+            - $ref: '#/components/schemas/Project'
+          nullable: true
+          description: >
+            Present when kind is project; subframes are limited to pending ones
+            whose filter this telescope carries.
+        visibility:
+          $ref: '#/components/schemas/NightPlanVisibility'
+    NightPlanExcluded:
+      type: object
+      description: One task or project left out of the plan, and why
+      properties:
+        kind:
+          type: string
+          enum: [task, project]
+        task_id:
+          type: integer
+          nullable: true
+        project_id:
+          type: integer
+          nullable: true
+        name:
+          type: string
+          nullable: true
+          description: Object name (task) or project name
+        reason:
+          type: string
+          enum:
+            - wrong_state
+            - outside_date_window
+            - outside_mount_dec_range
+            - filter_not_on_scope
+            - already_complete
+            - missing_coordinates
+            - below_min_altitude
+            - sun_too_high
+            - moon_too_close
+            - moon_phase_too_bright
     NightPlanResponse:
       type: object
+      description: Observing plan for one telescope and one night
       properties:
-        tasks:
+        scope_id:
+          type: integer
+        scope_name:
+          type: string
+        night_date:
+          type: string
+          format: date
+          description: The observing night this plan is for (NINA "local time - 12h" rule)
+        timezone:
+          type: string
+          description: IANA time zone the night date was computed in
+        night_start_utc:
+          type: string
+          description: Sunset (ISO-8601 UTC)
+        night_end_utc:
+          type: string
+          description: Sunrise (ISO-8601 UTC)
+        moonrise_utc:
+          type: string
+          nullable: true
+          description: Moonrise near this night (ISO-8601 UTC), null if none
+        moonset_utc:
+          type: string
+          nullable: true
+          description: Moonset near this night (ISO-8601 UTC), null if none
+        moon_illumination_pct:
+          type: number
+          description: Moon illuminated fraction at the middle of the night (0-100)
+        generated_at:
+          type: string
+          description: When this plan was computed (ISO-8601 UTC)
+        items:
           type: array
           items:
-            $ref: '#/components/schemas/Task'
-      description: List of tasks available for execution (no pagination)
+            $ref: '#/components/schemas/NightPlanItem'
+          description: Observable tasks and projects, highest priority first
+        excluded:
+          type: array
+          items:
+            $ref: '#/components/schemas/NightPlanExcluded'
+          description: Tasks/projects left out and why. Only present when explain=true
     ObjectsList:
       type: object
       properties:
@@ -2655,11 +2765,17 @@ paths:
                 $ref: '#/components/schemas/TaskUpdateResponse'
   /api/night-plan:
     get:
-      summary: Get night plan (tasks available for execution)
+      summary: Get the observing plan for one telescope and one night
       description: >
-        Returns tasks that can be executed tonight for a given telescope,
-        optionally filtered by user and date. Results are ordered by priority
-        descending (higher first), then task_id descending.
+        Returns the tasks and projects that are actually observable during the
+        given night at the given telescope: each candidate is checked against
+        the mount's declination limits and its own minimum altitude, maximum
+        sun altitude, minimum moon distance and maximum moon phase, and comes
+        back with the altitude/azimuth and sun/moon geometry it was accepted
+        on. The response also describes the night itself (sunset, sunrise,
+        moonrise, moonset, moon illumination). Items are ordered by priority
+        descending (higher first), tasks before projects, then id descending.
+        Pass explain=true to also get everything that was left out and why.
       parameters:
         - name: scope_id
           in: query
@@ -2672,29 +2788,44 @@ paths:
           required: false
           schema:
             type: integer
-          description: Optional user ID filter
+          description: Optional user ID filter (this user's tasks and project memberships only)
         - name: date
           in: query
           required: false
           schema:
             type: string
             format: date
-          description: Date in YYYY-MM-DD format (defaults to current date)
+          description: >
+            Observing night in YYYY-MM-DD format, labelled by the NINA
+            "local time - 12h" rule. Defaults to the night in progress at the
+            telescope's own time zone.
+        - name: explain
+          in: query
+          required: false
+          schema:
+            type: boolean
+            default: false
+          description: >
+            Also return the excluded tasks/projects with the reason each was
+            left out. This inspects every task on the telescope, finished ones
+            included, so combine it with user_id on a large archive.
       responses:
         '200':
-          description: List of tasks for the night
+          description: The night plan
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/NightPlanResponse'
+        '400':
+          description: Telescope has no location or an invalid time zone configured
+        '404':
+          description: Telescope not found
       security:
         - bearerAuth: []
     post:
-      summary: Get night plan (tasks available for execution)
+      summary: Get the observing plan for one telescope and one night
       description: >
-        Returns tasks that can be executed tonight for a given telescope (body
-        parameters). Results are ordered by priority descending (higher first),
-        then task_id descending.
+        Body-parameter variant of the GET above, with identical semantics.
       requestBody:
         required: true
         content:
@@ -2713,14 +2844,26 @@ paths:
                 date:
                   type: string
                   format: date
-                  description: Date in YYYY-MM-DD format
+                  description: Observing night in YYYY-MM-DD format
+                explain:
+                  type: boolean
+                  default: false
+                  description: >
+                    Also return the excluded tasks/projects with the reason each
+                    was left out. This inspects every task on the telescope,
+                    finished ones included, so combine it with user_id on a
+                    large archive.
       responses:
         '200':
-          description: List of tasks for the night
+          description: The night plan
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/NightPlanResponse'
+        '400':
+          description: Telescope has no location or an invalid time zone configured
+        '404':
+          description: Telescope not found
       security:
         - bearerAuth: []
   /api/scopes:

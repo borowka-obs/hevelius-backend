@@ -393,13 +393,6 @@ class TaskUpdateResponseSchema(Schema):
     msg = fields.String(metadata={"description": "Status message"})
 
 
-# Add new schema for night plan request
-class NightPlanRequestSchema(Schema):
-    scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
-    user_id = fields.Integer(metadata={"description": "Optional User ID filter"})
-    date = fields.Date(required=False, metadata={"description": "Date in YYYY-MM-DD format"})
-
-
 class SensorSchema(Schema):
     sensor_id = fields.Integer(required=True, metadata={"description": "Sensor ID"})
     name = fields.String(metadata={"description": "Sensor name"})
@@ -653,6 +646,77 @@ class ProjectsListSchema(Schema):
     page = fields.Integer()
     per_page = fields.Integer()
     pages = fields.Integer()
+
+
+# Night plan (OS-4): request, per-item visibility metadata, and the response
+# envelope describing the night itself. Defined after Task/ProjectSchema
+# because items nest both.
+class NightPlanRequestSchema(Schema):
+    scope_id = fields.Integer(required=True, metadata={"description": "Telescope ID"})
+    user_id = fields.Integer(metadata={"description": "Optional user ID filter: only this user's tasks and projects"})
+    date = fields.Date(
+        required=False,
+        metadata={"description": "Observing night in YYYY-MM-DD format (defaults to the night in progress at the telescope)"}
+    )
+    explain = fields.Boolean(
+        load_default=False,
+        metadata={"description": "Also return the excluded tasks/projects with the reason each was left out. "
+                                 "This inspects every task on the telescope, finished ones included, so combine it "
+                                 "with user_id on a large archive"}
+    )
+
+
+class NightPlanVisibilitySchema(Schema):
+    check_time_utc = fields.String(
+        metadata={"description": "Moment within the night the target was checked at (ISO-8601 UTC): its transit, or the nearest edge of the night"}
+    )
+    altitude_deg = fields.Float(metadata={"description": "Target altitude at check_time_utc (degrees)"})
+    azimuth_deg = fields.Float(metadata={"description": "Target azimuth at check_time_utc (degrees)"})
+    moon_separation_deg = fields.Float(metadata={"description": "Angular distance to the Moon at check_time_utc (degrees)"})
+    sun_altitude_deg = fields.Float(metadata={"description": "Sun altitude at check_time_utc (degrees)"})
+
+
+class NightPlanItemSchema(Schema):
+    kind = fields.String(metadata={"description": "Either 'task' or 'project'"})
+    task = fields.Nested(Task, allow_none=True, metadata={"description": "The task, when kind is 'task'"})
+    project = fields.Nested(
+        ProjectSchema, allow_none=True,
+        metadata={"description": "The project, when kind is 'project'; subframes are limited to pending ones this telescope can shoot"}
+    )
+    visibility = fields.Nested(NightPlanVisibilitySchema, metadata={"description": "Computed visibility metadata"})
+
+
+class NightPlanExcludedSchema(Schema):
+    kind = fields.String(metadata={"description": "Either 'task' or 'project'"})
+    task_id = fields.Integer(allow_none=True, metadata={"description": "Task ID, when kind is 'task'"})
+    project_id = fields.Integer(allow_none=True, metadata={"description": "Project ID, when kind is 'project'"})
+    name = fields.String(allow_none=True, metadata={"description": "Object name (task) or project name"})
+    reason = fields.String(
+        metadata={"description": "Why it was excluded: wrong_state, outside_date_window, outside_mount_dec_range, "
+                                 "filter_not_on_scope, already_complete, missing_coordinates, below_min_altitude, "
+                                 "sun_too_high, moon_too_close or moon_phase_too_bright"}
+    )
+
+
+class NightPlanResponseSchema(Schema):
+    scope_id = fields.Integer(metadata={"description": "Telescope ID"})
+    scope_name = fields.String(metadata={"description": "Telescope name"})
+    night_date = fields.Date(metadata={"description": "The observing night this plan is for (NINA 'date - 12h' rule)"})
+    timezone = fields.String(metadata={"description": "IANA timezone the night date was computed in"})
+    night_start_utc = fields.String(metadata={"description": "Sunset (ISO-8601 UTC)"})
+    night_end_utc = fields.String(metadata={"description": "Sunrise (ISO-8601 UTC)"})
+    moonrise_utc = fields.String(allow_none=True, metadata={"description": "Moonrise near this night (ISO-8601 UTC), null if none"})
+    moonset_utc = fields.String(allow_none=True, metadata={"description": "Moonset near this night (ISO-8601 UTC), null if none"})
+    moon_illumination_pct = fields.Float(metadata={"description": "Moon illuminated fraction at the middle of the night (0-100)"})
+    generated_at = fields.String(metadata={"description": "When this plan was computed (ISO-8601 UTC)"})
+    items = fields.List(
+        fields.Nested(NightPlanItemSchema),
+        metadata={"description": "Observable tasks and projects, highest priority first"}
+    )
+    excluded = fields.List(
+        fields.Nested(NightPlanExcludedSchema),
+        metadata={"description": "Tasks/projects left out and why. Only present when explain=true"}
+    )
 
 
 class CatalogSchema(Schema):

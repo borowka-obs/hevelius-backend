@@ -13,6 +13,7 @@ def register_blueprints(api, app):
     for _mod in (
         "auth_users",
         "tasks",
+        "night_plan",
         "scopes",
         "filters",
         "sensors",

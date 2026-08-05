@@ -113,15 +113,47 @@ def get_night_times(location: EarthLocation, obs_time: Time) -> Tuple[Time, Time
     morning. This matches observer "night" even when astronomical twilight
     never occurs (e.g. mid-latitude summer).
 
-    If the Sun never sets (polar day), falls back to a 12-hour window centred
-    on local solar midnight as a last resort. If the Sun never rises (polar
-    night), returns noon→next-noon.
+    The 24-hour search starts at 12:00 *UTC*, which brackets the intended
+    night for sites whose local midnight is near 00:00 UTC (everything
+    Hevelius runs today). For a site whose time zone is known, prefer
+    `night_window()`, which anchors the same search at local noon and is
+    therefore correct at any longitude.
     """
     _configure_iers_for_planning()
 
     # Search from noon UTC on the evening date through noon the next day.
     date_str = obs_time.iso[:10]
-    noon = Time(f"{date_str} 12:00:00")
+    return _night_times_from_noon(location, Time(f"{date_str} 12:00:00"))
+
+
+def night_window(location: EarthLocation, night: datetime.date, tz_name: str) -> Tuple[Time, Time]:
+    """
+    Return (sunset, sunrise) in UTC for the observing night labelled `night`
+    (a `night_date`, see above) at a site in the IANA zone `tz_name`.
+
+    Same search as `get_night_times`, anchored at *local* noon on `night`
+    instead of 12:00 UTC. That distinction only matters far from the Greenwich
+    meridian, but there it matters a lot: at a UTC+12 site, local sunset on
+    the evening of `night` happens around 06:00 UTC *that same day*, hours
+    before a UTC-noon-anchored window would even start looking, so the search
+    would lock onto the following evening and return the wrong night entirely.
+    """
+    local_noon = datetime.datetime.combine(
+        night, datetime.time(12, 0), tzinfo=ZoneInfo(tz_name),
+    )
+    return _night_times_from_noon(location, Time(local_noon.astimezone(datetime.timezone.utc)))
+
+
+def _night_times_from_noon(location: EarthLocation, noon: Time) -> Tuple[Time, Time]:
+    """
+    Find (sunset, sunrise) within the 24 hours following `noon`.
+
+    If the Sun never sets (polar day), falls back to a 12-hour window centred
+    on the midpoint of that span as a last resort. If the Sun never rises
+    (polar night), returns noon→next-noon.
+    """
+    _configure_iers_for_planning()
+
     times, alts = _altitude_series(get_sun, location, noon, noon + 24 * u.hour, n=577)
     crossings = _find_zero_crossings(times, alts, level=0.0)
 
