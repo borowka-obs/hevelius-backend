@@ -37,6 +37,16 @@ observation scheduler:
 > implementation (SQL pre-filter stays the caller's job, not part of
 > `observability.py`) — relevant to whoever picks up OS-4 next, now
 > unblocked along with OS-9's eventual dependency chain.
+>
+> **Revisions (2026-08-05, later)**: **OS-4 implemented** — merged in
+> [PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119),
+> issue #46 closed. §4.3–§4.4 updated for what actually shipped: a new
+> `strategy` ordering parameter (`priority`/`setting_first`) not in the
+> original plan, a `missing_coordinates` reason code added and
+> `min_interval_not_elapsed` deliberately left unimplemented pending OS-8,
+> and a `night.night_window()` bug fix (local-noon anchor, not UTC-noon —
+> the old anchor was wrong at ~UTC+12 sites). Response shape is a breaking
+> change from the old endpoint, as expected — **OS-5 and OS-12 are next**.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -378,26 +388,49 @@ enhancement once real sequencing needs it (§8).
 
 ### 4.3 A concrete, valuable addition: explain mode
 
-Without a way to see *why* something didn't make the cut, users will file
-confused bug reports every time a target silently doesn't show up. Add
-`?explain=true`: the response includes an `excluded` list alongside
-`items`, each tagged with a reason code:
+**Implemented** in
+[PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119)
+(merged), matching the plan below almost exactly. Without a way to see
+*why* something didn't make the cut, users will file confused bug reports
+every time a target silently doesn't show up. `?explain=true`: the
+response includes an `excluded` list alongside `items`, each tagged with a
+reason code — as shipped:
 
-`outside_mount_dec_range`, `below_min_altitude`, `sun_too_high`,
-`moon_too_close`, `moon_phase_too_bright`, `outside_date_window`,
-`filter_not_on_scope`, `already_complete`, `wrong_state`,
-`min_interval_not_elapsed`.
+`wrong_state`, `outside_date_window`, `outside_mount_dec_range`,
+`filter_not_on_scope`, `already_complete`, `missing_coordinates`,
+`below_min_altitude`, `sun_too_high`, `moon_too_close`,
+`moon_phase_too_bright`.
+
+Two differences from the original list above, both deliberate calls made
+during implementation, not oversights: **`missing_coordinates`** was
+added (`ra`/`decl` are nullable on both `tasks` and `projects`, and such a
+target can't be checked at all), and **`min_interval_not_elapsed` is not
+raised** — there's no execution event log yet (OS-8) to measure an
+interval *since*, so rather than fake the check it's left unimplemented
+until OS-8 exists. DONE tasks are deliberately excluded even from
+`explain=true` — nobody asks why a finished task isn't in tonight's plan,
+and on a real archive they'd drown out everything worth reading.
 
 ### 4.4 API
 
-`GET`/`POST /api/night-plan` (keeping both verbs, matching the existing
-GET+POST-for-the-same-semantics pattern already used elsewhere in this
-codebase, e.g. `TasksResource`):
+**Implemented** in PR #119. `GET`/`POST /api/night-plan` (both verbs kept,
+matching the existing GET+POST-for-the-same-semantics pattern already used
+elsewhere in this codebase, e.g. `TasksResource`):
 
-Query/body: `scope_id` (required, always explicit — this is the "API must
-allow any scope" requirement), `date` (optional, default = current night
-per §1.1 using the scope's own time zone), `user_id` (optional filter,
-kept for parity with today), `explain` (optional bool).
+Query/body: `scope_id` (required, always explicit — the "API must allow
+any scope" requirement), `date` (optional, default = current night per
+§1.1 using the scope's own time zone), `user_id` (optional filter, kept
+for parity with the old endpoint), `explain` (optional bool), and one
+addition beyond the original plan — **`strategy`** (optional, default
+`priority`):
+
+| `strategy` | Ordering |
+|---|---|
+| `priority` (default) | `priority` descending, tasks before projects, newest id first — what the old endpoint always returned, so existing callers see no change unless they opt in |
+| `setting_first` | Sky order: targets about to set come before ones still climbing, using each target's transit-time offset from the night's own midpoint (the value `hevelius/observability.py` already computes to pick its check moment, now public as `transit_offset_h`). A westerly object left for later is simply gone; an easterly one only gets better — so this order fits the most targets into one night. Correctly handles the wrap at the anti-meridian rather than breaking at raw RA 0h/24h, which would cut the sky in the wrong place on most nights. |
+
+Unknown telescope → 404; telescope with no `lat`/`lon` or an invalid time
+zone → 400 with a reason; unknown `strategy` → 422.
 
 ```jsonc
 {
@@ -407,6 +440,7 @@ kept for parity with today), `explain` (optional bool).
   "night_end_utc":   "2026-08-04T04:58:00Z",   // sunrise
   "moonrise_utc": "...", "moonset_utc": "...", "moon_illumination_pct": 12,
   "generated_at": "2026-08-03T18:00:11Z",
+  "strategy": "priority",
   "items": [
     {
       "kind": "task",
@@ -429,11 +463,32 @@ kept for parity with today), `explain` (optional bool).
 }
 ```
 
-Also add a CLI counterpart, `hevelius night-plan show --scope X --date Y`,
-matching the existing convention that most API features have a CLI twin
-(`asteroid visible`, `asteroid show --telescope`) — cheap to add since the
-module already computes everything, and valuable for debugging without
-going through the UI.
+**Breaking change from the old endpoint**: the response is no longer a
+bare `{"tasks": [...]}` list. OS-5 (web) and OS-12 (runner) are written
+against the old shape and need updating in their own repos against this
+one — expected and sequenced, not a surprise.
+
+CLI counterpart shipped in the same PR: `hevelius night-plan show --scope
+ID [--date] [--user-id] [--strategy] [--explain]`, matching the existing
+convention that most API features have a CLI twin (`asteroid visible`,
+`asteroid show --telescope`) — the fastest way to answer "why isn't my
+target in tonight's plan" without going through the UI.
+
+**Bug fix along the way, worth knowing about**: sunset/sunrise search now
+has a second entry point, `hevelius.night.night_window()`, anchored at the
+site's own *local* noon rather than 12:00 UTC. The old anchor
+(`get_night_times()`, kept unchanged and still used by asteroid
+visibility, so no behavior change there) would lock onto the wrong evening
+entirely at a site near UTC+12. Anything using night boundaries going
+forward should reach for `night_window()`, not `get_night_times()`.
+
+**Flagged during implementation, not addressed**: with no reachable IERS
+server, `astropy` retries the download on *every* coordinate transform,
+turning a ~30ms visibility check into ~8s. Harmless with network access
+(the table ends up cached), but would be felt by a fully offline
+observatory deployment. `night._configure_iers_for_planning()` (OS-3)
+would be the place to also stop retrying after one failure — left alone
+as a possible future OS-3 follow-up, not part of this task.
 
 ---
 
@@ -857,7 +912,7 @@ since OS-2 is schema-only and this is application code.
 | **OS-1** | Night identity (`night_date` computation) | backend | — | S | **Implemented** ([PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116), merged) | backend#111 (closed) |
 | **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | **Implemented** ([PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115), merged) | backend#112 (closed) |
 | **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | **Implemented** ([PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118), merged) | backend#113 (closed) |
-| **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned | backend#46 (pre-existing, updated) |
+| **OS-4** | Night Plan API rewrite | backend | OS-3 | M | **Implemented** ([PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119), merged) | backend#46 (closed) |
 | **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned | web#164 (pre-existing, updated) |
 | **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned | backend#114 |
 | **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned | web#170 |
@@ -918,12 +973,18 @@ results (tens of degrees) on the installed astropy version; fixed by
 transforming both into the same `AltAz` frame first. Worth remembering for
 any other moon-related code.
 
-**OS-4 — Night Plan API rewrite.** New `hevelius/api/routes/night_plan.py`;
-delete the old `_get_night_plan` stub out of `tasks.py` (§4.1); new
-request/response schemas including `explain=true` (§4.3–4.4); OpenAPI
-update; rewritten `test_night_plan_*` tests; `hevelius night-plan show`
-CLI companion folded into this task rather than split out, since it's a
-thin wrapper over the same module.
+**OS-4 — Night Plan API rewrite. Implemented** in
+[PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119)
+(merged): `hevelius/night_plan.py` (planning logic, shared by the route and
+the CLI) + `hevelius/api/routes/night_plan.py`; old `_get_night_plan` stub
+deleted out of `tasks.py`; `explain=true` shipped with one added reason
+code and one deliberately unimplemented one (§4.3); a new `strategy`
+ordering parameter not in the original plan (§4.4); `hevelius night-plan
+show` CLI shipped in the same PR. 21 new tests in
+`tests/test_api_night_plan.py` replace the old date/state-only tests.
+**Response shape is a breaking change** from the old endpoint — OS-5 and
+OS-12 (both written against the old bare `{"tasks": [...]}` shape) need
+updating against the new one, exactly as sequenced.
 
 **OS-5 — Night Plan web UI.** Rewrite `NightPlanComponent`/
 `NightPlanService` against the OS-4 contract: telescope selector defaulted
