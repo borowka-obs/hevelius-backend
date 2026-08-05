@@ -4,6 +4,7 @@ staged visibility pipeline (OS-3) that Night Plan (OS-4, #46) will call for
 tasks and projects.
 """
 
+import pytest
 from astropy.coordinates import EarthLocation
 from astropy.time import Time
 from astropy import units as u
@@ -141,3 +142,39 @@ class TestCheckVisibilityStaging:
         assert result.reason is None
         assert result.altitude_deg >= observability.DEFAULT_MIN_ALT_DEG
         assert result.check_time == NIGHT_END
+
+    def test_evening_target_sun_check_runs_at_sunset_not_midnight(self):
+        # Same evening-only target as above. At sunset the Sun is at ~0 deg;
+        # at midnight it's the night's most negative. A max_sun_alt constraint
+        # that only the midnight value would satisfy must still reject here,
+        # since sunset - not midnight - is the only moment this target is up.
+        evening_transit_ra = 124.4
+        sun_alt_at_sunset = night.sun_altitude_deg(NIGHT_START, SITE)
+        sun_alt_at_midnight = night.sun_altitude_deg(_T_MID, SITE)
+        assert sun_alt_at_sunset > sun_alt_at_midnight  # sanity: sunset is brighter
+        constraints = Constraints(max_sun_alt=(sun_alt_at_sunset + sun_alt_at_midnight) / 2)
+        result = observability.check_visibility(
+            ra_deg=evening_transit_ra, dec_deg=ZENITH_DEC, constraints=constraints,
+            location=SITE, night_start=NIGHT_START, night_end=NIGHT_END,
+        )
+        assert result.visible is False
+        assert result.reason == observability.REASON_SUN_TOO_HIGH
+        assert result.check_time == NIGHT_START
+        assert result.sun_altitude_deg == pytest.approx(sun_alt_at_sunset, abs=0.01)
+
+    def test_morning_target_sun_check_runs_at_sunrise_not_midnight(self):
+        # Mirror of the sunset case: this target is only up at sunrise, so
+        # the sun/moon check (stage 4) must use sunrise, not midnight.
+        morning_transit_ra = 82.4
+        sun_alt_at_sunrise = night.sun_altitude_deg(NIGHT_END, SITE)
+        sun_alt_at_midnight = night.sun_altitude_deg(_T_MID, SITE)
+        assert sun_alt_at_sunrise > sun_alt_at_midnight  # sanity: sunrise is brighter
+        constraints = Constraints(max_sun_alt=(sun_alt_at_sunrise + sun_alt_at_midnight) / 2)
+        result = observability.check_visibility(
+            ra_deg=morning_transit_ra, dec_deg=ZENITH_DEC, constraints=constraints,
+            location=SITE, night_start=NIGHT_START, night_end=NIGHT_END,
+        )
+        assert result.visible is False
+        assert result.reason == observability.REASON_SUN_TOO_HIGH
+        assert result.check_time == NIGHT_END
+        assert result.sun_altitude_deg == pytest.approx(sun_alt_at_sunrise, abs=0.01)

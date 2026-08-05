@@ -25,8 +25,9 @@ Unlike `asteroid.py`'s moving targets (which need one Kepler-orbit solve
 per check time), tasks and projects have fixed RA/Dec, so the "check
 moment" here is derived directly from the target's transit time rather
 than refined iteratively: the transit time if it falls inside the night
-window, else astronomical midnight (§4.2 of
-`doc/observation-scheduler-plan.md`).
+window, else whichever edge of the night (sunset or sunrise) is closest
+to transit, for targets only above the horizon near one edge of the
+night (§4.2 of `doc/observation-scheduler-plan.md`).
 """
 
 from dataclasses import dataclass
@@ -113,20 +114,6 @@ def _transit_offset_h(ra_deg: float, lst_mid_deg: float) -> float:
 
 
 def _representative_check_time(
-    ra_deg: float, lst_mid_deg: float, t_mid: Time, night_half_h: float,
-) -> Time:
-    """
-    Check moment = transit time if it falls inside the night window, else
-    astronomical midnight (§4.2). Fixed RA/Dec means the transit time is a
-    direct hour-angle computation - no orbit propagation needed.
-    """
-    transit_offset_h = _transit_offset_h(ra_deg, lst_mid_deg)
-    if abs(transit_offset_h) <= night_half_h:
-        return t_mid + transit_offset_h * u.hour
-    return t_mid
-
-
-def _altitude_check_time(
     ra_deg: float,
     lst_mid_deg: float,
     t_mid: Time,
@@ -135,13 +122,21 @@ def _altitude_check_time(
     night_end: Time,
 ) -> Time:
     """
-    Moment within the night when the target is highest (stage 5).
+    Moment within the night to run stages 4 and 5 against: transit time if
+    it falls inside the night window (fixed RA/Dec means that's a direct
+    hour-angle computation, no orbit propagation needed); otherwise the
+    target is only above the horizon near one edge of the night, so use
+    whichever edge is closest to its transit - sunset if transit is before
+    the night starts (the target is already descending all night), sunrise
+    if transit is after the night ends (still rising all night).
 
-    Fixed RA/Dec peaks at transit. When transit falls inside the night use
-    it; when transit is before sunset the target is descending so sunset is
-    best; when transit is after sunrise the target is still rising so sunrise
-    is best. This avoids rejecting evening/morning targets that stage 3
-    already confirmed overlap with the above-min_alt window.
+    Using astronomical midnight here for an evening-only or morning-only
+    target would check sun/moon conditions and altitude at a moment the
+    target isn't even above `min_alt` (stage 3 only confirmed *some* moment
+    in the night qualifies, not that midnight is it), which can both
+    wrongly reject the target (stage 5) and wrongly evaluate sun/moon
+    constraints against a moment the target was never observable at
+    (stage 4).
     """
     transit_offset_h = _transit_offset_h(ra_deg, lst_mid_deg)
     if abs(transit_offset_h) <= night_half_h:
@@ -183,7 +178,9 @@ def check_visibility(
     if not night.ha_window_visible(ra_deg, dec_deg, lat_deg, lst_mid_deg, night_half_h, min_alt):
         return VisibilityResult(visible=False, reason=REASON_BELOW_MIN_ALTITUDE)
 
-    t_check = _representative_check_time(ra_deg, lst_mid_deg, t_mid, night_half_h)
+    t_check = _representative_check_time(
+        ra_deg, lst_mid_deg, t_mid, night_half_h, night_start, night_end,
+    )
 
     # Stage 4: representative-moment check (sun altitude, moon separation/phase).
     sun_alt = night.sun_altitude_deg(t_check, location)
@@ -210,25 +207,22 @@ def check_visibility(
         )
 
     # Stage 5: precise astropy ICRS -> AltAz confirm, survivors only.
-    t_alt = _altitude_check_time(
-        ra_deg, lst_mid_deg, t_mid, night_half_h, night_start, night_end,
-    )
     target = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
-    altaz = target.transform_to(AltAz(obstime=t_alt, location=location))
+    altaz = target.transform_to(AltAz(obstime=t_check, location=location))
     alt_deg = float(altaz.alt.to(u.deg).value)
     az_deg = float(altaz.az.to(u.deg).value)
 
     if alt_deg < min_alt:
         return VisibilityResult(
             visible=False, reason=REASON_BELOW_MIN_ALTITUDE,
-            check_time=t_alt, altitude_deg=round(alt_deg, 2), azimuth_deg=round(az_deg, 2),
+            check_time=t_check, altitude_deg=round(alt_deg, 2), azimuth_deg=round(az_deg, 2),
             sun_altitude_deg=round(sun_alt, 2), moon_separation_deg=round(moon_sep, 2),
             moon_illumination_pct=round(moon_illum, 2),
         )
 
     return VisibilityResult(
         visible=True,
-        check_time=t_alt,
+        check_time=t_check,
         altitude_deg=round(alt_deg, 2),
         azimuth_deg=round(az_deg, 2),
         sun_altitude_deg=round(sun_alt, 2),
