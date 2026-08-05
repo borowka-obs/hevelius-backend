@@ -105,3 +105,39 @@ class TestCheckVisibilityStaging:
         )
         assert result.visible is True
         assert result.reason is None
+
+    def test_evening_target_visible_when_above_min_alt_at_sunset_not_at_midnight(self):
+        # Transit is before the night window: stage 3 overlap passes, but altitude
+        # at night midpoint is below min_alt. Stage 5 must check at sunset.
+        evening_transit_ra = 124.4
+        night_half_h = (NIGHT_END - NIGHT_START).to(u.hour).value / 2.0
+        assert night.ha_window_visible(
+            evening_transit_ra, ZENITH_DEC, SITE.lat.deg, _LST_MID_DEG,
+            night_half_h, observability.DEFAULT_MIN_ALT_DEG,
+        )
+        result = observability.check_visibility(
+            ra_deg=evening_transit_ra, dec_deg=ZENITH_DEC, constraints=Constraints(),
+            location=SITE, night_start=NIGHT_START, night_end=NIGHT_END,
+        )
+        assert result.visible is True
+        assert result.reason is None
+        assert result.altitude_deg >= observability.DEFAULT_MIN_ALT_DEG
+        assert result.check_time == NIGHT_START
+
+    def test_morning_target_visible_when_above_min_alt_at_sunrise_not_at_midnight(self):
+        # Transit is after the night window: stage 3 overlap passes, but altitude
+        # at night midpoint is below min_alt. Stage 5 must check at sunrise.
+        morning_transit_ra = 82.4
+        night_half_h = (NIGHT_END - NIGHT_START).to(u.hour).value / 2.0
+        assert night.ha_window_visible(
+            morning_transit_ra, ZENITH_DEC, SITE.lat.deg, _LST_MID_DEG,
+            night_half_h, observability.DEFAULT_MIN_ALT_DEG,
+        )
+        result = observability.check_visibility(
+            ra_deg=morning_transit_ra, dec_deg=ZENITH_DEC, constraints=Constraints(),
+            location=SITE, night_start=NIGHT_START, night_end=NIGHT_END,
+        )
+        assert result.visible is True
+        assert result.reason is None
+        assert result.altitude_deg >= observability.DEFAULT_MIN_ALT_DEG
+        assert result.check_time == NIGHT_END
