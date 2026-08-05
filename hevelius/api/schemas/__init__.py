@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from marshmallow import Schema, fields, ValidationError, validate, validates_schema
 
+from hevelius.night_plan import STRATEGIES, STRATEGY_PRIORITY
+
 
 def _validate_iana_timezone(value):
     """Reject strings that are not valid IANA timezone names."""
@@ -663,6 +665,14 @@ class NightPlanRequestSchema(Schema):
         metadata={"description": "Also return the excluded tasks/projects with the reason each was left out. "
                                  "Tasks already in the DONE state are not reported"}
     )
+    strategy = fields.String(
+        load_default=STRATEGY_PRIORITY,
+        validate=validate.OneOf(STRATEGIES),
+        metadata={"description": "Order of the planned items: 'priority' (default) puts the highest-priority work "
+                                 "first; 'setting_first' runs the sky west to east so targets about to set come "
+                                 "before ones still climbing, fitting the most targets into the night. Affects "
+                                 "ordering only, never which items are planned"}
+    )
 
 
 class NightPlanVisibilitySchema(Schema):
@@ -708,6 +718,7 @@ class NightPlanResponseSchema(Schema):
     moonset_utc = fields.String(allow_none=True, metadata={"description": "Moonset near this night (ISO-8601 UTC), null if none"})
     moon_illumination_pct = fields.Float(metadata={"description": "Moon illuminated fraction at the middle of the night (0-100)"})
     generated_at = fields.String(metadata={"description": "When this plan was computed (ISO-8601 UTC)"})
+    strategy = fields.String(metadata={"description": "The ordering strategy the items are sorted by"})
     items = fields.List(
         fields.Nested(NightPlanItemSchema),
         metadata={"description": "Observable tasks and projects, highest priority first"}

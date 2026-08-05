@@ -25,7 +25,8 @@ class NightPlanResource(MethodView):
         """Get the observing plan for one telescope and one night
         Returns the tasks and projects that are actually observable during the
         night, each with the altitude/azimuth and sun/moon geometry it was
-        accepted on, plus the night's own sunset/sunrise and moon times. Pass
+        accepted on, plus the night's own sunset/sunrise and moon times.
+        Order them by priority or by sky position with strategy. Pass
         explain=true to also get everything that was left out, and why.
         """
         return self._night_plan(args)
@@ -48,6 +49,7 @@ class NightPlanResource(MethodView):
                 night_date=args.get("date"),
                 user_id=args.get("user_id"),
                 explain=args.get("explain", False),
+                strategy=args.get("strategy", night_plan.STRATEGY_PRIORITY),
             )
         except night_plan.NightPlanError as err:
             logger.info("night-plan rejected: %s", err.message)

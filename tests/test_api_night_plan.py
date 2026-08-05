@@ -130,6 +130,11 @@ class TestNightPlan(unittest.TestCase):
         key = "object" if kind == "task" else "name"
         return [item[kind][key] for item in plan["items"] if item["kind"] == kind]
 
+    def _item_labels(self, plan):
+        """Every item's name, tasks and projects alike, in plan order."""
+        return [item[item["kind"]].get("object") or item[item["kind"]].get("name")
+                for item in plan["items"]]
+
     def _reasons(self, plan):
         return {entry["name"]: entry["reason"] for entry in plan["excluded"]}
 
@@ -416,9 +421,71 @@ class TestNightPlan(unittest.TestCase):
 
         plan = self._plan(f'scope_id=1&date={NIGHT}')
 
-        labels = [item[item['kind']].get('object') or item[item['kind']].get('name')
-                  for item in plan['items']]
-        self.assertEqual(labels, ['HighPri', 'MidPri', 'MidPriProject', 'LowPri'])
+        self.assertEqual(plan['strategy'], 'priority')
+        self.assertEqual(self._item_labels(plan),
+                         ['HighPri', 'MidPri', 'MidPriProject', 'LowPri'])
+
+        # The default is priority, so asking for it explicitly changes nothing.
+        explicit = self._plan(f'scope_id=1&date={NIGHT}&strategy=priority')
+        self.assertEqual(explicit['items'], plan['items'])
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_night_plan_setting_first_orders_west_to_east(self, config):
+        """
+        strategy=setting_first runs the sky west to east.
+
+        On this night local sidereal time at the middle of the night is around
+        7-8h, so RA 4h is already heading down while RA 11h is still climbing:
+        the setting one has to be shot first or not at all. Priority is
+        deliberately the reverse of the sky order here, so the two strategies
+        cannot accidentally agree.
+        """
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = self._db()
+        self._prepare_scope(cnx)
+        self._insert_task(cnx, 'Setting', ra=4.0, priority=1)
+        self._insert_task(cnx, 'Transiting', ra=7.5, priority=5)
+        self._insert_task(cnx, 'Rising', ra=11.0, priority=9)
+        cnx.close()
+
+        by_sky = self._plan(f'scope_id=1&date={NIGHT}&strategy=setting_first')
+        by_priority = self._plan(f'scope_id=1&date={NIGHT}')
+
+        self.assertEqual(by_sky['strategy'], 'setting_first')
+        self.assertEqual(self._item_labels(by_sky), ['Setting', 'Transiting', 'Rising'])
+        self.assertEqual(self._item_labels(by_priority), ['Rising', 'Transiting', 'Setting'])
+        # Same plan either way - the strategy only decides the order.
+        self.assertEqual(sorted(self._item_labels(by_sky)),
+                         sorted(self._item_labels(by_priority)))
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_night_plan_setting_first_handles_ra_wraparound(self, config):
+        """
+        Sky order is relative to the night, not to the 0h/24h RA origin.
+
+        With sidereal time around 7-8h at midnight, RA 23h rises late and RA 5h
+        sets early; ordering on raw RA would put 23h last by sheer numeric
+        accident, and get it right for the wrong reason. RA 13h is the case that
+        tells the two apart: numerically it sits between them, but in the sky
+        it is the last of the three to come round.
+        """
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = self._db()
+        self._prepare_scope(cnx)
+        self._insert_task(cnx, 'RA5', ra=5.0)
+        self._insert_task(cnx, 'RA13', ra=13.0)
+        self._insert_task(cnx, 'RA23', ra=23.0)
+        cnx.close()
+
+        plan = self._plan(f'scope_id=1&date={NIGHT}&strategy=setting_first')
+
+        self.assertEqual(self._item_labels(plan), ['RA23', 'RA5', 'RA13'])
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_night_plan_unknown_strategy(self, config):
+        """An unrecognised strategy is rejected, not silently ignored."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        self._plan(f'scope_id=1&date={NIGHT}&strategy=whatever', expect=422)
 
     @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_night_plan_post_matches_get(self, config):

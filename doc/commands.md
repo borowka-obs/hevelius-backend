@@ -174,20 +174,32 @@ options:
 
 `hevelius night-plan show` prints the observing plan for one telescope and one
 night: the tasks and projects that are actually above the horizon and within
-their own sun/moon constraints, ordered by priority. It is the CLI twin of
-`GET /api/night-plan` and runs exactly the same computation.
+their own sun/moon constraints. It is the CLI twin of `GET /api/night-plan`
+and runs exactly the same computation.
 
 The night is identified the way NINA does it (local civil time minus 12 hours),
 in the telescope's own time zone, so `--date 2026-01-15` means "the night of
 15 January" — including the small hours of the 16th. Without `--date`, the
 night currently in progress at that telescope is used.
 
+`--strategy` picks the order of the plan:
+
+- `priority` (default) — highest-priority work first, the order the endpoint
+  has always produced.
+- `setting_first` — sky order instead: west to east, so targets about to set
+  come before ones still climbing. Shooting in this order is what lets a night
+  fit the most targets in — a westerly object left for later is simply gone,
+  while an easterly one only gets better. Priority still breaks ties between
+  targets at the same place in the sky. The order is relative to *this* night's
+  sidereal time, not to the 0h/24h RA origin, so nothing sorts strangely just
+  because it happens to sit near the RA wrap.
+
 `--explain` additionally lists everything that was left out and why, which is
 the fastest way to answer "why isn't my target in the plan?":
 
 ```shell
 hevelius night-plan show --scope 3
-hevelius night-plan show --scope 3 --date 2026-01-15
+hevelius night-plan show --scope 3 --date 2026-01-15 --strategy setting_first
 hevelius night-plan show --scope 3 --date 2026-01-15 --user-id 12 --explain
 ```
 

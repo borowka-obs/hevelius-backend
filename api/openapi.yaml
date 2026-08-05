@@ -1566,6 +1566,10 @@ components:
         generated_at:
           type: string
           description: When this plan was computed (ISO-8601 UTC)
+        strategy:
+          type: string
+          enum: [priority, setting_first]
+          description: The ordering strategy the items are sorted by
         items:
           type: array
           items:
@@ -2773,8 +2777,8 @@ paths:
         sun altitude, minimum moon distance and maximum moon phase, and comes
         back with the altitude/azimuth and sun/moon geometry it was accepted
         on. The response also describes the night itself (sunset, sunrise,
-        moonrise, moonset, moon illumination). Items are ordered by priority
-        descending (higher first), tasks before projects, then id descending.
+        moonrise, moonset, moon illumination). Items are ordered by the chosen
+        strategy - by priority (the default) or west to east across the sky.
         Pass explain=true to also get everything that was left out and why.
       parameters:
         - name: scope_id
@@ -2799,6 +2803,20 @@ paths:
             Observing night in YYYY-MM-DD format, labelled by the NINA
             "local time - 12h" rule. Defaults to the night in progress at the
             telescope's own time zone.
+        - name: strategy
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [priority, setting_first]
+            default: priority
+          description: >
+            Order of the planned items. "priority" puts the highest-priority
+            work first (priority descending, tasks before projects, newest id
+            first). "setting_first" runs the sky west to east, so targets about
+            to set come before ones still climbing, which fits the most targets
+            into the night; priority breaks ties. Affects ordering only, never
+            which items are planned.
         - name: explain
           in: query
           required: false
@@ -2844,6 +2862,14 @@ paths:
                   type: string
                   format: date
                   description: Observing night in YYYY-MM-DD format
+                strategy:
+                  type: string
+                  enum: [priority, setting_first]
+                  default: priority
+                  description: >
+                    Order of the planned items: "priority" (highest-priority
+                    work first) or "setting_first" (west to east, so targets
+                    about to set come first).
                 explain:
                   type: boolean
                   default: false
