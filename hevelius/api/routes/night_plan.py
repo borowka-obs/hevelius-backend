@@ -53,6 +53,10 @@ class NightPlanResource(MethodView):
             )
         except night_plan.NightPlanError as err:
             logger.info("night-plan rejected: %s", err.message)
-            abort(err.status, message=err.message)
+            # `abort` raises rather than returns, so the `return` is dead code -
+            # it is there to say out loud that this branch never falls through
+            # to an implicit `return None`, which is otherwise the one reading
+            # of this method that would silently produce an empty 200.
+            return abort(err.status, message=err.message)
         finally:
             cnx.close()
