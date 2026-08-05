@@ -30,6 +30,13 @@ observation scheduler:
 > **Revisions (2026-08-04, even later)**: PR #115 deployed to production
 > and existing telescope rows backfilled with real IANA timezones — the
 > one loose end noted on OS-2 is closed out (§2, §7).
+>
+> **Revisions (2026-08-05)**: **OS-3 implemented** — merged in
+> [PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118),
+> issue #113 closed. §4.2 updated with a scoping refinement from the real
+> implementation (SQL pre-filter stays the caller's job, not part of
+> `observability.py`) — relevant to whoever picks up OS-4 next, now
+> unblocked along with OS-9's eventual dependency chain.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -346,6 +353,13 @@ Stage 4 (precise AltAz, survivors only):
   real astropy GCRS->AltAz transform to confirm altitude/azimuth for the
   response payload.
 ```
+
+**As implemented in OS-3** (PR #118): Stage 0 lives in the *caller*, not
+inside `hevelius/observability.py` — it's inherently table-specific (tasks
+vs. projects need different `WHERE` clauses) and doesn't generalize the
+way stages 1–4 do. `observability.py` exports the generic
+`(ra_deg, dec_deg, constraints)` pipeline for stages 1–4 only; OS-4 does
+its own SQL pre-filtering before calling into it per surviving row.
 
 At the scale involved (thousands of tasks + tens of project-subframe rows
 per scope — nowhere near the ~1M-row asteroid catalogue), raw performance
@@ -842,7 +856,7 @@ since OS-2 is schema-only and this is application code.
 |---|---|---|---|---|---|---|
 | **OS-1** | Night identity (`night_date` computation) | backend | — | S | **Implemented** ([PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116), merged) | backend#111 (closed) |
 | **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | **Implemented** ([PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115), merged) | backend#112 (closed) |
-| **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | Planned | backend#113 |
+| **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | **Implemented** ([PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118), merged) | backend#113 (closed) |
 | **OS-4** | Night Plan API rewrite | backend | OS-3 | M | Planned | backend#46 (pre-existing, updated) |
 | **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned | web#164 (pre-existing, updated) |
 | **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned | backend#114 |
@@ -879,13 +893,30 @@ outstanding from this task. `observation_events` (OS-8) and telemetry
 (OS-10) were deliberately **not** in this task — they're new tables with
 real design questions attached, not plain column additions.
 
-**OS-3 — Shared observability engine.** Extract `hevelius/night.py` out of
-`hevelius/asteroid.py` (pure refactor, no behavior change for the asteroid
-feature) plus the new `hevelius/observability.py` staged-filter pipeline
-(§4.2), generic over `(ra_deg, dec_deg, constraints)`. Includes the RA
-hours→degrees conversion at the boundary (§1.2) and a unit test guarding
-it specifically — the easiest kind of bug to introduce here and the
-hardest to notice by inspection.
+**OS-3 — Shared observability engine. Implemented** in
+[PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118)
+(merged): `hevelius/night.py` extracted from `hevelius/asteroid.py` (pure
+refactor, no behavior change for the asteroid feature) — `get_night_times`,
+`moon_rise_set`, `transit_altitude_deg`, `ha_window_visible`, plus new
+`sun_altitude_deg`, `moon_separation_deg`, `moon_illumination_pct` — and
+`hevelius/observability.py` added with the staged pipeline, generic over
+`(ra_deg, dec_deg, constraints)`. The RA hours→degrees boundary conversion
+(§1.2) has its own dedicated test.
+
+**Scoping refinement from implementation** (carries forward to OS-4): the
+SQL pre-filter stage (scope match, state/date window, mount `min_dec`/
+`max_dec`) stayed the **caller's** responsibility rather than living inside
+`observability.py` — it's inherently table-specific (tasks vs. projects
+need different `WHERE` clauses) and doesn't generalize the way the
+astronomy stages do. OS-4 does its own SQL pre-filtering, then calls this
+engine per surviving row, rather than delegating that stage to it.
+
+**Also worth knowing**: implementation surfaced a real astropy pitfall in
+`moon_separation_deg` — comparing a distance-less ICRS `SkyCoord` directly
+against a finite-distance GCRS body via `.separation()` gave wildly wrong
+results (tens of degrees) on the installed astropy version; fixed by
+transforming both into the same `AltAz` frame first. Worth remembering for
+any other moon-related code.
 
 **OS-4 — Night Plan API rewrite.** New `hevelius/api/routes/night_plan.py`;
 delete the old `_get_night_plan` stub out of `tasks.py` (§4.1); new
