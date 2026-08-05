@@ -661,8 +661,7 @@ class NightPlanRequestSchema(Schema):
     explain = fields.Boolean(
         load_default=False,
         metadata={"description": "Also return the excluded tasks/projects with the reason each was left out. "
-                                 "This inspects every task on the telescope, finished ones included, so combine it "
-                                 "with user_id on a large archive"}
+                                 "Tasks already in the DONE state are not reported"}
     )
 
 

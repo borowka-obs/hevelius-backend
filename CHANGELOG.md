@@ -20,7 +20,9 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   `filter_not_on_scope`, `already_complete`, `missing_coordinates`,
   `below_min_altitude`, `sun_too_high`, `moon_too_close`,
   `moon_phase_too_bright`) - previously there was no way to tell why a target
-  didn't show up. Projects carry only the subframes still to shoot whose
+  didn't show up. Tasks already in the DONE state are not reported there, so
+  the answer stays proportional to the backlog rather than to the archive.
+  Projects carry only the subframes still to shoot whose
   filter this telescope actually has. The response shape changed: it is no
   longer a bare `{tasks: [...]}` list. Moved out of
   `hevelius/api/routes/tasks.py` into `hevelius/api/routes/night_plan.py`,
