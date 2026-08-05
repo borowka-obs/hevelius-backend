@@ -18,9 +18,8 @@ astronomy: transit altitude, night hour-angle overlap, sun/moon at a
 representative moment, precise AltAz confirm) live in `observability.py` and
 run only on rows that survive stage 1.
 
-Ordering: `priority` descending first (the ordering signal added in OS-2),
-then tasks before projects, then newest id first - the same "highest priority,
-most recently added" order the old endpoint produced for tasks alone.
+Ordering is chosen by the caller (`strategy`), because "what should I shoot
+first" has two defensible answers and they conflict: see `STRATEGIES` below.
 """
 
 import datetime
@@ -64,6 +63,21 @@ REASON_MISSING_COORDINATES = "missing_coordinates"
 
 # `min_interval_not_elapsed` from §4.3 is deliberately not raised yet: with no
 # execution event log (OS-8) there is nothing to measure the interval since.
+
+# Ordering strategies for the planned items.
+#
+# `priority`: what the user said matters most, first - `priority` descending,
+# tasks before projects, newest id first. The order the endpoint has always
+# produced, and the default, so existing callers are unaffected.
+#
+# `setting_first`: sky order instead of preference order - west to east, so
+# targets about to set come before ones still climbing. Shooting in this order
+# is what lets a night fit the most targets in: a westerly object left for
+# later is simply gone, while an easterly one only gets better. Priority still
+# breaks ties between targets at the same place in the sky.
+STRATEGY_PRIORITY = "priority"
+STRATEGY_SETTING_FIRST = "setting_first"
+STRATEGIES = (STRATEGY_PRIORITY, STRATEGY_SETTING_FIRST)
 
 
 class NightPlanError(Exception):
@@ -513,20 +527,33 @@ def _collect_projects(cnx, scope: Telescope, night_date: datetime.date,
     return candidates
 
 
-def _sort_key(candidate: Candidate):
+def _preference_key(candidate: Candidate):
     """priority desc, tasks before projects, newest id first."""
     return (-candidate.priority, 0 if candidate.kind == "task" else 1, -candidate.ident)
 
 
+def _sort_candidates(candidates: List[Candidate], strategy: str, lst_mid_deg: float):
+    """Order the surviving candidates according to `strategy` (see STRATEGIES)."""
+    if strategy == STRATEGY_SETTING_FIRST:
+        return sorted(
+            candidates,
+            key=lambda c: (observability.transit_offset_h(c.ra_deg, lst_mid_deg),
+                           *_preference_key(c)),
+        )
+    return sorted(candidates, key=_preference_key)
+
+
 def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] = None,
-                       user_id: Optional[int] = None, explain: bool = False) -> dict:
+                       user_id: Optional[int] = None, explain: bool = False,
+                       strategy: str = STRATEGY_PRIORITY) -> dict:
     """
     Build the night plan for one telescope and one night.
 
     `night_date` labels the night per the NINA "date - 12h" rule
     (`hevelius.night.night_date`); it defaults to the night in progress at the
     telescope right now. `user_id` narrows the plan to one user's tasks and
-    project memberships.
+    project memberships. `strategy` picks the order of `items` (see
+    `STRATEGIES`); it affects ordering only, never which items are planned.
 
     `explain=True` adds an `excluded` list saying why each non-planned
     task/project was left out: it drops the SQL pre-filter so the rows that
@@ -536,6 +563,10 @@ def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] =
     archive.
     """
     started = time_module.monotonic()
+    if strategy not in STRATEGIES:
+        raise NightPlanError(
+            f"Unknown strategy {strategy!r}. Choose from: {', '.join(STRATEGIES)}.", status=400)
+
     scope = _fetch_telescope(cnx, scope_id)
 
     if night_date is None:
@@ -546,13 +577,14 @@ def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] =
     night_start, night_end = night.night_window(location, night_date, scope.timezone)
     moonrise, moonset = night.moon_rise_set(location, night_start, night_end)
     night_mid = night_start + (night_end - night_start) / 2.0
+    lst_mid_deg = night_mid.sidereal_time("apparent", longitude=location.lon).deg
 
     rejected: List[_Rejected] = []
     candidates = _collect_tasks(cnx, scope, night_start, night_end, user_id, explain, rejected)
     candidates += _collect_projects(cnx, scope, night_date, user_id, explain, rejected)
 
     items = []
-    for candidate in sorted(candidates, key=_sort_key):
+    for candidate in _sort_candidates(candidates, strategy, lst_mid_deg):
         result = observability.check_visibility(
             candidate.ra_deg, candidate.dec_deg, candidate.constraints,
             location, night_start, night_end)
@@ -585,6 +617,7 @@ def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] =
         "moonset_utc": _iso_utc(moonset),
         "moon_illumination_pct": round(night.moon_illumination_pct(night_mid), 2),
         "generated_at": _iso_utc(datetime.datetime.now(datetime.timezone.utc)),
+        "strategy": strategy,
         "items": items,
     }
     if explain:
@@ -600,8 +633,8 @@ def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] =
         ]
 
     logger.info(
-        "night-plan: scope=%s (%s) night=%s user=%s items=%d excluded=%d in %.2fs",
-        scope.scope_id, scope.name, night_date, user_id, len(items), len(rejected),
+        "night-plan: scope=%s (%s) night=%s user=%s strategy=%s items=%d excluded=%d in %.2fs",
+        scope.scope_id, scope.name, night_date, user_id, strategy, len(items), len(rejected),
         time_module.monotonic() - started,
     )
     return plan

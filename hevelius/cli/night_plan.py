@@ -50,6 +50,7 @@ def night_plan_show(args) -> int:
             night_date=night_date,
             user_id=getattr(args, "user_id", None),
             explain=getattr(args, "explain", False),
+            strategy=getattr(args, "strategy", night_plan.STRATEGY_PRIORITY),
         )
     except night_plan.NightPlanError as err:
         print(f"ERROR: {err.message}", file=sys.stderr)
@@ -71,6 +72,7 @@ def night_plan_show(args) -> int:
     print(dim(f"  sunset {_hhmm(plan['night_start_utc'])} → sunrise {_hhmm(plan['night_end_utc'])}"
               f"   moonrise {_hhmm(plan['moonrise_utc'])}  moonset {_hhmm(plan['moonset_utc'])}"
               f"   moon {plan['moon_illumination_pct']:.0f}% illuminated"))
+    print(dim(f"  ordered by {plan['strategy']}"))
     print()
 
     print(f"{'Kind':<8}  {'ID':>6}  {'Name':<24}  {'Alt':>6}  {'Az':>6}  "

@@ -107,8 +107,18 @@ class VisibilityResult:
     moon_illumination_pct: Optional[float] = None
 
 
-def _transit_offset_h(ra_deg: float, lst_mid_deg: float) -> float:
-    """Hours from night midpoint to upper transit (negative = transit before midnight)."""
+def transit_offset_h(ra_deg: float, lst_mid_deg: float) -> float:
+    """
+    Hours from night midpoint to upper transit (negative = transit before midnight).
+
+    Public because it is also the ordering signal Night Plan's `setting_first`
+    strategy (OS-4) sorts on: ascending offset runs the sky west to east, so
+    targets about to set come before ones still climbing. Doing that on this
+    value rather than on raw RA gets the 0h/24h wrap right for free - the
+    result is normalized to +/-12h around the night's own midpoint, so the
+    discontinuity sits at the anti-meridian, far from anything observable
+    tonight.
+    """
     ha_mid_deg = ((lst_mid_deg - ra_deg) + 180.0) % 360.0 - 180.0
     return -ha_mid_deg / 15.0
 
@@ -138,10 +148,10 @@ def _representative_check_time(
     constraints against a moment the target was never observable at
     (stage 4).
     """
-    transit_offset_h = _transit_offset_h(ra_deg, lst_mid_deg)
-    if abs(transit_offset_h) <= night_half_h:
-        return t_mid + transit_offset_h * u.hour
-    if transit_offset_h < -night_half_h:
+    offset_h = transit_offset_h(ra_deg, lst_mid_deg)
+    if abs(offset_h) <= night_half_h:
+        return t_mid + offset_h * u.hour
+    if offset_h < -night_half_h:
         return night_start
     return night_end
 

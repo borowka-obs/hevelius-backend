@@ -23,12 +23,18 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   didn't show up. Tasks already in the DONE state are not reported there, so
   the answer stays proportional to the backlog rather than to the archive.
   Projects carry only the subframes still to shoot whose
-  filter this telescope actually has. The response shape changed: it is no
-  longer a bare `{tasks: [...]}` list. Moved out of
+  filter this telescope actually has. The item order is selectable with
+  `strategy`: `priority` (default, the order this endpoint has always
+  produced) or `setting_first`, which runs the sky west to east so targets
+  about to set come before ones still climbing - the order that fits the most
+  targets into a night. It sorts on transit time relative to the night rather
+  than on raw RA, so the 0h/24h wrap is handled correctly.
+  The response shape changed: it is no longer a bare `{tasks: [...]}`
+  list. Moved out of
   `hevelius/api/routes/tasks.py` into `hevelius/api/routes/night_plan.py`,
   with the planning logic itself in `hevelius/night_plan.py`.
 - Added `hevelius night-plan show --scope ID [--date YYYY-MM-DD] [--user-id ID]
-  [--explain]`, the CLI twin of the endpoint above - the quickest way to answer
+  [--strategy priority|setting_first] [--explain]`, the CLI twin of the endpoint above - the quickest way to answer
   "why isn't my target in tonight's plan" without going through the web UI.
 - Added `hevelius.night.night_window()`: the sunset/sunrise search anchored at
   the site's *local* noon rather than 12:00 UTC. `get_night_times()` keeps its

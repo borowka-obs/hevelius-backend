@@ -442,6 +442,10 @@ def run():
                                         help="Observing night (YYYY-MM-DD, default: the night in progress at the telescope)")
     night_plan_show_parser.add_argument('--user-id', dest='user_id', type=int, default=None,
                                         help="Only plan this user's tasks and projects")
+    night_plan_show_parser.add_argument('--strategy', default='priority',
+                                        choices=['priority', 'setting_first'],
+                                        help="Ordering: priority (default, highest-priority work first) or "
+                                             "setting_first (west to east, so targets about to set come first)")
     night_plan_show_parser.add_argument('--explain', action='store_true',
                                         help="Also list what was excluded, and why")
     night_plan_show_parser.add_argument('--no-color', action='store_true',
