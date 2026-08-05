@@ -248,7 +248,7 @@ class TestNightPlan(unittest.TestCase):
         self._prepare_scope(cnx)
         self._insert_task(cnx, 'HighUp')
         self._insert_task(cnx, 'InQueue', state=3)
-        self._insert_task(cnx, 'AlreadyDone', state=6)
+        self._insert_task(cnx, 'Template', state=0)
         self._insert_task(cnx, 'NotYet', skip_before='2026-06-01 00:00:00')
         self._insert_task(cnx, 'Expired', skip_after='2025-06-01 00:00:00')
         self._insert_task(cnx, 'Nowhere', ra=None, decl=None)
@@ -258,10 +258,36 @@ class TestNightPlan(unittest.TestCase):
 
         self.assertEqual(sorted(self._labels(plan)), ['HighUp', 'InQueue'])
         reasons = self._reasons(plan)
-        self.assertEqual(reasons['AlreadyDone'], 'wrong_state')
+        self.assertEqual(reasons['Template'], 'wrong_state')
         self.assertEqual(reasons['NotYet'], 'outside_date_window')
         self.assertEqual(reasons['Expired'], 'outside_date_window')
         self.assertEqual(reasons['Nowhere'], 'missing_coordinates')
+
+    @use_repository(load_test_data="tests/test-data-basic.psql")
+    def test_night_plan_explain_skips_finished_tasks(self, config):
+        """
+        Explain mode says nothing about DONE tasks.
+
+        They are never planned and never asked about, and on a real archive
+        they outnumber everything else - reporting them would make the excluded
+        list grow with the archive instead of with the backlog.
+        """
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        cnx = self._db()
+        self._ensure_task_states(cnx)
+        self._prepare_scope(cnx)
+        self._insert_task(cnx, 'HighUp')
+        self._insert_task(cnx, 'AlreadyDone', state=6)
+        self._insert_task(cnx, 'Template', state=0)
+        cnx.close()
+
+        plan = self._plan(f'scope_id=1&date={NIGHT}&explain=true')
+
+        self.assertEqual(self._labels(plan), ['HighUp'])
+        reasons = self._reasons(plan)
+        self.assertNotIn('AlreadyDone', reasons)
+        self.assertEqual(reasons['Template'], 'wrong_state',
+                         "other unplannable states are still explained")
 
     @use_repository(load_test_data="tests/test-data-basic.psql")
     def test_night_plan_explain_does_not_change_the_plan(self, config):

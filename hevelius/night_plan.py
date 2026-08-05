@@ -44,6 +44,12 @@ logger = logging.getLogger(__name__)
 # 0/-1/-2 are templates and soft-deletes.
 PLANNABLE_TASK_STATES = (1, 3)
 
+# DONE. Never planned, and never explained either: a finished task is not
+# something anyone asks "why isn't this in tonight's plan" about, and on a real
+# archive it is the overwhelming majority of the rows - explaining those would
+# make the excluded list grow with the archive rather than with the backlog.
+DONE_TASK_STATE = 6
+
 # Stage-1 exclusion reasons (doc/observation-scheduler-plan.md §4.3). The
 # astronomy reasons (below_min_altitude, sun_too_high, moon_too_close,
 # moon_phase_too_bright) are raised by hevelius/observability.py instead.
@@ -261,7 +267,12 @@ def _collect_tasks(cnx, scope: Telescope, night_start: Time, night_end: Time,
         query += " AND t.user_id = %s"
         values.append(user_id)
 
-    if not explain:
+    if explain:
+        # Everything else this pre-filter would drop still gets fetched and
+        # explained; finished tasks are the one exception (see DONE_TASK_STATE).
+        query += " AND t.state <> %s"
+        values.append(DONE_TASK_STATE)
+    else:
         # Cheap pre-filter, mirroring _task_exclusion_reason. Skipped in explain
         # mode so the excluded list can name the rows this would have dropped.
         query += " AND t.state IN %s"
@@ -518,11 +529,11 @@ def compute_night_plan(cnx, scope_id: int, night_date: Optional[datetime.date] =
     project memberships.
 
     `explain=True` adds an `excluded` list saying why each non-planned
-    task/project was left out. Note that it deliberately drops the SQL
-    pre-filter to do so, so it walks *every* task on the telescope - including
-    long-finished ones - and the answer grows with the archive rather than with
-    the plan. That's the price of being able to explain a task that was
-    rejected for its state; narrow it with `user_id` on a large archive.
+    task/project was left out: it drops the SQL pre-filter so the rows that
+    filter would have removed can be named instead. Tasks in the DONE state are
+    the exception and stay out of both lists (see `DONE_TASK_STATE`), which is
+    what keeps the answer proportional to the backlog rather than to the
+    archive.
     """
     started = time_module.monotonic()
     scope = _fetch_telescope(cnx, scope_id)

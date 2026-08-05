@@ -194,7 +194,9 @@ hevelius night-plan show --scope 3 --date 2026-01-15 --user-id 12 --explain
 Exclusion reasons are `wrong_state`, `outside_date_window`,
 `outside_mount_dec_range`, `filter_not_on_scope`, `already_complete`,
 `missing_coordinates`, `below_min_altitude`, `sun_too_high`, `moon_too_close`
-and `moon_phase_too_bright`.
+and `moon_phase_too_bright`. Tasks already in the DONE state are not listed:
+they are never planned, nobody asks why, and on a real archive they would
+drown out everything worth reading.
 
 The telescope needs `lat`/`lon` and a correct `timezone` set (see
 [Telescope timezone](#telescope-timezone) above) — planning fails with an
