@@ -394,6 +394,10 @@ class TestNightPlan(unittest.TestCase):
         self.assertEqual(project['subframes'][0]['count'], 3)
         self.assertEqual(project['subframes'][0]['filter']['short_name'], 'NL')
         self.assertEqual(project['user_ids'], [])
+        # The completion fields describe the subframes returned here, i.e. the
+        # pending work this telescope can do: 7 frames of the one NL subframe.
+        self.assertFalse(project['is_complete'])
+        self.assertEqual(project['subframes_remaining'], 7)
 
         reasons = self._reasons(plan)
         self.assertEqual(reasons['NoSubframes'], 'already_complete')

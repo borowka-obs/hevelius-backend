@@ -33,6 +33,16 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   list. Moved out of
   `hevelius/api/routes/tasks.py` into `hevelius/api/routes/night_plan.py`,
   with the planning logic itself in `hevelius/night_plan.py`.
+- Every project the API returns (`GET /api/projects`, `GET /api/projects/{id}`,
+  the create/update responses and the night plan's project items) now carries
+  computed `is_complete` and `subframes_remaining` fields (OS-6, #114), so the
+  Observation Planning UI can tell at a glance what is still owed instead of
+  re-deriving it from `count`/`goal_count` per subframe. No schema change and
+  no new endpoint. Both fields cover the *active* subframes only; a subframe
+  with no `goal_count` is open-ended, so it keeps a project incomplete while
+  adding 0 to the count. The definition of "complete" now lives in one place,
+  `hevelius/projects.py`, which the night plan's `already_complete` test also
+  uses - a project the API calls complete is exactly one the night plan skips.
 - Added `hevelius night-plan show --scope ID [--date YYYY-MM-DD] [--user-id ID]
   [--strategy priority|setting_first] [--explain]`, the CLI twin of the endpoint above - the quickest way to answer
   "why isn't my target in tonight's plan" without going through the web UI.

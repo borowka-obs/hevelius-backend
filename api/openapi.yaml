@@ -729,6 +729,20 @@ components:
           items:
             type: integer
           description: User IDs associated with the project
+        is_complete:
+          type: boolean
+          description: >
+            Computed, not stored: no active subframe has anything left to shoot. A subframe
+            without a goal_count is open-ended and never complete; a project with no subframes
+            at all counts as complete. In a night plan item this describes only the subframes
+            returned there (pending ones this telescope can shoot).
+        subframes_remaining:
+          type: integer
+          description: >
+            Computed, not stored: frames still to capture, summed over the active subframes
+            (goal_count - count). Subframes without a goal_count add 0, so read this together
+            with is_complete rather than instead of it. In a night plan item this counts only
+            the subframes returned there.
     ProjectCreate:
       type: object
       required:

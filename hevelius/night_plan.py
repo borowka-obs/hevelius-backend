@@ -34,6 +34,7 @@ from astropy.time import Time
 from astropy import units as u
 
 from hevelius import db, night, observability
+from hevelius import projects as projects_lib
 from hevelius.observability import Constraints
 
 logger = logging.getLogger(__name__)
@@ -359,21 +360,6 @@ def _project_row_to_dict(row):
     }
 
 
-def _subframe_pending(subframe) -> bool:
-    """
-    Is there anything left to shoot for this subframe?
-
-    Inactive subframes never count. A NULL goal_count means "no target set",
-    which is treated as open-ended rather than complete - a project nobody has
-    given a goal to is still something the telescope can work on.
-    """
-    if not subframe["active"]:
-        return False
-    if subframe["goal_count"] is None:
-        return True
-    return (subframe["count"] or 0) < subframe["goal_count"]
-
-
 def _fetch_subframes(cnx, project_ids):
     """Subframes of the given projects, grouped by project_id."""
     if not project_ids:
@@ -499,11 +485,14 @@ def _collect_projects(cnx, scope: Telescope, night_date: datetime.date,
         project["user_ids"] = users.get(project["project_id"], [])
         reason = _project_exclusion_reason(project, scope, night_date)
         if reason is None:
-            pending = [s for s in subframes.get(project["project_id"], []) if _subframe_pending(s)]
+            pending = [s for s in subframes.get(project["project_id"], []) if projects_lib.subframe_pending(s)]
             on_scope = [s for s in pending if s["filter_id"] in scope_filters]
             reason = _subframe_exclusion_reason(pending, on_scope)
-            # Only the work this telescope can still do is worth returning.
+            # Only the work this telescope can still do is worth returning - and
+            # the completion fields describe exactly those subframes, not the
+            # project's full backlog.
             project["subframes"] = on_scope
+            project.update(projects_lib.completion(on_scope))
 
         if reason is not None:
             if explain:
