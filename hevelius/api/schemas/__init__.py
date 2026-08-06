@@ -569,6 +569,16 @@ class ProjectSchema(Schema):
     priority = fields.Integer(metadata={"description": "Ordering signal for Night Plan / Observation Planning (higher first)"})
     subframes = fields.List(fields.Nested(ProjectSubframeSchema))
     user_ids = fields.List(fields.Integer())
+    is_complete = fields.Boolean(
+        metadata={"description": "Computed: no active subframe has anything left to shoot. A subframe without a "
+                                 "goal_count is open-ended and never complete; a project with no subframes at all "
+                                 "counts as complete"}
+    )
+    subframes_remaining = fields.Integer(
+        metadata={"description": "Computed: frames still to capture, summed over the active subframes "
+                                 "(goal_count - count). Subframes without a goal_count add 0 - read this "
+                                 "together with is_complete, not instead of it"}
+    )
 
 
 class ProjectCreateSchema(Schema):
@@ -690,7 +700,8 @@ class NightPlanItemSchema(Schema):
     task = fields.Nested(Task, allow_none=True, metadata={"description": "The task, when kind is 'task'"})
     project = fields.Nested(
         ProjectSchema, allow_none=True,
-        metadata={"description": "The project, when kind is 'project'; subframes are limited to pending ones this telescope can shoot"}
+        metadata={"description": "The project, when kind is 'project'; subframes are limited to pending ones this "
+                                 "telescope can shoot, and subframes_remaining counts only those"}
     )
     visibility = fields.Nested(NightPlanVisibilitySchema, metadata={"description": "Computed visibility metadata"})
 
