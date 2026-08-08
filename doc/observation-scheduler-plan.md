@@ -47,6 +47,13 @@ observation scheduler:
 > and a `night.night_window()` bug fix (local-noon anchor, not UTC-noon —
 > the old anchor was wrong at ~UTC+12 sites). Response shape is a breaking
 > change from the old endpoint, as expected — **OS-5 and OS-12 are next**.
+>
+> **Revisions (2026-08-08)**: **OS-5 implemented** — merged in
+> [hevelius-web PR #173](https://github.com/borowka-obs/hevelius-web/pull/173),
+> issue `web#164` closed (it wasn't auto-closed by the merge, closed
+> manually). **OS-12 (runner) is next** on the Night Plan track; OS-6/OS-7
+> (Observation Planning) and OS-11 (NINA spike) remain independently
+> available in the meantime.
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
@@ -913,7 +920,7 @@ since OS-2 is schema-only and this is application code.
 | **OS-2** | Data model: telescopes, projects, tasks | backend | — | M | **Implemented** ([PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115), merged) | backend#112 (closed) |
 | **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | **Implemented** ([PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118), merged) | backend#113 (closed) |
 | **OS-4** | Night Plan API rewrite | backend | OS-3 | M | **Implemented** ([PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119), merged) | backend#46 (closed) |
-| **OS-5** | Night Plan web UI | web | OS-4 | S–M | Planned | web#164 (pre-existing, updated) |
+| **OS-5** | Night Plan web UI | web | OS-4 | S–M | **Implemented** ([PR #173](https://github.com/borowka-obs/hevelius-web/pull/173), merged) | web#164 (closed) |
 | **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned | backend#114 |
 | **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned | web#170 |
 | **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned | — |
@@ -986,10 +993,17 @@ show` CLI shipped in the same PR. 21 new tests in
 OS-12 (both written against the old bare `{"tasks": [...]}` shape) need
 updating against the new one, exactly as sequenced.
 
-**OS-5 — Night Plan web UI.** Rewrite `NightPlanComponent`/
-`NightPlanService` against the OS-4 contract: telescope selector defaulted
-from `users/me/preferences.default_scope`, date picker, visibility badges,
-explain-mode toggle.
+**OS-5 — Night Plan web UI. Implemented** in
+[PR #173](https://github.com/borowka-obs/hevelius-web/pull/173) (merged):
+`NightPlanComponent`/`NightPlanService` rewritten against the OS-4
+contract — telescope selector defaulted from
+`users/me/preferences.default_scope` (falling back to the first active
+telescope), date picker with a "Tonight" shortcut, visibility metadata
+(max altitude, Moon separation, best time) for both tasks and projects,
+explain-mode toggle. New `src/app/models/night-plan.ts` for the
+request/response types. One fix beyond the brief: Night Plan is now linked
+from the main menu — the route existed before but wasn't reachable from
+the nav.
 
 **OS-6 — Observation Planning: backend additions.** Computed
 `is_complete`/`subframes_remaining` on project list/detail; wire `priority`
