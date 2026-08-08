@@ -2259,6 +2259,87 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(data['project']['description'], 'Brand new description')
         os.environ.pop('HEVELIUS_DB_NAME')
 
+    # ── computed completion fields (OS-6) ───────────────────────────────────
+
+    def _create_project(self, name_prefix):
+        """Create a bare project and return its id."""
+        suf = datetime.now().strftime('%H%M%S%f')
+        body = {"name": f"{name_prefix}{suf}", "scope_id": 1, "ra": 0.3, "decl": 12.0}
+        response = self.app.post('/api/projects', data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.data)
+        return json.loads(response.data)['project_id']
+
+    def _add_subframe(self, project_id, **body):
+        """Add a subframe to a project and return its id."""
+        body.setdefault("filter_id", 1)
+        body.setdefault("exposure_time", 60.0)
+        response = self.app.post(f'/api/projects/{project_id}/subframes',
+                                 data=json.dumps(body), headers=self.headers)
+        self.assertEqual(response.status_code, 201, response.data)
+        return json.loads(response.data)['subframe_id']
+
+    def _get_project(self, project_id):
+        response = self.app.get(f'/api/projects/{project_id}', headers=self.headers)
+        self.assertEqual(response.status_code, 200, response.data)
+        return json.loads(response.data)['project']
+
+    @use_repository
+    def test_project_completion_counts_frames_still_to_shoot(self, config):
+        """is_complete/subframes_remaining track the subframes' progress."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        project_id = self._create_project('Completion')
+
+        # No subframes at all: nothing left to shoot, so complete.
+        project = self._get_project(project_id)
+        self.assertTrue(project['is_complete'])
+        self.assertEqual(project['subframes_remaining'], 0)
+
+        first = self._add_subframe(project_id, count=3, goal_count=10)
+        self._add_subframe(project_id, count=1, goal_count=5)
+        project = self._get_project(project_id)
+        self.assertFalse(project['is_complete'])
+        self.assertEqual(project['subframes_remaining'], 11)
+
+        # Finish the first subframe; only the second one is still owed.
+        response = self.app.patch(f'/api/projects/{project_id}/subframes/{first}',
+                                  data=json.dumps({"count": 10}), headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        project = self._get_project(project_id)
+        self.assertFalse(project['is_complete'])
+        self.assertEqual(project['subframes_remaining'], 4)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_project_completion_ignores_inactive_subframes(self, config):
+        """A subframe switched off is not work the project is waiting on."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        project_id = self._create_project('InactiveSub')
+        self._add_subframe(project_id, count=0, goal_count=20, active=False)
+        self._add_subframe(project_id, count=8, goal_count=8)
+
+        project = self._get_project(project_id)
+        self.assertTrue(project['is_complete'])
+        self.assertEqual(project['subframes_remaining'], 0)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
+    @use_repository
+    def test_projects_list_includes_completion_fields(self, config):
+        """The list response carries the same computed fields as the detail one."""
+        os.environ['HEVELIUS_DB_NAME'] = config['database']
+        project_id = self._create_project('ListCompletion')
+        self._add_subframe(project_id, count=2, goal_count=12)
+
+        listed = json.loads(
+            self.app.get('/api/projects?per_page=1000', headers=self.headers).data
+        )['projects']
+        for project in listed:
+            self.assertIn('is_complete', project)
+            self.assertIn('subframes_remaining', project)
+        ours = next(p for p in listed if p['project_id'] == project_id)
+        self.assertFalse(ours['is_complete'])
+        self.assertEqual(ours['subframes_remaining'], 10)
+        os.environ.pop('HEVELIUS_DB_NAME')
+
     # ── rotation field tests ──────────────────────────────────────────────────
 
     @use_repository

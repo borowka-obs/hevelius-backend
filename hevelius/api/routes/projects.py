@@ -10,6 +10,7 @@ from flask_smorest import abort
 
 
 from hevelius import db
+from hevelius import projects as projects_lib
 from hevelius.equipment import find_similar_project_names
 from hevelius.api.auth_utils import (
     jwt_user_id_int,
@@ -84,7 +85,11 @@ def _normalize_publications(val):
 
 
 def _project_row_to_dict(r, subframes=None, user_ids=None):
-    """Build project dict from a projects SELECT row (includes last_updated, total_integration_time, dates)."""
+    """Build project dict from a projects SELECT row (includes last_updated, total_integration_time, dates).
+
+    is_complete/subframes_remaining are computed from the subframes as returned here
+    (see hevelius.projects), so the numbers always agree with the counts alongside them.
+    """
     return {
         "project_id": r[0], "name": r[1], "description": r[2], "regexps": r[3], "scope_id": r[4], "ra": r[5], "decl": r[6], "active": r[7],
         "last_updated": r[8], "total_integration_time": float(r[9]) if r[9] is not None else 0.0,
@@ -95,7 +100,8 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
         "focal": r[14], "resx": r[15], "resy": r[16], "pixel_x": r[17], "pixel_y": r[18],
         "min_alt": r[19], "moon_distance": r[20], "max_moon_phase": r[21], "max_sun_alt": r[22],
         "min_interval": r[23], "priority": r[24],
-        "subframes": subframes or [], "user_ids": user_ids or []
+        "subframes": subframes or [], "user_ids": user_ids or [],
+        **projects_lib.completion(subframes),
     }
 
 
