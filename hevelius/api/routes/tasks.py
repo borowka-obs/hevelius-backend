@@ -8,7 +8,7 @@ from flask_jwt_extended import jwt_required
 
 
 from hevelius import db, config as hevelius_config
-from hevelius import stats
+from hevelius import sky_grid
 from hevelius.version import VERSION
 from hevelius.api.auth_utils import (
     jwt_user_id_int,
@@ -25,6 +25,7 @@ from hevelius.api.schemas import (
     TaskUpdateResponseSchema,
     TasksFilenameListQuerySchema,
     TasksFilenameListResponseSchema,
+    TasksHistogramQuerySchema,
     TasksHistogramSchema,
     TasksList,
     TasksRequestSchema,
@@ -145,12 +146,19 @@ class TaskAddResource(MethodView):
 @blp.route("/tasks/histogram")
 class TasksHistogramResource(MethodView):
     @jwt_required()
+    @blp.arguments(TasksHistogramQuerySchema, location="query")
     @blp.response(200, TasksHistogramSchema)
-    def get(self):
-        """Sky density histogram of completed plate-solved tasks (1° bins)."""
+    def get(self, args):
+        """Sky density grid of tasks (switchable resolution, mode, scope, project overlay)."""
         cnx = db.connect()
         try:
-            return stats.sky_histogram_payload(cnx)
+            return sky_grid.sky_grid_payload(
+                cnx,
+                resolution_deg=args["resolution_deg"],
+                mode=args["mode"],
+                scope_id=args.get("scope_id"),
+                include_projects=args["include_projects"],
+            )
         finally:
             cnx.close()
 

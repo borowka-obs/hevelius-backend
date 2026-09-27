@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from marshmallow import Schema, fields, ValidationError, validate, validates_schema
 
 from hevelius.night_plan import STRATEGIES, STRATEGY_PRIORITY
+from hevelius.sky_grid import RESOLUTIONS_DEG
 
 
 def _validate_iana_timezone(value):
@@ -256,14 +257,60 @@ class TasksList(Schema):
     pages = fields.Integer(required=True, metadata={"description": "Total number of pages"})
 
 
+class TasksHistogramQuerySchema(Schema):
+    resolution_deg = fields.Integer(
+        load_default=1,
+        validate=validate.OneOf(RESOLUTIONS_DEG),
+        metadata={"description": "Grid bin size in degrees"},
+    )
+    mode = fields.String(
+        load_default="completed",
+        validate=validate.OneOf(["all", "completed"]),
+        metadata={
+            "description": (
+                "'completed': state=6 plate-solved frames only. "
+                "'all': every non-template, non-deleted task (state >= 1), "
+                "bucketed by solved position when available, else nominal target position."
+            )
+        },
+    )
+    scope_id = fields.Integer(
+        load_default=None,
+        metadata={"description": "Filter by telescope/scope ID (omit for all scopes)"},
+    )
+    include_projects = fields.Boolean(
+        load_default=False,
+        metadata={
+            "description": (
+                "Include distinct project_count per bucket (projects with "
+                ">=1 task in that bucket, under the active mode and scope filter)"
+            )
+        },
+    )
+
+
 class TasksHistogramCellSchema(Schema):
     ra_deg = fields.Integer(required=True, metadata={"description": "RA bin in degrees (0–359)"})
     decl_deg = fields.Integer(required=True, metadata={"description": "Declination bin in degrees"})
-    count = fields.Integer(required=True, metadata={"description": "Frame count in this bin"})
+    count = fields.Integer(required=True, metadata={"description": "Task count in this bin under the active mode"})
+    completed_count = fields.Integer(
+        required=True, metadata={"description": "Completed (state=6) task count in this bin, regardless of mode"}
+    )
+    project_count = fields.Integer(
+        required=True, allow_none=True,
+        metadata={
+            "description": (
+                "Distinct project count in this bin under the active mode; "
+                "null unless include_projects=true"
+            )
+        }
+    )
 
 
 class TasksHistogramSchema(Schema):
     resolution_deg = fields.Integer(required=True)
+    mode = fields.String(required=True)
+    scope_id = fields.Integer(required=True, allow_none=True)
     ra_bins = fields.Integer(required=True)
     decl_bins = fields.Integer(required=True)
     ra_unit = fields.String(required=True)

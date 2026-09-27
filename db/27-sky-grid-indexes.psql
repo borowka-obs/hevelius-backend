@@ -1,0 +1,13 @@
+-- Schema version 27: indexes to keep the sky density grid (GET /api/tasks/histogram)
+-- and other tasks.{state,scope_id,ra,decl,he_solved_ra,he_solved_dec} filters fast
+-- as the tasks table grows toward ~1M rows. None of these columns were indexed before.
+
+CREATE INDEX IF NOT EXISTS tasks_state_idx ON tasks (state);
+CREATE INDEX IF NOT EXISTS tasks_scope_id_idx ON tasks (scope_id);
+CREATE INDEX IF NOT EXISTS tasks_state_scope_id_idx ON tasks (state, scope_id);
+CREATE INDEX IF NOT EXISTS tasks_he_solved_ra_decl_idx ON tasks (he_solved_ra, he_solved_dec)
+    WHERE he_solved_ra IS NOT NULL;
+CREATE INDEX IF NOT EXISTS tasks_ra_decl_idx ON tasks (ra, decl)
+    WHERE ra IS NOT NULL;
+
+UPDATE schema_version SET version = 27;

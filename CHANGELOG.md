@@ -5,6 +5,19 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
 
 ## 0.7.0 (unreleased)
 
+- Rewrote `GET /api/tasks/histogram` (schema v27) as a real SQL-side
+  aggregation instead of fetching every matching row into Python - the old
+  version (added but never wired up to the frontend) hardcoded 1° bins and
+  `state=6` plate-solved frames only, and wouldn't have scaled past ~1M rows.
+  It now accepts `resolution_deg` (1/2/5/10), `mode` (`all` or `completed`),
+  an optional `scope_id` filter, and `include_projects` (adds a per-bucket
+  distinct project count). A task's bucket is always
+  `COALESCE(he_solved_ra, ra*15)`/`COALESCE(he_solved_dec, decl)` regardless
+  of mode, so a task's cell never moves when switching modes. New indexes on
+  `tasks.state`, `tasks.scope_id`, `tasks.he_solved_ra`/`he_solved_dec` and
+  `tasks.ra`/`decl` (none existed before) keep the underlying filter cheap
+  as the table grows. New generic `hevelius.sky_grid` module backs both this
+  endpoint and the `hevelius task groups` CLI command.
 - Rewrote `GET`/`POST /api/night-plan` (OS-4, #46) as a real visibility
   endpoint. It used to filter tasks by telescope, state and date only - it
   never looked at `ra`/`decl`, so nothing about it was actually about
