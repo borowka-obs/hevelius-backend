@@ -63,7 +63,7 @@ pycparser==3.0
     # via cffi
 pyerfa==2.0.1.5
     # via astropy
-pyjwt==2.13.0
+pyjwt==2.15.0
     # via
     #   -r requirements.in
     #   flask-jwt-extended
