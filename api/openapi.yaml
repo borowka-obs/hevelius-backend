@@ -186,26 +186,40 @@ components:
           description: Total number of pages
     TasksHistogramCell:
       type: object
-      required: [ra_deg, decl_deg, count]
+      required: [ra_deg, decl_deg, count, completed_count, project_count]
       properties:
         ra_deg:
           type: integer
-          description: Right Ascension bin centre in degrees (0–359)
+          description: Right Ascension bin origin in degrees (0–359)
           minimum: 0
           maximum: 359
         decl_deg:
           type: integer
-          description: Declination bin centre in degrees (−90–90)
+          description: Declination bin origin in degrees (−90–90)
           minimum: -90
           maximum: 90
         count:
           type: integer
-          description: Number of completed plate-solved frames in this bin
+          description: Task count in this bin under the active `mode`
+          minimum: 0
+        completed_count:
+          type: integer
+          description: Completed (state=6) task count in this bin, regardless of `mode`
+          minimum: 0
+        project_count:
+          type: integer
+          nullable: true
+          description: >
+            Distinct project count in this bin (projects with at least one
+            task here, under the active mode and scope filter). Null unless
+            `include_projects=true` was requested.
           minimum: 0
     TasksHistogram:
       type: object
       required:
         - resolution_deg
+        - mode
+        - scope_id
         - ra_bins
         - decl_bins
         - ra_unit
@@ -213,21 +227,35 @@ components:
         - nonempty_cells
         - cells
       description: >
-        Sky density of completed (state=6), plate-solved tasks in 1°×1° bins.
-        RA is in degrees (0–359). Declination rows cover +90…−89 (180 bins).
-        Only non-empty bins are returned in `cells`.
+        Sky density grid of tasks, binned by resolution_deg x resolution_deg
+        cells. A task's cell is COALESCE(he_solved_ra, ra*15deg) /
+        COALESCE(he_solved_dec, decl) — the actual plate-solved frame center
+        when available, else the nominal target position — so a task's cell
+        is stable whether `mode` is "all" or "completed". Only non-empty
+        bins (under the active mode) are returned in `cells`.
       properties:
         resolution_deg:
           type: integer
-          description: Bin size in degrees (currently always 1)
+          enum: [1, 2, 5, 10]
+          description: Bin size in degrees, as requested
           example: 1
+        mode:
+          type: string
+          enum: [all, completed]
+          description: >
+            "completed": state=6 plate-solved frames only. "all": every
+            non-template, non-deleted task (state >= 1).
+        scope_id:
+          type: integer
+          nullable: true
+          description: Telescope/scope filter that was applied, or null for all scopes
         ra_bins:
           type: integer
-          description: Number of RA bins (0..ra_bins-1 degrees)
+          description: Number of RA bins (360 / resolution_deg)
           example: 360
         decl_bins:
           type: integer
-          description: Number of declination bins
+          description: Number of declination bins (180 / resolution_deg)
           example: 180
         ra_unit:
           type: string
@@ -235,10 +263,10 @@ components:
           description: Unit of ra_deg values
         total_frames:
           type: integer
-          description: Total frames included in the histogram
+          description: Sum of `count` across all returned cells
         nonempty_cells:
           type: integer
-          description: Number of bins with count > 0
+          description: Number of bins with count > 0 under the active mode
         cells:
           type: array
           items:
@@ -2323,10 +2351,44 @@ paths:
         - bearerAuth: []
   /api/tasks/histogram:
     get:
-      summary: Sky density histogram of completed tasks
+      summary: Sky density grid of tasks
       description: >
-        Returns a sparse 1°×1° histogram of completed (state=6), plate-solved
-        frames across the sky (RA/Dec). Suitable for heatmap visualisation.
+        Returns a sparse sky density grid of tasks (RA/Dec), suitable for
+        heatmap visualisation. Switchable bin resolution, all-tasks vs.
+        completed-only mode, optional telescope/scope filter, and an
+        optional per-bucket distinct project count.
+      parameters:
+        - name: resolution_deg
+          in: query
+          description: Grid bin size in degrees
+          required: false
+          schema:
+            type: integer
+            enum: [1, 2, 5, 10]
+            default: 1
+        - name: mode
+          in: query
+          description: >
+            "completed": state=6 plate-solved frames only (default).
+            "all": every non-template, non-deleted task (state >= 1).
+          required: false
+          schema:
+            type: string
+            enum: [all, completed]
+            default: completed
+        - name: scope_id
+          in: query
+          description: Filter by telescope/scope ID (omit for all scopes)
+          required: false
+          schema:
+            type: integer
+        - name: include_projects
+          in: query
+          description: Include distinct project_count per bucket
+          required: false
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Sky histogram data
