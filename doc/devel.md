@@ -18,9 +18,16 @@ python -m hevelius.api
 
 4. Run Flask app: `python -m hevelius.api` (add `--host`/`--port` to change the bind address, e.g. `--host 0.0.0.0 --port 5001`)
 
-5. Retrieve the list of tasks:
+5. Retrieve the list of tasks (the API is JWT-authenticated; log in first to get a token):
 
-curl -X POST http://127.0.0.1:5001/api/tasks -H 'Content-type: application/json' -d '{  limit: 10, user_id: 3, password: "digest-here" }'
+```shell
+TOKEN=$(curl -s -X POST http://127.0.0.1:5001/api/login \
+    -H 'Content-type: application/json' \
+    -d '{"username": "thomson", "password": "secret1"}' | jq -r .token)
+
+curl -s http://127.0.0.1:5001/api/tasks?user_id=3\&per_page=10 \
+    -H "Authorization: Bearer $TOKEN"
+```
 
 ## Running in gunicorn
 
@@ -54,46 +61,18 @@ localhost:5432:hevelius:hevelius:secret1
 
 ## Fast DB tests
 
-The DB can be run in two modes: slow (using incremental migrations) or fast (using template database).
+`tests/dbtest.py` keeps one migrated template database per `pytest` run and clones
+test databases from it, instead of running the full incremental migration for every
+test case:
 
-Here's the final comparison:
+- First test: creates the test DB, runs the full incremental migration
+  (`hevelius db migrate`) against it, then saves it as a `..._template` database.
+- Every later test: clones a fresh test DB from that template with
+  `CREATE DATABASE ... WITH TEMPLATE ...` (near-instant — a filesystem-level copy),
+  skipping the migration entirely.
+- Test data (e.g. `tests/test-data.psql`) is loaded into the cloned DB after cloning,
+  per test case — it is not baked into the shared template.
+- At process exit, the template database is dropped (via `atexit`).
 
-Performance Results
-
-------------------------------|---------------|--------
-Mode                          | 57 tests      | Speedup
-------------------------------|---------------|----
-Fast (template database)      |	~10.2 seconds | ~4x faster
-------------------------------|---------------|--------
-Slow (incremental migrations) |	~39.9 seconds | baseline
-
-The DB template solution that makes your tests run approximately 4x faster while keeping the incremental schema files for production deployments. Here's what was created/modified:
-
-The consolidated schem is available in db/schema-consolidated.psql - A consolidated schema file representing the final schema state (version 14). This is used only for testing and contains all tables, indexes, and constraints in their final form.
-
-tests/conftest.py - A pytest configuration file that automatically cleans up template databases at the end of the test session.
-
-tests/dbtest.py - Updated to use PostgreSQL's template database feature:
-Creates template databases once per test session (one per unique load_test_data file)
-Uses CREATE DATABASE ... TEMPLATE to clone databases instantly
-Falls back to incremental migrations if HEVELIUS_SLOW_TESTS=1 is set
-
-Automatically handles different test data files with separate templates
-
-How It Works
-
-First test run: Creates a template database using the consolidated schema + test data
-Subsequent tests: Clone the template database (nearly instant via filesystem copy)
-End of session: Clean up all template databases
-
-Environment Variables
-
-Default behavior: Fast mode using template databases
-HEVELIUS_SLOW_TESTS=1: Use incremental migrations (useful for testing the actual migration path)
-HEVELIUS_DEBUG: Keep test databases for debugging
-
-Keeping Schema in Sync
-
-When you add new incremental migration files, you'll need to update db/schema-consolidated.psql to reflect the changes. The consolidated file includes a comment header explaining this. You can either:
-Manually update it based on the new migration
-Apply all migrations to a fresh database and dump the schema
+Set `HEVELIUS_DEBUG=1` to keep the per-test database around afterwards instead of
+dropping it, for debugging.

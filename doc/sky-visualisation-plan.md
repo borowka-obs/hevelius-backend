@@ -1,13 +1,20 @@
 # Sky Visualisation — Implementation Plan
 
+Status: **implemented**. Backend (schema v23 + API) and frontend (hevelius-web:
+`SkyViewComponent`, `SkyMapComponent` at `/sky-map`, and the add-project form's FOV
+preview) are all in place; see the implementation order checklist at the bottom.
+hevelius-web also went beyond this plan with a `/sky-heatmap` page (a sky-density
+grid, backed by `GET /api/tasks/histogram` and schema v27). This document is kept
+for historical context on the original design.
+
 ## Overview
 
 Add sky visualisation to the project detail page showing the telescope's camera field-of-view (FOV) frame overlaid on a real sky background, centred on the project's RA/Dec target. Projects now store the optical parameters needed for FOV calculation directly, copied from the telescope and sensor at creation time and editable afterwards.
 
 ## Scope
 
-- **Backend** (this PR): add `rotation`, `focal`, `resx`, `resy`, `pixel_x`, `pixel_y` to `projects` (schema v23); expose via API — ✅ in progress
-- **Frontend** (hevelius-web, follow-up): new Angular component + service, sky map showing all projects, add-project form FOV preview
+- **Backend** (this PR): add `rotation`, `focal`, `resx`, `resy`, `pixel_x`, `pixel_y` to `projects` (schema v23); expose via API — ✅ done
+- **Frontend** (hevelius-web, follow-up): new Angular component + service, sky map showing all projects, add-project form FOV preview — ✅ done
 
 Tasks are explicitly **out of scope** — the visualisation is based solely on the project's nominal pointing and the stored optical geometry.
 
@@ -202,13 +209,13 @@ Pass the result to `A.polygon(corners)` in the Aladin overlay.
 
 1. ✅ Schema v23 — `rotation` + optical params on `projects` (this PR)
 2. ✅ API — expose new fields on all project endpoints (this PR)
-3. `npm install aladin-lite` in hevelius-web
-4. Update `Project` model with new fields
-5. Create `SkyViewComponent` (Aladin init + FOV rectangle overlay)
-6. Wire `<app-sky-view>` into `ProjectDetailComponent` using stored params
-7. Build `SkyMapComponent` for all-projects view; add route `/sky-map`
-8. Extend add-project form with sensor-derived FOV preview
-9. Test with a few real projects (Orion Nebula, Crab Nebula, etc.)
+3. ✅ `npm install aladin-lite` in hevelius-web
+4. ✅ Update `Project` model with new fields
+5. ✅ Create `SkyViewComponent` (Aladin init + FOV rectangle overlay)
+6. ✅ Wire `<app-sky-view>` into `ProjectDetailComponent` using stored params
+7. ✅ Build `SkyMapComponent` for all-projects view; add route `/sky-map`
+8. ✅ Extend add-project form with sensor-derived FOV preview
+9. ✅ Test with a few real projects (Orion Nebula, Crab Nebula, etc.)
 
 ---
 

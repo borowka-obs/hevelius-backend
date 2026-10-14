@@ -6,10 +6,10 @@ The command-line can be accessed the following way:
 ```shell
 $ python bin/hevelius --help
 usage: hevelius [-h]
-                {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid} ...
+                {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,night-plan,asteroid} ...
 
 positional arguments:
-  {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,asteroid}
+  {config,version,doctor,db,repo,task,catalog,filter,sensor,project,telescope,user,night-plan,asteroid}
                         commands
     config              Shows current Hevelius (DB,file repository) configuration.
     version             Shows the current Hevelius version.
@@ -23,6 +23,7 @@ positional arguments:
     project             List, add, edit, show project or manage subframes
     telescope           List, add, edit, show telescope or manage sensor/filters
     user                List, add, enable, or disable a user
+    night-plan          Night observing plan (what a telescope can shoot tonight)
     asteroid            Asteroid observation planning (MPC orbits, visibility)
 
 options:
