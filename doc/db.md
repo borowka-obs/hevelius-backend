@@ -20,9 +20,17 @@ python bin/hevelius migrate
 
 he_solved_ra - Right Ascension, from the plate solving, in degrees (0-359)
 
+### Schema version 27 (sky grid indexes)
+
+- **tasks** – Added indexes on **state**, **scope_id**, the combined **(state, scope_id)**,
+  **(he_solved_ra, he_solved_dec)** (partial, where `he_solved_ra IS NOT NULL`), and
+  **(ra, decl)** (partial, where `ra IS NOT NULL`). None of these columns were indexed
+  before; they keep `tasks.*` filters and the sky density grid (`GET /api/tasks/histogram`)
+  fast as the table grows toward ~1M rows.
+
 ### Schema version 26 (OS-2: telescope timezone, project constraints, priority)
 
-Part of the observation scheduler plan (`doc/observation-scheduler-plan.md`, OS-2).
+Part of the observation scheduler plan (OS-2).
 
 - **telescopes** – Added **timezone** (varchar 64, NOT NULL, default `'UTC'`): IANA
   timezone name (e.g. `Europe/Warsaw`) used to compute the observing night boundary
@@ -79,14 +87,3 @@ Part of the observation scheduler plan (`doc/observation-scheduler-plan.md`, OS-
 - **filters** – Optical filters: filter_id (PK), short_name (≤8 chars), full_name, url, active (default true). Many-to-many with telescopes via **telescope_filters**.
 - **sensors** – Extended with vendor, url, active (default true). Telescope uses at most one sensor (camera); the same sensor can be used on multiple telescopes.
 - **projects** – name, description, scope_id, ra, decl, active (default true). **project_subframes**: filter_id, exposure_time, goal_count (integer), active (default true). **project_users**: many-to-many with users. **task_projects**: tasks can belong to zero or more projects.
-
-
-## Setting up MySQL database (obsolete)
-
-Setting up a new database goes the usual way:
-
-```sql
-CREATE DATABASE hevelius;
-CREATE USER 'hevelius'@'192.0.2.1' IDENTIFIED BY 'password';
-GRANT ALL on hevelius.* to 'hevelius'@'192.0.2.1';
-```
