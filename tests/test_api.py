@@ -1881,7 +1881,7 @@ class TestProjectOperations(unittest.TestCase):
 
     @use_repository
     def test_project_subframe_add(self, config):
-        """Add subframe to project."""
+        """Add subframe to project; goal_count alone must not fill in count."""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
         body = {"filter_id": 1, "exposure_time": 60.0, "goal_count": 20, "active": True}
         response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
@@ -1889,11 +1889,18 @@ class TestProjectOperations(unittest.TestCase):
         self.assertEqual(response.status_code, 201)
         self.assertTrue(data['status'])
         self.assertIn('subframe_id', data)
+
+        project = json.loads(self.app.get('/api/projects/1', headers=self.headers).data)['project']
+        sf = next(s for s in project['subframes'] if s['id'] == data['subframe_id'])
+        self.assertEqual(sf['count'], 0)
+        self.assertEqual(sf['goal_count'], 20)
+        self.assertFalse(project['is_complete'])
+        self.assertGreaterEqual(project['subframes_remaining'], 20)
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository
     def test_project_subframe_add_defaults_count_to_zero(self, config):
-        """Subframe count defaults to 0 when neither count nor goal_count is provided."""
+        """Omitted count starts at 0; omitted goal_count stays open-ended (null)."""
         os.environ['HEVELIUS_DB_NAME'] = config['database']
         body = {"filter_id": 1, "exposure_time": 60.0, "active": True}
         response = self.app.post('/api/projects/1/subframes', data=json.dumps(body), headers=self.headers)
@@ -1904,7 +1911,7 @@ class TestProjectOperations(unittest.TestCase):
         get_data = json.loads(get_resp.data)
         sf = next(s for s in get_data['project']['subframes'] if s['id'] == subframe_id)
         self.assertEqual(sf['count'], 0)
-        self.assertEqual(sf['goal_count'], 0)
+        self.assertIsNone(sf['goal_count'])
         os.environ.pop('HEVELIUS_DB_NAME')
 
     @use_repository

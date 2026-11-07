@@ -56,6 +56,11 @@ and this project versioning adheres to [Semantic Versioning](https://semver.org/
   adding 0 to the count. The definition of "complete" now lives in one place,
   `hevelius/projects.py`, which the night plan's `already_complete` test also
   uses - a project the API calls complete is exactly one the night plan skips.
+- API: `POST /api/projects/{id}/subframes` no longer mirrors `count` and
+  `goal_count`. They are independent on create (as they already were on PATCH):
+  omitted `count` defaults to 0; omitted `goal_count` stays open-ended. Projects
+  API subframe `count` also no longer falls back to `goal_count` when the DB
+  value is missing - it uses 0, matching the night plan.
 - Added `hevelius night-plan show --scope ID [--date YYYY-MM-DD] [--user-id ID]
   [--strategy priority|setting_first] [--explain]`, the CLI twin of the endpoint above - the quickest way to answer
   "why isn't my target in tonight's plan" without going through the web UI.
