@@ -583,7 +583,7 @@ class ProjectSubframeSchema(Schema):
     filter = fields.Nested(FilterSchema, allow_none=True)
     exposure_time = fields.Float()
     count = fields.Integer()
-    goal_count = fields.Integer()
+    goal_count = fields.Integer(allow_none=True)
     active = fields.Boolean()
     last_updated = fields.DateTime(allow_none=True)
 

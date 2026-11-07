@@ -590,7 +590,8 @@ components:
           description: Number of captured subframes (optional; defaults to 0)
         goal_count:
           type: integer
-          description: Target number of subframes
+          nullable: true
+          description: Target number of subframes; null means open-ended (never complete)
         active:
           type: boolean
         last_updated:
@@ -601,7 +602,11 @@ components:
       type: object
       required:
         - exposure_time
-      description: Specify exactly one of filter (short name) or filter_id; not both. count and goal_count are aliases.
+      description: |
+        Specify exactly one of filter (short name) or filter_id; not both.
+        count (captured frames) and goal_count (target) are independent — not
+        mirrored. Omit count to start at 0; omit goal_count for an open-ended
+        subframe (never complete).
       properties:
         filter:
           type: string
@@ -614,10 +619,10 @@ components:
           format: float
         count:
           type: integer
-          description: Optional alias for goal_count; defaults to 0 when omitted with goal_count
+          description: Number of captured subframes. Defaults to 0 when omitted.
         goal_count:
           type: integer
-          description: Optional alias for count; defaults to 0 when omitted with count
+          description: Target number of subframes. Omit for an open-ended subframe.
         active:
           type: boolean
           default: true

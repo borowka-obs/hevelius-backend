@@ -105,15 +105,6 @@ def _project_row_to_dict(r, subframes=None, user_ids=None):
     }
 
 
-def _project_subframe_count(goal_count, count):
-    """Prefer explicit count; otherwise keep backward-compatible goal_count value; default 0."""
-    if count is not None:
-        return int(count)
-    if goal_count is not None:
-        return int(goal_count)
-    return 0
-
-
 def _find_similar_project_names(cnx, name, exclude_id=None):
     """Return list of existing projects whose names are similar to name."""
     return find_similar_project_names(name, exclude_id=exclude_id, cnx=cnx)
@@ -176,7 +167,7 @@ class ProjectsResource(MethodView):
                 {
                     "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                     "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                    "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+                    "exposure_time": sr[8], "goal_count": sr[9], "count": sr[10] or 0, "active": sr[11],
                     "last_updated": sr[12],
                 }
                 for sr in (sub_rows or [])
@@ -280,7 +271,7 @@ class ProjectsResource(MethodView):
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+             "exposure_time": sr[8], "goal_count": sr[9], "count": sr[10] or 0, "active": sr[11],
              "last_updated": sr[12]}
             for sr in (sub_rows or [])
         ]
@@ -315,7 +306,7 @@ class ProjectDetailResource(MethodView):
             {
                 "id": sr[0], "project_id": sr[1], "filter_id": sr[2],
                 "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-                "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+                "exposure_time": sr[8], "goal_count": sr[9], "count": sr[10] or 0, "active": sr[11],
                 "last_updated": sr[12],
             }
             for sr in (sub_rows or [])
@@ -370,7 +361,7 @@ class ProjectDetailResource(MethodView):
         subframes = [
             {"id": sr[0], "project_id": sr[1], "filter_id": sr[2],
              "filter": {"filter_id": sr[3], "short_name": sr[4], "full_name": sr[5], "url": sr[6], "active": sr[7]},
-             "exposure_time": sr[8], "goal_count": sr[9], "count": _project_subframe_count(sr[9], sr[10]), "active": sr[11],
+             "exposure_time": sr[8], "goal_count": sr[9], "count": sr[10] or 0, "active": sr[11],
              "last_updated": sr[12]}
             for sr in (sub_rows or [])
         ]
@@ -426,15 +417,12 @@ class ProjectSubframesResource(MethodView):
             cnx.close()
             abort(400, message=err)
         exposure_time = body["exposure_time"]
+        # count (captured) and goal_count (target) are independent - same rule as PATCH.
+        # Omitted count means nothing shot yet; omitted goal_count means open-ended.
         count = body.get("count")
-        goal_count = body.get("goal_count")
-        if count is None and goal_count is None:
+        if count is None:
             count = 0
-            goal_count = 0
-        elif count is None:
-            count = goal_count
-        elif goal_count is None:
-            goal_count = count
+        goal_count = body.get("goal_count")
         active = body.get("active", True)
         db.run_query(cnx, "INSERT INTO project_subframes (project_id, filter_id, exposure_time, goal_count, count, active) VALUES (%s, %s, %s, %s, %s, %s)",
                      (project_id, filter_id, exposure_time, goal_count, count, active))
