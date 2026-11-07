@@ -1,78 +1,59 @@
 # Observation Scheduler — Design Plan
 
-Status: **draft for review**. This document is meant to be iterated on before any
-code is written. It covers four components requested for the telescope
-observation scheduler:
-
-> **Revisions (2026-08-03)**: §6 revised after feedback that external
-> telemetry (weather, roof state, sensor temperatures, ASCOM state) belongs
-> in this picture too — that data class has a genuinely different shape
-> than `observation_events` and changes the database recommendation, see
-> §6.3. §7 turned into a numbered `OS-#` task breakdown, with telemetry
-> (OS-10) deferred as a separate topic.
->
-> **Revisions (2026-08-04)**: runner implementation is now in scope
-> (previously contract-only) — §5.6–§5.11 add the actual runner-side
-> design, including generating NINA Advanced Sequencer files from the
-> Night Plan (OS-11–OS-15 in §7). GitHub issues opened for OS-1, OS-2,
-> OS-3, OS-6, OS-7, and OS-11; OS-4, OS-5, OS-12, and OS-13 turned out to
-> already exist as issues filed by the project owner before this plan
-> (`backend#46`, `web#164`, `runner#1`/`#2`) and were updated in place
-> rather than duplicated — see §7's Issue column for the full mapping.
->
-> **Revisions (2026-08-04, later)**: **OS-2 implemented** — merged in
-> [PR #115](https://github.com/borowka-obs/hevelius-backend/pull/115),
-> issue #112 closed. **OS-1 implemented** — merged in
-> [PR #116](https://github.com/borowka-obs/hevelius-backend/pull/116),
-> issue #111 closed. OS-3 (depends on both) is now the next unblocked
-> backend task; OS-6 (depends only on OS-2) is unblocked too.
->
-> **Revisions (2026-08-04, even later)**: PR #115 deployed to production
-> and existing telescope rows backfilled with real IANA timezones — the
-> one loose end noted on OS-2 is closed out (§2, §7).
->
-> **Revisions (2026-08-05)**: **OS-3 implemented** — merged in
-> [PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118),
-> issue #113 closed. §4.2 updated with a scoping refinement from the real
-> implementation (SQL pre-filter stays the caller's job, not part of
-> `observability.py`) — relevant to whoever picks up OS-4 next, now
-> unblocked along with OS-9's eventual dependency chain.
->
-> **Revisions (2026-08-05, later)**: **OS-4 implemented** — merged in
-> [PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119),
-> issue #46 closed. §4.3–§4.4 updated for what actually shipped: a new
-> `strategy` ordering parameter (`priority`/`setting_first`) not in the
-> original plan, a `missing_coordinates` reason code added and
-> `min_interval_not_elapsed` deliberately left unimplemented pending OS-8,
-> and a `night.night_window()` bug fix (local-noon anchor, not UTC-noon —
-> the old anchor was wrong at ~UTC+12 sites). Response shape is a breaking
-> change from the old endpoint, as expected — **OS-5 and OS-12 are next**.
->
-> **Revisions (2026-08-08)**: **OS-5 implemented** — merged in
-> [hevelius-web PR #173](https://github.com/borowka-obs/hevelius-web/pull/173),
-> issue `web#164` closed (it wasn't auto-closed by the merge, closed
-> manually). **OS-12 (runner) is next** on the Night Plan track; OS-6/OS-7
-> (Observation Planning) and OS-11 (NINA spike) remain independently
-> available in the meantime.
+Status (2026-11-07): **partly implemented, scope reduced.** OS-1 through OS-5
+are merged, OS-6 is open as a pull request, and the rest has not started
+(table in §7). On 2026-11-07 the scope was cut: the execution event log
+(`observation_events`), statistics, and external telemetry / Grafana exports
+are **out of scope** (§6). Three components remain:
 
 1. Observation Planning (backlog UI: tasks + projects)
 2. Night Plan (per-telescope, per-night subset; read API used by web + runner)
 3. Runner support, including NINA sequence generation
-4. Statistics (nightly observing-time reporting, Grafana-ready)
 
-It also answers the four general questions raised alongside the request
-(plan sanity check, night-date convention, naming, skeptical review) inline,
-plus a dedicated recap at the end.
+Section numbers (`§N`) and task numbers (`OS-N`) are deliberately **stable**
+across the cut, because GitHub issues in all three repos cite them. Removed
+material leaves a stub rather than renumbering what follows, and OS-8, OS-9
+and OS-10 are retired, not reused.
 
-Repos involved: `hevelius-backend` (this repo, most of the work),
-`hevelius-web` (UI), `hevelius-runner` (contract only, no code changes here).
+§9 recaps the answers to the general questions asked alongside the original
+request (plan sanity check, night-date convention, naming, skeptical review).
+
+Repos involved: `hevelius-backend` (this repo), `hevelius-web` (UI),
+`hevelius-runner` (observatory-side client, in scope since 2026-08-04).
+
+### Revision history
+
+- **2026-08-03** — First draft. Feedback that weather/roof/sensor telemetry
+  belongs in the picture led to a TimescaleDB recommendation (since cut, §6).
+  §7 turned into numbered `OS-#` tasks.
+- **2026-08-04** — Runner implementation brought into scope (§5.6–§5.11).
+  GitHub issues opened for OS-1, 2, 3, 6, 7 and 11; OS-4, 5, 12 and 13
+  already existed (`backend#46`, `web#164`, `runner#1`/`#2`) and were
+  updated in place. OS-2
+  ([#115](https://github.com/borowka-obs/hevelius-backend/pull/115)) and OS-1
+  ([#116](https://github.com/borowka-obs/hevelius-backend/pull/116))
+  implemented; real telescope timezones backfilled in production.
+- **2026-08-05** — OS-3 implemented
+  ([#118](https://github.com/borowka-obs/hevelius-backend/pull/118)); the SQL
+  pre-filter stays with the caller (§4.2). OS-4 implemented
+  ([#119](https://github.com/borowka-obs/hevelius-backend/pull/119)):
+  `strategy` ordering parameter, `missing_coordinates` reason,
+  `night.night_window()` fix (§4.3–§4.4).
+- **2026-08-08** — OS-5 implemented
+  ([hevelius-web #173](https://github.com/borowka-obs/hevelius-web/pull/173)).
+- **2026-11-07** — Scope reduced: `observation_events` (OS-8), statistics
+  (OS-9) and telemetry / Grafana (OS-10) removed (§6); OS-14 rescoped
+  (§5.10). OS-6 found open as
+  [PR #120](https://github.com/borowka-obs/hevelius-backend/pull/120).
 
 ---
 
 ## 0. Current state (grounding)
 
-So reviewers don't have to re-derive this: what exists today, as of this
-plan, with file references.
+A snapshot of the codebase on **2026-08-03, before any implementation**,
+so reviewers don't have to re-derive it. OS-1–OS-5 have since changed several
+of these points (Night Plan, project constraint columns, telescope timezone);
+what shipped is recorded in §4.2–§4.4 and §7.
 
 - **Tasks** (`tasks` table, `db/07-init.psql`): one-shot "take one image"
   requests. Relevant columns: `scope_id`, `ra`/`decl` (RA in **hours**,
@@ -95,9 +76,10 @@ plan, with file references.
   no `min_alt`, `moon_distance`, `max_moon_phase`, `max_sun_alt`, no
   `min_interval`. Only `start_date`/`end_date` exist as coarse date bounds.
   `count` is set by the runner via absolute-value `PATCH
-  /api/projects/{id}/subframes/{id}` (`hevelius/api/routes/projects.py`) —
-  the caller supplies the new total, there is no per-exposure event log
-  behind it.
+  /api/projects/{id}/subframes/{id}` (`hevelius/api/routes/projects.py`).
+  The runner's `volumes` scan recounts the frames on disk and sends that
+  total, so the number is recomputed from the files each time rather than
+  incremented (§5.1).
 
 - **Night plan** (`GET`/`POST /api/night-plan`,
   `hevelius/api/routes/tasks.py:575-673`): this is the "existing, never
@@ -131,9 +113,8 @@ plan, with file references.
 
 - **Statistics** (`hevelius/stats.py`): only a sky-density histogram
   (1°×1° bins of completed, plate-solved tasks) and simple `COUNT(*) …
-  GROUP BY state/user`. **There is no time-series or per-night data of any
-  kind today**, and — importantly — no event log to build one from (see
-  §5.2).
+  GROUP BY state/user`. There is no per-night or time-series data.
+  Extending that is out of scope for this plan (§6).
 
 - **User preferences** (`db/25-user-preferences-rework.psql`,
   `hevelius/api/routes/auth_users.py`): `GET`/`PATCH /api/users/me/preferences`
@@ -171,7 +152,7 @@ subtlety for simplicity):
 
 Both the evening and the small-hours-of-the-morning parts of the same
 observing session collapse onto one date, which is exactly the property we
-want for grouping tasks/statistics/UI by "night."
+want for grouping tasks and the UI by "night."
 
 **This requires a per-telescope time zone**, which does not exist in the
 schema today (see §2). NINA can get away without one because it runs on a
@@ -219,17 +200,13 @@ it's not a second proper noun in code, config, or API docs.
 | Table | Change | Why |
 |---|---|---|
 | `telescopes` | `+ timezone varchar(64) NOT NULL DEFAULT 'UTC'` (IANA name) | Night-date labeling (§1.1); required once sites span time zones. **Done**: deployed (PR #115) and existing rows backfilled by hand with real per-site values in production. |
-| `projects` | `+ min_alt float`, `+ moon_distance float`, `+ max_moon_phase int`, `+ max_sun_alt int`, `+ min_interval int` (all nullable) | Mirrors the same columns on `tasks` so both can go through one visibility engine (§5.2). Today projects have **no** observing constraints at all. |
+| `projects` | `+ min_alt float`, `+ moon_distance float`, `+ max_moon_phase int`, `+ max_sun_alt int`, `+ min_interval int` (all nullable) | Mirrors the same columns on `tasks` so both can go through one visibility engine (§4.2). Today projects have **no** observing constraints at all. |
 | `projects`, `tasks` | `+ priority int NOT NULL DEFAULT 0` | *Recommended, not required.* Night Plan and Observation Planning both need *some* ordering signal beyond "visible y/n"; see §8 "no ordering/priority field" for why this is flagged separately rather than assumed. |
 | `tasks` | `skip_before`, `skip_after`, `created`, `activated`, `performed` : `timestamp` → `timestamptz` | These are naive today (§0). Fine as long as everything writing them is disciplined about UTC, but that's an invariant enforced by convention only, not the type system — a real footgun across multi-timezone sites. Values are assumed already UTC; migration is a type change, not a value change. |
-| new: `observation_events` | see §5.2 | Execution/report event log — becomes the source of truth for project subframe counts *and* all statistics. This table does not exist in any form today; it's the biggest net-new piece of this plan. |
-| new: `telemetry_weather`, `telemetry_sensor_temps`, `telemetry_ascom_state`, `telemetry_roof_events` | see §6.4 | External telemetry not tracked anywhere today. First three become TimescaleDB hypertables; roof events stay a plain event-log table (low frequency, same shape as `observation_events`). |
 
-Illustrative migration numbers (next free is 26): `26` telescopes timezone +
-project constraint/priority columns, `27` tasks timestamptz conversion, `28`
-`observation_events` + derived subframe counts, `29` enable TimescaleDB
-extension + telemetry tables/hypertables. Final numbering decided at
-implementation time.
+Shipped as schema v26 (`db/26-os2-scheduler-data-model.psql`, PR #115). No
+further schema changes are planned: the `observation_events` and telemetry
+tables this section used to list were cut on 2026-11-07 (§6).
 
 ---
 
@@ -412,9 +389,10 @@ Two differences from the original list above, both deliberate calls made
 during implementation, not oversights: **`missing_coordinates`** was
 added (`ra`/`decl` are nullable on both `tasks` and `projects`, and such a
 target can't be checked at all), and **`min_interval_not_elapsed` is not
-raised** — there's no execution event log yet (OS-8) to measure an
-interval *since*, so rather than fake the check it's left unimplemented
-until OS-8 exists. DONE tasks are deliberately excluded even from
+raised** — nothing records *when* a target was last shot precisely enough to
+measure an interval since (the event log that would have, OS-8, was cut, §6),
+so rather than fake the check it's left unimplemented; whether `min_interval`
+should be enforced at all is an open question (§8). DONE tasks are deliberately excluded even from
 `explain=true` — nobody asks why a finished task isn't in tonight's plan,
 and on a real archive they'd drown out everything worth reading.
 
@@ -501,71 +479,41 @@ as a possible future OS-3 follow-up, not part of this task.
 
 ## 5. Component 3 — Runner support
 
-**Now in scope** (revised from "contract only" — see §5.6 onward for the
-actual runner-side design). §5.1–§5.5 below are the backend contract
-(`observation_events`); §5.6–§5.11 are the runner-side implementation,
-including the sequence-generation problem flagged as the hard part.
+Runner-side implementation is in scope (since 2026-08-04). §5.6 onward is the
+design, including the sequence-generation problem flagged as the hard part.
 
-### 5.1 The gap: no execution event log
+### 5.1–5.4 Removed: the execution event log
 
-Today, "reporting completion" means two different, weak things:
+These four subsections proposed an `observation_events` table, a
+`POST /api/observation-events` endpoint, subframe counts derived from it, and
+idempotency keys for it. **Cut on 2026-11-07**, together with statistics (§6),
+which was the main reason for it. The full text is in git history:
+`git show 593137c:doc/observation-scheduler-plan.md`. Numbering from §5.5
+onward is unchanged on purpose — GitHub issues cite §5.7, §5.8 and §5.9.
 
-- For tasks: one atomic `task-update` (`state=6`, `imagename=...`) — a
-  single terminal write, no record of actual captured exposure time,
-  success/failure detail, or quality metrics.
-- For projects: `PATCH /projects/{id}/subframes/{id}` where the **caller
-  supplies the new absolute `count`**. This is racy (two writers, or a
-  runner that crashes mid-session and miscounts on restart, corrupt the
-  number silently) and leaves zero history — you can see *that* a subframe
-  has 12/20 frames, never *when* they were taken or by which run.
+Reporting stays on the **existing** endpoints: `task-update` (`state=6` plus
+`imagename`) for tasks, and the subframe `PATCH` for projects.
 
-Neither gives statistics (§7) anything to aggregate.
-
-### 5.2 Proposed: `observation_events`, event-sourced counts
-
-```
-observation_events
-  id, scope_id, user_id,
-  task_id NULL, project_id NULL, subframe_id NULL,   -- exactly one of task_id or (project_id[+subframe_id]) set
-  filter_id, exposure_time_actual, started_at timestamptz, completed_at timestamptz,
-  night_date date,                -- denormalized via §1.1's rule, computed at write time, makes GROUP BY trivial
-  status ('success' | 'failed' | 'aborted'), failure_reason text NULL,
-  imagename text NULL, fwhm float NULL, hfr float NULL, eccentricity float NULL, guiding_rms float NULL,
-  idempotency_key varchar(64) UNIQUE   -- runner-generated; see 5.4
-```
-
-One row per captured (or attempted) sub-exposure. `project_subframes.count`
-becomes **derived** — either a DB trigger increments it on insert (keeps
-the existing column, keeps existing readers working unmodified) or it's
-computed as `COUNT(*) FROM observation_events WHERE subframe_id = …` on
-read. I'd start with the trigger approach: cheapest migration, and
-`PATCH /projects/{id}/subframes/{id}` can stay around for manual
-corrections (a human fixing a miscount) without conflicting, as long as
-it's documented as "manual override" rather than "the normal write path"
-going forward.
-
-### 5.3 New endpoint
-
-`POST /api/observation-events` — one call per captured/attempted
-sub-exposure. On success against a `task_id`, this endpoint also performs
-the `state → 6`/`imagename` transition (superseding that part of
-`task-update`'s role) so the runner has one call to make, not two.
-
-### 5.4 Idempotency
-
-Runner includes a client-generated `idempotency_key` (e.g. a UUID). Server
-does insert-or-ignore on conflict. Needed because network retries on a
-"did that POST actually land?" timeout must not double-count an exposure —
-this is exactly the kind of bug that's invisible until a cloudy night causes
-a burst of retries and your statistics quietly overcount.
+One correction to the reasoning behind the original proposal, made after
+reading the runner code more closely. It argued that the absolute-count
+`PATCH` is racy and can silently corrupt a count after a crash. That
+overstated it: the runner's `volumes` scan (`src/cmd_volumes.py`) recounts the
+frames *on disk* per project, filter and exposure and sends that total, so the
+count is recomputed from the files every time and heals itself. The disk is
+the source of truth, which is a sound design. What genuinely goes missing
+without an event log is *history* — when a frame was taken, by which run, with
+what quality — and anything that needs it (per-night statistics, enforcing
+`min_interval`). Both are out of scope.
 
 ### 5.5 Explicitly flagged, not solved here
 
-- **Failure semantics**: what should happen to a task whose exposure fails
-  mid-capture (clouds, mount fault)? Proposal: `status=failed` with a
-  reason, task stays/returns to state `1` (re-enters the pool) rather than
-  being silently lost — but this needs sign-off from whoever runs the
-  observatories, it's a behavioral decision, not just a schema one.
+- **Failure semantics**: with no event log there is no `failed` record. A
+  capture that doesn't yield a usable frame simply leaves the task in state
+  `1`/`3` (so it reappears in the next Night Plan) and the project subframe
+  count short (so it stays pending) — which is the behavior we want, for
+  free. Still undecided: whether a task that fails *repeatedly* should be set
+  aside rather than retried every night. That needs sign-off from whoever
+  runs the observatories; it's a behavioral decision, not a schema one.
 - **Auth for unattended operation**: the runner logs in with a real human
   username/password (`APIClient.login`). Workable, but a human-owned
   password used by a 24/7 unattended process is an operational smell
@@ -573,7 +521,7 @@ a burst of retries and your statistics quietly overcount.
   per-telescope API key/service-account is a reasonable future hardening
   step — not blocking a first version, but worth deciding before "no
   manual actions" is taken literally.
-- **Runner liveness**: not part of the four requested components, but
+- **Runner liveness**: not part of the requested components, but
   directly relevant to "long term goal: no manual actions" — the backend
   currently has no idea whether a runner is online, stuck, or has been
   silent for six hours. A lightweight heartbeat
@@ -596,14 +544,19 @@ pieces are replaced — it doesn't need a rebuild:
 - **`FileMonitor`** (`src/file_monitor.py`) already watches configured
   volumes for new FITS/XISF files via `watchdog`, calls back per file, and
   can catch up on pre-existing files on startup (`process_existing_files`).
-  This is exactly the mechanism needed for decoupled, pull-based execution
-  reporting (§5.10) — reused, not rebuilt, just pointed at new logic.
+  Alongside it, the `volumes` scan (`src/cmd_volumes.py`) already matches
+  captured frames to tasks and project subframes and syncs them to the
+  server — `task_update`/`task_add` for tasks, a subframe `PATCH` with the
+  recounted total for projects (creating the subframe if none matches). So
+  the reporting loop exists today, in batch form (§5.10).
 - **What's actually broken**: `TaskManager.prepare_sequence_file` (§0)
   builds a JSON shape (`Targets: [{Filters: [...], Exposures: [...]}]`)
   that matches neither the real `Task`/`Project` schema nor NINA's actual
   Advanced Sequencer file format — it's replaced outright, not patched
-  (§5.9). And there is currently no bridge at all from "a FITS file just
-  appeared" to `POST /api/observation-events` (§5.10).
+  (§5.9). And `APIClient.get_night_plan` still reads `response_json["tasks"]`,
+  which no longer exists since OS-4 changed the response shape (§4.4); that
+  only goes unnoticed because the `run` loop calling it was already
+  non-functional. OS-12 replaces it.
 - **What's unverified**: the `-s` CLI flag and the assumption that a
   loaded sequence starts executing unattended (vs. loading into the UI for
   a human to press play) are both asserted by existing code, not confirmed
@@ -733,23 +686,27 @@ as a v2 enhancement once §5.7's spike clarifies what the Advanced API
 plugin actually supports for live sequence mutation, rather than guessing
 now.
 
-### 5.10 Execution correlation & reporting
+### 5.10 Execution correlation & reporting (rescoped, small)
 
-`FileMonitor`'s existing callback (§5.6) fires per new FITS/XISF file.
-The new logic behind that callback: parse the `HEV-T512` / `HEV-P42-S7`
-identifier out of the FITS header (or filename, as a fallback) written by
-the sequence generated in §5.9, then `POST /api/observation-events` (§5.3)
-with that task/project/subframe id, the filter/exposure actually used (from
-the FITS header, not just what was requested — catches partial/aborted
-exposures), an idempotency key (§5.4, derived from the file's content hash
-or path so a restarted runner re-scanning the same file doesn't
-double-report), and `status` inferred from whether the frame looks
-complete (file size stabilized, expected FITS keywords present) vs. a
-truncated/aborted capture. `process_existing_files` (already in
-`FileMonitor`) gives this a free "catch up on anything captured while the
-runner itself was offline" path — no separate backfill mechanism needed.
-This is **OS-14**, and it's the piece that actually starts populating
-`observation_events` (OS-8) and therefore Statistics (OS-9) with real data.
+Originally: parse the `HEV-…` identifier out of each new FITS file and
+`POST /api/observation-events`. With the event log cut, **reporting is the
+existing `volumes` reconciliation** (§5.6), which already matches frames to
+tasks and projects and syncs the result through `task-update` and the
+subframe `PATCH`. What remains is making the frames the generated sequence
+produces *matchable by it*:
+
+- If OS-11 shows the target name reaches the FITS `OBJECT` header and the
+  filename (§5.7 item 3), teach the matcher to recognize the `HEV-T512` /
+  `HEV-P42-S7` identifiers from §5.9 — a direct parse instead of the fuzzy
+  name / `regexps` matching it uses today.
+- If the identifier doesn't survive, name the NINA targets with the task or
+  project name the matcher already understands, and drop the `HEV-` scheme.
+- Run the reconciliation when the night's sequence ends (§5.11) rather than
+  building a per-file, real-time reporter.
+
+Either way it is a small change on top of OS-13, not a task of its own.
+**OS-14** keeps its number as "rescoped"; whether it survives as a separate
+item should be decided after OS-11.
 
 ### 5.11 Process lifecycle & scheduling
 
@@ -757,135 +714,51 @@ Ties §5.8–§5.10 together into the thing that actually runs unattended each
 night: at a configured time before sunset (or driven by the Night Plan's
 own `night_start_utc`, §4.4), fetch the plan (OS-12), generate the sequence
 (OS-13), launch NINA via the existing `NINAController` (confirmed, not
-assumed, per §5.7), keep `FileMonitor` running throughout (OS-14), and —
-new behavior the current `NINAController` doesn't have — detect NINA
-exiting **before** the sequence's expected end (crash, hardware fault, a
-weather closure NINA's own safety monitor already handled correctly) and
-report a partial-night status rather than assuming full completion or,
-worse, blindly relaunching NINA into a crash loop. This is **OS-15**, and
-it's where the §5.5 heartbeat idea plugs in if it's built.
+assumed, per §5.7), and when the sequence ends run the `volumes`
+reconciliation so the night's frames are reported (OS-14). New behavior the
+current `NINAController` doesn't have: detect NINA exiting **before** the
+sequence's expected end (crash, hardware fault, a weather closure NINA's own
+safety monitor already handled correctly) and record a partial-night outcome
+rather than assuming full completion or, worse, blindly relaunching NINA
+into a crash loop. This is **OS-15**; the §5.5 heartbeat idea is where that
+outcome would be surfaced if it is ever built.
 
 ---
 
-## 6. Component 4 — Statistics
+## 6. Out of scope: statistics, telemetry, Grafana
 
-### 6.1 What to build
+**Cut on 2026-11-07.** Three things this plan used to cover are no longer
+part of the feature:
 
-`observation_events` (§5.2) is the fact table. It directly answers every
-metric in the request:
-
-| Requested metric | Query shape |
-|---|---|
-| Observing time per night | `SUM(exposure_time_actual) WHERE status='success' GROUP BY night_date, scope_id` |
-| Tasks completed | `COUNT(*)` of task-linked events with `status='success'`, grouped by `night_date` |
-| Time for tasks vs. projects | same `GROUP BY`, split on `task_id IS NOT NULL` |
-| (bonus, cheap to add) | per-filter breakdown, per-user breakdown, success/failure rate (frames lost to weather/faults is an operationally useful number), per-telescope utilization |
-
-A couple of canned REST endpoints for the web app's own widgets
-(`GET /api/stats/nightly?scope_id&from&to`), computed with plain SQL
-aggregates over `observation_events` — no rollup table needed at this
-volume (10 telescopes × maybe a few hundred exposures/night, worst case,
-is tens of thousands of rows a year; trivial for Postgres to aggregate on
-the fly). A nightly rollup/materialized view is worth adding later *if*
-dashboard query latency ever becomes a real complaint — not before.
-
-**Scope-reduction point**: don't try to pre-build a REST endpoint for every
-conceivable Grafana panel. Grafana's Postgres data source runs arbitrary
-read-only SQL directly — anything beyond the couple of in-app widgets can
-just be a SQL query written in a Grafana panel against `observation_events`
-(or a rollup view later), with zero new backend code.
-
-### 6.2 The database question, part 1: `observation_events` itself
-
-For the business/event data described in §6.1 alone, the original
-reasoning still holds: ≤10 telescopes, thousands-to-tens-of-thousands of
-rows a year, dimensional data that wants to join against `tasks`,
-`projects`, `users`, `filters`. That's a plain Postgres table, no argument.
-The picture changes once a second, genuinely different data class enters —
-see below.
-
-### 6.3 The database question, part 2: external telemetry changes the answer
-
-You're right that weather, roof open/closed, sensor temperatures, and
-ASCOM telescope state are a different data class than `observation_events`,
-and I was implicitly scoping the earlier recommendation to the latter only.
-Characterizing the difference concretely:
-
-| | `observation_events` | Telemetry (weather / roof / sensors / ASCOM) |
+| Was | Task | Status |
 |---|---|---|
-| Frequency | one row per exposure (minutes apart) | continuous polling (seconds-to-minutes) |
-| Channels | few, fixed dimensions | many numeric channels per telescope, growing over time |
-| Primary use | exact audit trail, joined to tasks/projects/users | downsampled graphs, threshold alerting, coarse long-term history |
-| Retention shape | keep every row forever (it's the audit trail) | keep fine detail briefly, coarse rollups long-term |
+| `observation_events` execution log (`POST /api/observation-events`, subframe counts derived from it) | OS-8 | Removed. Its main purpose was feeding statistics; reporting works through existing endpoints (§5.1–5.4). |
+| Statistics API (per-night observing time, tasks vs. projects) | OS-9 | Out of scope. |
+| External telemetry (weather, roof state, sensor temperatures, ASCOM state), TimescaleDB, Grafana dashboards and exports | OS-10 | Out of scope. |
 
-That last row is the important one: telemetry *wants* automatic
-downsampling and retention management (raw 10-second samples for 90 days,
-5-minute rollups forever) — machinery you'd otherwise hand-roll as cron
-jobs in plain Postgres. That's a legitimate, different requirement, and it
-changes which of the earlier options make sense — re-evaluated against
-*this* data class specifically:
+None of it had been built, so there is nothing to remove from any codebase.
+The numbers OS-8, OS-9 and OS-10 are retired, not reused.
 
-| Option | Fit for telemetry | Why / why not |
-|---|---|---|
-| **TimescaleDB (recommended)** | ✅ | Postgres extension: hypertables auto-partition by time, continuous aggregates auto-maintain rollups, retention policies auto-expire raw data — the exact machinery this data needs, declared in SQL, no external service. Stays in the same database as `observation_events`, so **correlating a failed/aborted exposure with cloud cover or roof state at that moment is a plain SQL join**, not a cross-database federation — directly useful for diagnosing "was this actually a weather abort?" (§8 flags live weather *gating* as still unsolved; this at least closes the post-hoc analysis half of that gap). One backup job, one credential story, one system to run. |
-| **Plain PostgreSQL (no Timescale)** | ⚠️ works, but you'd rebuild Timescale by hand | Postgres can absolutely store this volume, but continuous high-frequency polling from up to 10 sites, over months/years, with no automatic partitioning/rollup/retention, means either unbounded table growth or a hand-written downsampling+deletion job — exactly what Timescale gives you for free as a config statement. Since Timescale is "the same Postgres, plus an extension," there's no real reason to decline it once this data class exists. |
-| **InfluxDB** | ⚠️ legitimate, second-choice | A real, popular, self-hostable, Grafana-native option, and this data class is actually within its intended envelope (unlike the earlier `observation_events` case). The reason to prefer Timescale over it here is architectural fit, not capability: it'd be a second database (separate backup/ops/credentials) and, more concretely, a second **ingestion path** — see below, telemetry is naturally pushed by the runner over the same authenticated HTTPS API it already uses, and Influx doesn't change that story, it just adds a second target for it to write to. Worth revisiting if telemetry cardinality/volume ever outgrows what one Postgres+Timescale instance handles comfortably (unlikely at 10 telescopes, but not impossible at much larger fleet sizes). |
-| **Prometheus** | ⚠️ good fit for a *different* job | Prometheus's pull/scrape model is a real mismatch for this topology: it wants to reach into each site and scrape a `/metrics` endpoint, and "multiple locations" plausibly means home-observatory setups behind NAT with no inbound access — you'd need a Pushgateway workaround to make pull-based collection work at all. Where Prometheus *is* the right tool: monitoring the **machines** themselves (is the backend server up, is a runner PC's disk full, is the API responding) — that's a separate, complementary concern from domain telemetry (roof/weather/mount state) and shouldn't be conflated with it. If infra monitoring is wanted later, it can run alongside Timescale-backed domain telemetry as two independent, non-competing systems. |
+**Where the design went.** The full analysis — event-log schema, the
+Postgres vs. InfluxDB / Prometheus / TimescaleDB comparison and its
+recommendation (plain Postgres for the event table, TimescaleDB on the same
+instance for telemetry, Grafana's native Postgres data source), the telemetry
+table sketches and ingestion payloads — stays in git history at commit
+`593137c`: `git show 593137c:doc/observation-scheduler-plan.md` (§5.1–5.4,
+§6 and the two appendices). Start there if any of it returns.
 
-**Revised recommendation**: enable the **TimescaleDB extension on the same
-Postgres instance**, and use it for telemetry hypertables (§6.4) while
-`observation_events` and everything else stays exactly as designed in §6.2
-— one database, two workloads it's each well-suited for, rather than
-fragmenting into Postgres + InfluxDB + Prometheus for three overlapping
-concerns. Point Grafana at that one Postgres/Timescale instance for
-everything (Grafana's Postgres data source understands Timescale
-hypertables/continuous-aggregates transparently — no separate data source
-needed).
+**Issues that already existed and are untouched by this plan:**
+`hevelius-backend#78` "Scope, project statistics", `hevelius-web#122`
+"Statistics" and `hevelius-backend#103` "Telescope state reporting". They are
+the natural home for this work if it comes back.
 
-### 6.4 Telemetry schema and ingestion (sketch)
+**What the cut changes elsewhere in the plan**
 
-Not every telemetry source is actually high-frequency — worth not
-cargo-culting "hypertable" onto all of it:
-
-- **Roof state** is naturally sparse (a handful of open/close transitions a
-  night) — an event log, same shape as `observation_events`, not a
-  hypertable candidate:
-  ```
-  telemetry_roof_events (time timestamptz, scope_id int, state ('open'|'closed'|'moving'|'error'), reason text NULL)
-  ```
-- **Weather**, **sensor temperatures**, and **ASCOM state** genuinely are
-  continuous polls and become hypertables:
-  ```
-  telemetry_weather      (time, scope_id, source, temperature_c, humidity_pct, wind_speed_kph, cloud_cover_pct, sky_temp_c, rain boolean)
-  telemetry_sensor_temps (time, scope_id, sensor, temperature_c)          -- sensor: 'camera_ccd' | 'ambient' | 'mount' | 'focuser' | ...
-  telemetry_ascom_state  (time, scope_id, mount_ra_deg, mount_dec_deg, mount_tracking, mount_slewing, focuser_position, filter_wheel_position, connected)
-  ```
-  Each `SELECT create_hypertable('telemetry_weather', 'time'), ...` plus a
-  continuous aggregate (e.g. 5-minute rollups) and a retention policy
-  (drop raw rows after ~90 days, keep rollups indefinitely) — a handful of
-  SQL statements in the migration, not application code.
-
-  Modeling choice worth flagging: this is a handful of purpose-built,
-  typed tables (matching how the rest of Hevelius is modeled — explicit
-  columns, not JSONB blobs) rather than one generic long/narrow
-  `(time, scope_id, metric, value)` table. That trades a small amount of
-  schema flexibility (a genuinely new sensor type needs a migration) for
-  real column types and much more natural SQL — the right call while the
-  telemetry sources are a known, short list (weather / roof / sensor temps
-  / ASCOM). Revisit if the sensor set turns out to be large and
-  fast-changing.
-
-- **Ingestion**: reuse the runner's existing authenticated HTTPS
-  relationship with the backend rather than inventing a new
-  push/pull topology (Prometheus scrape targets or an InfluxDB write
-  token) — the runner already polls ASCOM/ambient sensors on the
-  observatory PC for its own purposes, so it batches samples and `POST`s
-  them periodically (e.g. once a minute, not per-sample) to a new
-  `POST /api/telemetry` endpoint. This is push-based by construction, so
-  it works from a home-observatory site behind NAT with no inbound
-  access, unlike Prometheus's default pull model. **Runner-side polling
-  itself is out of scope for this session**, same as the rest of the
-  runner work — this section defines the backend contract it will target.
+- `night_date()` (OS-1) now has one consumer, Night Plan, instead of three.
+  It is already built and still in the right place.
+- `min_interval_not_elapsed` can't be implemented as planned (§4.3).
+- No schema changes remain (§2).
+- OS-14 shrinks to a small matching change (§5.10).
 
 ---
 
@@ -905,14 +778,13 @@ and any completed checklist items.
 **On "is night identity a good separate task?"** — yes, worth pulling out.
 The `night_date(scope, t)` rule (§1.1) is pure logic (not a schema change),
 it's small and precisely testable in isolation (the worked examples in
-§1.1 basically *are* the test cases), and — most importantly — three
-different consumers need to call the exact same function: Night Plan
-(OS-4), `observation_events.night_date` (OS-8), and the nightly Statistics
-grouping (OS-9). Bundling it into whichever of those three ships first
-risks the other two re-deriving it slightly differently later. Written and
-tested once, up front, as its own task, that risk goes away. It's listed
-separately below (OS-1) rather than folded into the schema task (OS-2),
-since OS-2 is schema-only and this is application code.
+§1.1 basically *are* the test cases), and it was meant to be called from
+three places: Night Plan (OS-4), `observation_events.night_date` (OS-8) and
+nightly Statistics grouping (OS-9). The latter two were cut (§6), so it now
+has a single consumer, but it is built, tested and in the right place
+(`hevelius/night.py`), so nothing changes. It was listed separately (OS-1)
+rather than folded into the schema task (OS-2), since OS-2 is schema-only and
+this is application code.
 
 | ID | Title | Repo | Depends on | Size | Status | Issue |
 |---|---|---|---|---|---|---|
@@ -921,15 +793,15 @@ since OS-2 is schema-only and this is application code.
 | **OS-3** | Shared observability engine | backend | OS-1, OS-2 | M | **Implemented** ([PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118), merged) | backend#113 (closed) |
 | **OS-4** | Night Plan API rewrite | backend | OS-3 | M | **Implemented** ([PR #119](https://github.com/borowka-obs/hevelius-backend/pull/119), merged) | backend#46 (closed) |
 | **OS-5** | Night Plan web UI | web | OS-4 | S–M | **Implemented** ([PR #173](https://github.com/borowka-obs/hevelius-web/pull/173), merged) | web#164 (closed) |
-| **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | Planned | backend#114 |
+| **OS-6** | Observation Planning — backend additions | backend | OS-2 | S | **PR open** ([PR #120](https://github.com/borowka-obs/hevelius-backend/pull/120)) | backend#114 |
 | **OS-7** | Observation Planning — web UI | web | OS-6 | M–L | Planned | web#170 |
-| **OS-8** | Observation events (execution log) | backend | OS-1, OS-2 | L | Planned | — |
-| **OS-9** | Statistics API | backend | OS-8 | S–M | Planned | — |
-| **OS-10** | Telemetry (weather / roof / sensors / ASCOM) | backend (+ runner, later) | OS-2 | L | **Deferred** — separate topic, per your note | — |
+| **OS-8** | ~~Observation events (execution log)~~ | — | — | — | **Removed** (§6) | — |
+| **OS-9** | ~~Statistics API~~ | — | — | — | **Removed** (§6) | — |
+| **OS-10** | ~~Telemetry (weather / roof / sensors / ASCOM)~~ | — | — | — | **Removed** (§6) | — |
 | **OS-11** | NINA integration spike (empirical verification) | runner | — | S | Planned | runner#25 |
 | **OS-12** | Runner — night plan consumption | runner | OS-4 | S | Planned | runner#1 (pre-existing, updated) |
 | **OS-13** | Runner — NINA Advanced Sequencer generation | runner | OS-11, OS-12 | L | Planned | runner#2 (pre-existing, updated) |
-| **OS-14** | Runner — execution correlation & reporting | runner | OS-13, OS-8 | M | Planned | — |
+| **OS-14** | Runner — execution correlation & reporting | runner | OS-13 | S | **Rescoped** (§5.10) | — |
 | **OS-15** | Runner — process lifecycle & scheduling | runner | OS-11, OS-12, OS-13 | M | Planned | — |
 
 **OS-1 — Night identity (`night_date` computation). Implemented** in
@@ -951,9 +823,9 @@ through create/update/list/get and documented in OpenAPI, with tests.
 The one loose end — the manual timezone backfill for existing telescope
 rows, since it's not automatable from lat/lon reliably — is **done**:
 deployed to production with real per-site IANA values set. Nothing left
-outstanding from this task. `observation_events` (OS-8) and telemetry
-(OS-10) were deliberately **not** in this task — they're new tables with
-real design questions attached, not plain column additions.
+outstanding from this task. The `observation_events` and telemetry
+tables were deliberately **not** in this task, and were later cut altogether
+(§6).
 
 **OS-3 — Shared observability engine. Implemented** in
 [PR #118](https://github.com/borowka-obs/hevelius-backend/pull/118)
@@ -1005,10 +877,15 @@ request/response types. One fix beyond the brief: Night Plan is now linked
 from the main menu — the route existed before but wasn't reachable from
 the nav.
 
-**OS-6 — Observation Planning: backend additions.** Computed
-`is_complete`/`subframes_remaining` on project list/detail; wire `priority`
-(from OS-2) into `task-add`/`task-update`/`tasks` list sort and
-project create/update. Small — no new tables, no new endpoints.
+**OS-6 — Observation Planning: backend additions. PR open**
+([#120](https://github.com/borowka-obs/hevelius-backend/pull/120), mergeable,
+open since 2026-08-06): computed `is_complete` / `subframes_remaining` on
+every project the API returns (list, detail, create, update, and the Night
+Plan's project items), from one completion rule moved to
+`hevelius/projects.py` and shared with Night Plan so the numbers can't
+disagree with each other. The `priority` half of this task
+(`task-add` / `task-update` / `tasks` sort, project create / update) already
+landed with OS-2 in #115. No schema change, no new endpoint.
 
 **OS-7 — Observation Planning: web UI.** The unified tasks+projects
 planning screen (§3.1's client-side-merge recommendation), filters, and
@@ -1017,27 +894,8 @@ here and are worth closing out before/during implementation rather than
 guessing: the unified-vs-two-sections final call (§3.1), and task-delete
 semantics (no delete endpoint exists today — hard delete vs. `state=-1`).
 
-**OS-8 — Observation events (execution log).** `observation_events` table
-(§5.2); `POST /api/observation-events` (§5.3) including idempotency-key
-handling (§5.4); switch `project_subframes.count` to trigger-derived from
-the event log, keeping `PATCH` around as a manual-override path rather than
-the primary write path; publish the "Runner Integration Guide" as the spec
-OS-11 will implement against. The largest single task here — it's real
-schema plus a state-transition change to how subframe counts work.
-Decisions flagged in §5.5 (failure/retry semantics, unattended auth) are
-worth resolving before or during this task, not deferred silently.
-
-**OS-9 — Statistics API.** `GET /api/stats/nightly` (and similar) as plain
-SQL aggregates over `observation_events` (§6.1); example Grafana dashboard
-doc pointed directly at Postgres. Depends on OS-8 existing, though it can
-be developed and demoed against seed/backfilled data before OS-11 (the
-runner) actually produces live events.
-
-**OS-10 — Telemetry (weather / roof / sensors / ASCOM). Deferred**, as
-requested — a separate, large topic on its own (external data sources,
-TimescaleDB, a new runner-side polling/ingestion story). Kept numbered so
-§6.3–6.4's design has a stable reference when it's picked back up, but
-intentionally excluded from the active sequence below.
+**OS-8, OS-9, OS-10 — Removed** on 2026-11-07 (observation events,
+statistics, telemetry / Grafana). See §6.
 
 **OS-11 — NINA integration spike.** Empirical verification against a real
 NINA install (§5.7): export one real Advanced Sequencer template, confirm
@@ -1055,32 +913,33 @@ substitution engine (§5.9) — the piece flagged as the hard part. Replaces
 `TaskManager.prepare_sequence_file` outright. Depends on OS-11's actual
 template/findings, not on a guessed schema.
 
-**OS-14 — Runner: execution correlation & reporting.** Wire `FileMonitor`'s
-existing callback (§5.10) to parse the `HEV-T#`/`HEV-P#-S#` identifier
-from each new FITS file and `POST /api/observation-events` (OS-8) with an
-idempotency key. This is what actually starts populating `observation_events`
-and therefore Statistics (OS-9) with real data — everything upstream of
-this is planning, everything downstream is just SQL until this lands.
+**OS-14 — Runner: execution correlation & reporting. Rescoped (small).**
+Originally: parse the `HEV-T#` / `HEV-P#-S#` identifier out of each new FITS
+file and `POST /api/observation-events`. With the event log cut, reporting is
+the existing `volumes` reconciliation, so what is left is making the frames
+the generated sequence produces *matchable by it* (§5.10) — most likely a
+small change folded into OS-13. Whether it survives as a task of its own
+should be decided after OS-11.
 
 **OS-15 — Runner: process lifecycle & scheduling.** Ties OS-12–OS-14
 together into the nightly unattended run (§5.11): scheduled trigger before
-sunset, generate + launch, keep `FileMonitor` running, detect early NINA
-exit and report partial-night status instead of assuming completion or
-blind-relaunching.
+sunset, generate + launch NINA, reconcile the night's frames when the
+sequence ends, detect early NINA exit and record a partial-night outcome
+instead of assuming completion or blind-relaunching.
 
 ### Suggested order
 
-OS-1 and OS-2 have no dependencies and can start immediately, in either
-order or in parallel. Once both land: OS-3 → OS-4 → OS-5 is one track
-(Night Plan); OS-6 → OS-7 is an independent second track (Observation
-Planning) that only needs OS-2, not OS-3/4. OS-8 needs only OS-1 and OS-2,
-so it can run alongside either track rather than waiting on Night Plan;
-OS-9 follows it. On the runner side, OS-11 has no dependencies and should
-start early — ideally in parallel with everything above, since OS-13
-depends on its findings and is the longest task in the whole plan. OS-12
-needs OS-4 (Night Plan); OS-13 needs OS-11 and OS-12; OS-14 needs OS-13
-and OS-8; OS-15 closes the loop over OS-11–OS-13. OS-10 (telemetry) stays
-off the active sequence, deferred as its own topic.
+What is left, in the order the dependencies allow:
+
+1. **Merge OS-6** ([PR #120](https://github.com/borowka-obs/hevelius-backend/pull/120))
+   — already written and mergeable; it unblocks OS-7.
+2. **OS-11 (NINA spike)** — no dependencies, but it needs hands-on access to a
+   real NINA install, which is why it should start now: OS-13 is the longest
+   task left and waits on it.
+3. In parallel with the spike: **OS-12** (runner night plan consumption — OS-4
+   has already landed) and **OS-7** (web, once #120 is merged).
+4. **OS-13** (sequence generation) once OS-11 and OS-12 are done.
+5. **OS-14** (small, may fold into OS-13), then **OS-15**.
 
 ---
 
@@ -1090,7 +949,7 @@ off the active sequence, deferred as its own topic.
   machine; projects are an aggregate goal/count target. This plan keeps
   them structurally distinct (different backend rows, different UI
   sections) and bridges them only where it's cheap to do so: one shared
-  visibility engine (§4.2) and one shared event log (§5.2). Don't let a
+  visibility engine (§4.2) and the same reporting path (§5.10). Don't let a
   future "let's unify tasks and projects into one entity" refactor sneak
   in scope-creep — the request doesn't ask for that, and the two models
   serve genuinely different use cases (single-shot vs. accumulate-until-
@@ -1110,18 +969,17 @@ off the active sequence, deferred as its own topic.
   building can make a "visible" target actually unobservable. Worth a
   per-telescope horizon-mask feature eventually; explicitly not in this
   plan.
-- **No *live* weather/cloud gating.** This is probably the single biggest
-  gap relative to the stated long-term goal ("automate observations, no
-  manual actions each evening"). Night Plan answers "what *could* be
+- **No weather/cloud awareness at all.** This is probably the single
+  biggest gap relative to the stated long-term goal ("automate observations,
+  no manual actions each evening"). Night Plan answers "what *could* be
   observed tonight" as a static, pre-computed list — it says nothing about
-  live sky conditions at the moment of execution. §6.3–6.4 now plans for
-  *storing* weather/roof/sensor telemetry, which closes the **post-hoc**
-  half of this gap (e.g. "was this abort actually caused by clouds?" is a
-  SQL join once telemetry lands) — but storing telemetry is not the same
-  as a live go/no-go gate the runner consults *during* the night before/
-  while executing. That decision logic is still separate, still
-  unaddressed, and still runner-side future work. Flagging this explicitly
-  so telemetry storage isn't mistaken for automation gating.
+  live sky conditions at the moment of execution. Storing weather / roof /
+  sensor telemetry was planned and has been cut (§6), so there is also no way
+  to look back and ask "was this abort caused by clouds?". The runner is left
+  relying on whatever NINA itself is configured to do (a safety monitor or
+  weather-stop integration, if the observatory has wired one in). That is a
+  legitimate division of labor (§5.6), but it should be a conscious choice
+  verified per observatory, not an assumption.
 - **Ordering is priority + per-target visibility windows, not real
   scheduling.** Night Plan (§4.2) tells you *what's possible*; §5.9's
   generator orders target containers by `priority` and gates each with its
@@ -1152,11 +1010,12 @@ off the active sequence, deferred as its own topic.
   the system to more than one owner.
 - **Unattended auth uses a human account/password** (§5.5) — a hardening
   gap, not a blocker.
-- **No idempotency today anywhere in the write API** — every existing
-  POST/PATCH assumes exactly-once delivery. `observation-events` gets an
-  idempotency key (§5.4) because it's new and it's obviously needed there;
-  the same gap exists on `task-update`/subframe `PATCH` today and is out of
-  scope to retrofit here.
+- **No idempotency anywhere in the write API** — every existing POST /
+  PATCH assumes exactly-once delivery. With the event log cut, nothing new
+  is added that would need it, and the calls the runner relies on
+  (`task-update`, the subframe `PATCH`) are naturally idempotent in practice:
+  repeating the same recounted total, or the same move to state 6, leaves the
+  same result. A note, not a problem.
 - **`min_interval`'s exact intended semantics are unclear.** It exists on
   `tasks` (and would be mirrored onto `projects` per §2), but nothing in
   the current codebase enforces it, and it isn't obvious from the schema
@@ -1164,33 +1023,29 @@ off the active sequence, deferred as its own topic.
   `performed`" or something else (e.g., variable-star cadence). Confirm the
   intended meaning with whoever actually uses it before the new engine
   starts enforcing it — better to ask than to guess and silently change
-  behavior for existing tasks that set it.
+  behavior for existing tasks that set it. With the event log cut (§6), the
+  only signals available to enforce it are `tasks.performed` and
+  `project_subframes.last_updated`; the simplest honest answer may be to
+  leave it unenforced and say so.
 - **Scale check, stated explicitly so nobody over-builds**: 10 telescopes,
-  thousands of tasks, tens of projects, a few hundred exposure-events/night
-  at the high end (continuous telemetry per §6.3–6.4 is higher-frequency
-  but still modest — tens of channels × 10 sites polled every 10–60s). This
-  does not justify message queues, Redis caches, a genuinely separate
-  database system (InfluxDB/Prometheus), or a distributed scheduler — note
-  that TimescaleDB is deliberately *not* in that list, since it's an
-  extension to the one Postgres instance already being run, not a second
-  system to operate. Every recommendation above is sized for "small
-  self-hosted system," not "cloud-scale" — if a future reviewer proposes
-  infrastructure beyond what's here, ask what problem it solves at *this*
-  scale first.
+  thousands of tasks, tens of projects. This does not justify message
+  queues, Redis caches, a second database, or a distributed scheduler. Every
+  recommendation above is sized for "small self-hosted system," not
+  "cloud-scale" — if a future reviewer proposes infrastructure beyond what's
+  here, ask what problem it solves at *this* scale first.
 
 ---
 
 ## 9. Recap: answers to your specific questions
 
 1. **Does the plan make sense?** Directionally yes — backlog (Planning) →
-   nightly filtered subset (Night Plan) → execution + reporting (Runner) →
-   event log → aggregated Statistics is a sound pipeline, and it matches
-   how the codebase already thinks about tasks/projects. The concrete
-   blockers are schema gaps (§2) and the missing event log (§5.2), both
-   addressed above; the concrete risks are the automation-adjacent gaps in
-   §8 (weather, ACLs, unattended auth, sequencing) that this plan
-   deliberately does not attempt to solve, so they don't get assumed-solved
-   by omission.
+   nightly filtered subset (Night Plan) → execution + reporting (Runner) is a
+   sound pipeline, and it matches how the codebase already thinks about
+   tasks / projects. After the 2026-11-07 cut it is also a smaller one: no
+   event log, statistics or telemetry. The schema gaps (§2) are closed; the
+   concrete risks are the automation-adjacent gaps in §8 (weather, ACLs,
+   unattended auth, sequencing) that this plan deliberately does not attempt
+   to solve, so they don't get assumed-solved by omission.
 2. **Night-date convention**: adopted NINA's "local time − 12h, take the
    date" rule exactly, detailed with a worked example in §1.1. The one
    addition beyond NINA's own approach is a per-telescope IANA time zone,
@@ -1200,52 +1055,3 @@ off the active sequence, deferred as its own topic.
    **"runner"** stay as the formal names (§1.3).
 4. **Skeptical review**: §8, in full.
 
----
-
-## Appendix: example `observation-events` POST payload
-
-```jsonc
-POST /api/observation-events
-{
-  "scope_id": 3,
-  "task_id": 512,                 // XOR project_id/subframe_id
-  "filter_id": 7,
-  "exposure_time_actual": 300.0,
-  "started_at": "2026-08-03T23:05:00Z",
-  "completed_at": "2026-08-03T23:10:00Z",
-  "status": "success",
-  "imagename": "obs3/2026/08/m33_300s_0007.fits",
-  "fwhm": 2.1, "hfr": 1.9, "eccentricity": 0.12,
-  "idempotency_key": "b3f1c2a0-…"
-}
-```
-
-## Appendix: example `POST /api/telemetry` payload
-
-Batched, not one request per sample — the runner accumulates a minute (or
-so) of polled readings and sends them together.
-
-```jsonc
-POST /api/telemetry
-{
-  "scope_id": 3,
-  "weather": [
-    { "time": "2026-08-03T23:00:00Z", "source": "boltwood", "temperature_c": 9.1,
-      "humidity_pct": 62, "wind_speed_kph": 8.4, "cloud_cover_pct": 5, "sky_temp_c": -18.2, "rain": false },
-    { "time": "2026-08-03T23:01:00Z", "source": "boltwood", "temperature_c": 9.0,
-      "humidity_pct": 63, "wind_speed_kph": 9.1, "cloud_cover_pct": 5, "sky_temp_c": -18.0, "rain": false }
-  ],
-  "sensor_temps": [
-    { "time": "2026-08-03T23:00:00Z", "sensor": "camera_ccd", "temperature_c": -10.0 },
-    { "time": "2026-08-03T23:00:00Z", "sensor": "ambient", "temperature_c": 9.1 }
-  ],
-  "ascom_state": [
-    { "time": "2026-08-03T23:00:30Z", "mount_ra_deg": 45.2, "mount_dec_deg": 25.9,
-      "mount_tracking": true, "mount_slewing": false, "focuser_position": 12480,
-      "filter_wheel_position": 3, "connected": true }
-  ],
-  "roof_events": [
-    { "time": "2026-08-03T19:40:00Z", "state": "open", "reason": "schedule-start" }
-  ]
-}
-```
